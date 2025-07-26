@@ -41,7 +41,7 @@ app.get("/api/longshort", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
     const response = await axios.get(
-      "https://open-api-v4.coinglass.com/api/pro/global_longshort_account_ratio",
+      "https://open-api.coinglass.com/api/pro/v1/futures/globalLongShortAccountRatio",
       { headers }
     );
 
