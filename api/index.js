@@ -7,7 +7,7 @@ app.use(cors());
 
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 
-// Global liquidation summary endpoint
+// ====== 1. Global Liquidation Summary (/api/liquidations) ======
 app.get("/api/liquidations", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
@@ -19,7 +19,6 @@ app.get("/api/liquidations", async (req, res) => {
     const coinData = response.data?.data || [];
 
     let total24h = 0;
-
     coinData.forEach((coin) => {
       total24h += coin.liquidation_usd_24h || 0;
     });
@@ -32,6 +31,33 @@ app.get("/api/liquidations", async (req, res) => {
     console.error("Error fetching from CoinGlass:", err.message);
     res.status(500).json({
       error: "Failed to load liquidation data",
+      message: err.message
+    });
+  }
+});
+
+// ====== 2. Long/Short Account Ratio (/api/longshort) ======
+app.get("/api/longshort", async (req, res) => {
+  try {
+    const headers = { "CG-API-KEY": COINGLASS_API_KEY };
+    const response = await axios.get(
+      "https://open-api-v4.coinglass.com/api/pro/global_longshort_account_ratio",
+      { headers }
+    );
+
+    const data = response.data?.data?.binance;
+    if (!data) {
+      return res.status(500).json({ error: "Binance ratio data unavailable" });
+    }
+
+    res.json({
+      long: +(data.longAccount * 100).toFixed(2),
+      short: +(data.shortAccount * 100).toFixed(2)
+    });
+  } catch (err) {
+    console.error("Error fetching long/short ratio:", err.message);
+    res.status(500).json({
+      error: "Failed to load long/short ratio",
       message: err.message
     });
   }
