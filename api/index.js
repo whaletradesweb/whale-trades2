@@ -53,9 +53,9 @@ app.get("/api/longshort", async (req, res) => {
     const startTime = Math.floor(twentyFourHoursAgo.getTime() / 1000);
     const endTime = Math.floor(now.getTime() / 1000);
 
-    // Use the correct Coinglass API v4 endpoint for Binance BTC long/short account ratio
-    // Use 24h interval to get the actual 24-hour aggregated data for Bitcoin
-    const apiUrl = `https://open-api-v4.coinglass.com/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTC&interval=24h&start_time=${startTime}&end_time=${endTime}`;
+    // Use the correct Coinglass API v4 endpoint with proper parameters
+    // exchange: Binance, symbol: BTCUSDT, interval: 1d (24 hours)
+    const apiUrl = `https://open-api-v4.coinglass.com/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=1d&start_time=${startTime}&end_time=${endTime}`;
 
     console.log(`Fetching long/short data from: ${apiUrl}`);
 
