@@ -36,55 +36,30 @@ app.get("/api/coinglass-proxy", async (req, res) => {
 app.get("/api/liquidations", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
-    const now = Date.now();
-    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list", { headers });
+    const coinData = response.data?.data || [];
 
-    const end_time = now;
-    const start_time = now - ONE_DAY;
-    const prev_start_time = start_time - ONE_DAY;
-
-    // Helper function to fetch and sum liquidation data from a window
-    const fetchWindow = async (from, to) => {
-      const params = new URLSearchParams({
-        interval: "1d",
-        start_time: from.toString(),
-        end_time: to.toString(),
-      });
-      const url = `https://open-api-v4.coinglass.com/api/futures/liquidation/history?${params.toString()}`;
-      const response = await axios.get(url, { headers });
-      return response.data?.data || [];
-    };
-
-    // Fetch current 24h
-    const currentData = await fetchWindow(start_time, end_time);
     let total24h = 0;
-    currentData.forEach(item => {
-      total24h += (parseFloat(item.long_liquidation_usd) || 0) + (parseFloat(item.short_liquidation_usd) || 0);
+    let total48h = 0;
+
+    coinData.forEach(coin => {
+      total24h += coin.liquidation_usd_24h || 0;
+      total48h += coin.liquidation_usd_48h || 0;
     });
 
-    // Fetch previous 24h
-    const previousData = await fetchWindow(prev_start_time, start_time);
-    let prev24h = 0;
-    previousData.forEach(item => {
-      prev24h += (parseFloat(item.long_liquidation_usd) || 0) + (parseFloat(item.short_liquidation_usd) || 0);
-    });
-
-    // Calculate percentage change
+    const prev24h = total48h - total24h;
     const change = prev24h > 0 ? ((total24h - prev24h) / prev24h) * 100 : 0;
 
-    // Return structured JSON
     res.json({
       total24h: Math.round(total24h),
-      prev24h: Math.round(prev24h),
+      total48h: Math.round(total48h),
       change24h: +change.toFixed(2)
     });
-
   } catch (err) {
-    console.error("Error fetching liquidation history:", err.message);
-    res.status(500).json({ error: "Failed to load liquidation data", message: err.message });
+    console.error("Error fetching aggregated liquidations:", err.message);
+    res.status(500).json({ error: "Failed to load liquidations", message: err.message });
   }
 });
-
 
 // Export the app for Vercel's serverless function deployment
 module.exports = app;
