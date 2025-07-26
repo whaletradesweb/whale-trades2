@@ -105,6 +105,44 @@ app.get("/api/open-interest", async (req, res) => {
   }
 });
 
+// ====== 4. Aggregated Liquidations Table (/api/liquidations-table) ======
+app.get("/api/liquidations-table", async (req, res) => {
+  try {
+    const headers = {
+      accept: "application/json",
+      "CG-API-KEY": COINGLASS_API_KEY
+    };
+
+    const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+    const response = await axios.get(url, { headers });
+    const coins = response.data?.data || [];
+
+    const timeframes = ['1h', '4h', '12h', '24h'];
+
+    const aggregates = {
+      '1h': { total: 0, long: 0, short: 0 },
+      '4h': { total: 0, long: 0, short: 0 },
+      '12h': { total: 0, long: 0, short: 0 },
+      '24h': { total: 0, long: 0, short: 0 }
+    };
+
+    coins.forEach(coin => {
+      timeframes.forEach(tf => {
+        aggregates[tf].total += coin[`liquidation_usd_${tf}`] || 0;
+        aggregates[tf].long += coin[`long_liquidation_usd_${tf}`] || 0;
+        aggregates[tf].short += coin[`short_liquidation_usd_${tf}`] || 0;
+      });
+    });
+
+    res.json(aggregates);
+  } catch (err) {
+    console.error("Error fetching liquidation table data:", err.message);
+    res.status(500).json({
+      error: "Failed to load liquidation table data",
+      message: err.message
+    });
+  }
+});
 
 
 module.exports = app;
