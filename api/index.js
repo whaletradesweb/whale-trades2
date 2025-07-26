@@ -65,32 +65,36 @@ app.get("/api/longshort", async (req, res) => {
 // ====== 3. Aggregate Open Interest (/api/open-interest) ======
 app.get("/api/open-interest", async (req, res) => {
   try {
-    const headers = { "CG-API-KEY": COINGLASS_API_KEY };
-    const url = "https://open-api-v4.coinglass.com/api/coin/market";
+    const headers = { 
+      accept: "application/json", 
+      "CG-API-KEY": COINGLASS_API_KEY 
+    };
 
+    const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
     const response = await axios.get(url, { headers });
     const coinData = response.data?.data || [];
 
     let totalOpenInterest = 0;
     let weightedChange = 0;
-    let validCoins = 0;
+    let weight = 0;
 
     coinData.forEach((coin) => {
       const oi = coin.open_interest_usd || 0;
-      const change = coin.open_interest_change_percent_24h ?? null;
+      const change = coin.open_interest_change_percent_24h;
 
-      if (oi > 0 && change !== null) {
-        totalOpenInterest += oi;
+      totalOpenInterest += oi;
+
+      if (change !== undefined && oi > 0) {
         weightedChange += oi * change;
-        validCoins += oi;
+        weight += oi;
       }
     });
 
-    const avgChange = validCoins > 0 ? (weightedChange / validCoins) : 0;
+    const openInterestChange24h = weight > 0 ? weightedChange / weight : 0;
 
     res.json({
       totalOpenInterest: Math.round(totalOpenInterest),
-      openInterestChange24h: avgChange.toFixed(2)
+      openInterestChange24h: openInterestChange24h.toFixed(2)
     });
   } catch (err) {
     console.error("Error fetching Open Interest data:", err.message);
@@ -100,6 +104,7 @@ app.get("/api/open-interest", async (req, res) => {
     });
   }
 });
+
 
 
 module.exports = app;
