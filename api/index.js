@@ -41,24 +41,20 @@ app.get("/api/longshort", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
     const response = await axios.get(
-      "https://open-api.coinglass.com/api/pro/v1/futures/globalLongShortAccountRatio",
+      "https://open-api.coinglass.com/api/pro/v1/futures/longShort_account_ratio",
       { headers }
     );
 
-    const data = response.data?.data?.binance;
-    if (!data) {
-      return res.status(500).json({ error: "Binance ratio data unavailable" });
-    }
+    const ratio = response.data.data;
+    const long = parseFloat(ratio.long).toFixed(2);
+    const short = parseFloat(ratio.short).toFixed(2);
 
-    res.json({
-      long: +(data.longAccount * 100).toFixed(2),
-      short: +(data.shortAccount * 100).toFixed(2)
-    });
+    res.json({ long, short });
   } catch (err) {
     console.error("Error fetching long/short ratio:", err.message);
     res.status(500).json({
       error: "Failed to load long/short ratio",
-      message: err.message
+      message: err.message,
     });
   }
 });
