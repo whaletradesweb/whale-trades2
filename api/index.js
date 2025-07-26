@@ -41,7 +41,7 @@ app.get("/api/longshort", async (req, res) => {
   try {
     // Use the correct header format for Coinglass API v4
     const headers = { 
-      "coinglassSecret": COINGLASS_API_KEY,
+      "CG-API-KEY": COINGLASS_API_KEY,
       "accept": "application/json"
     };
 
