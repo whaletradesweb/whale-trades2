@@ -118,7 +118,6 @@ app.get("/api/liquidations-table", async (req, res) => {
     const coins = response.data?.data || [];
 
     const timeframes = ['1h', '4h', '12h', '24h'];
-
     const aggregates = {
       '1h': { total: 0, long: 0, short: 0 },
       '4h': { total: 0, long: 0, short: 0 },
@@ -126,6 +125,7 @@ app.get("/api/liquidations-table", async (req, res) => {
       '24h': { total: 0, long: 0, short: 0 }
     };
 
+    // Aggregate data across all coins
     coins.forEach(coin => {
       timeframes.forEach(tf => {
         aggregates[tf].total += coin[`liquidation_usd_${tf}`] || 0;
@@ -134,7 +134,24 @@ app.get("/api/liquidations-table", async (req, res) => {
       });
     });
 
-    res.json(aggregates);
+    // Format values: round to 2 decimals, add $, and abbreviate
+    function formatUSD(value) {
+      if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+      if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+      if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
+      return `$${value.toFixed(2)}`;
+    }
+
+    const formatted = {};
+    timeframes.forEach(tf => {
+      formatted[tf] = {
+        total: formatUSD(aggregates[tf].total),
+        long: formatUSD(aggregates[tf].long),
+        short: formatUSD(aggregates[tf].short)
+      };
+    });
+
+    res.json(formatted);
   } catch (err) {
     console.error("Error fetching liquidation table data:", err.message);
     res.status(500).json({
@@ -143,6 +160,7 @@ app.get("/api/liquidations-table", async (req, res) => {
     });
   }
 });
+
 
 
 module.exports = app;
