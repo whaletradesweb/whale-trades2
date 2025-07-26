@@ -66,19 +66,31 @@ app.get("/api/longshort", async (req, res) => {
 app.get("/api/open-interest", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
-    const url = "https://open-api-v4.coinglass.com/api/coins/markets";
+    const url = "https://open-api-v4.coinglass.com/api/coin/market";
 
     const response = await axios.get(url, { headers });
     const coinData = response.data?.data || [];
 
     let totalOpenInterest = 0;
+    let weightedChange = 0;
+    let validCoins = 0;
 
     coinData.forEach((coin) => {
-      totalOpenInterest += coin.open_interest_usd || 0;
+      const oi = coin.open_interest_usd || 0;
+      const change = coin.open_interest_change_percent_24h ?? null;
+
+      if (oi > 0 && change !== null) {
+        totalOpenInterest += oi;
+        weightedChange += oi * change;
+        validCoins += oi;
+      }
     });
 
+    const avgChange = validCoins > 0 ? (weightedChange / validCoins) : 0;
+
     res.json({
-      totalOpenInterest: Math.round(totalOpenInterest)
+      totalOpenInterest: Math.round(totalOpenInterest),
+      openInterestChange24h: avgChange.toFixed(2)
     });
   } catch (err) {
     console.error("Error fetching Open Interest data:", err.message);
@@ -88,5 +100,6 @@ app.get("/api/open-interest", async (req, res) => {
     });
   }
 });
+
 
 module.exports = app;
