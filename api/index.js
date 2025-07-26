@@ -52,6 +52,7 @@ app.get("/api/liquidations", async (req, res) => {
 
     res.json({
       total24h: Math.round(total24h),
+      total48h: Math.round(total48h),
       change24h: +change.toFixed(2)
     });
   } catch (err) {
