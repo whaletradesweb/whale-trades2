@@ -40,36 +40,27 @@ app.get("/api/liquidations", async (req, res) => {
 app.get("/api/longshort", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
+    const url = "https://open-api-v4.coinglass.com/api/futures/taker-buy-sell-volume/exchange-list?symbol=BTC&range=24h";
 
-    const response = await axios.get(
-      "https://open-api-v4.coinglass.com/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=1d",
-      { headers }
-    );
+    const response = await axios.get(url, { headers });
+    const data = response.data?.data;
 
-    const data = response.data?.data || [];
-
-    if (data.length === 0) {
-      return res.json({ long: null, short: null });
+    if (!data || data.buy_ratio == null || data.sell_ratio == null) {
+      throw new Error("Invalid buy/sell ratio data");
     }
 
-    // Use the most recent entry
-    const latest = data[data.length - 1];
+    const buy = +data.buy_ratio.toFixed(2);
+    const sell = +data.sell_ratio.toFixed(2);
 
-    const long = latest.global_account_long_percent;
-    const short = latest.global_account_short_percent;
-
-    res.json({ long, short });
-
+    res.json({ long: buy, short: sell });
   } catch (err) {
-    console.error("Error fetching long/short ratio:", err.message);
+    console.error("Error fetching Buy/Sell ratio:", err.message);
     res.status(500).json({
-      error: "Failed to load long/short ratio",
-      message: err.message,
+      error: "Failed to load buy/sell ratio",
+      message: err.message
     });
   }
 });
-
-
 
 
 module.exports = app;
