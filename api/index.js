@@ -74,7 +74,6 @@ app.get("/api/coinglass-proxy", async (req, res) => {
 })();
 </script>
 
-
 // Export the app for Vercel's serverless function deployment
 module.exports = app;
 
