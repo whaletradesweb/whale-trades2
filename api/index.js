@@ -33,33 +33,47 @@ app.get("/api/coinglass-proxy", async (req, res) => {
   }
 });
 // New global liquidations endpoint
-app.get("/api/liquidations", async (req, res) => {
-  try {
-    const headers = { "CG-API-KEY": COINGLASS_API_KEY };
-    const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list", { headers });
-    const coinData = response.data?.data || [];
+<script>
+(function () {
+  async function fetchLiquidationData() {
+    const endpoint = 'https://whale-trades2.vercel.app/api/liquidations';
 
-    let total24h = 0;
-    let total48h = 0;
+    try {
+      const response = await fetch(endpoint);
+      const data = await response.json();
 
-    coinData.forEach(coin => {
-      total24h += coin.liquidation_usd_24h || 0;
-      total48h += coin.liquidation_usd_48h || 0;
-    });
+      const total = data.total24h;
+      const change = data.change24h;
 
-    const prev24h = total48h - total24h;
-    const change = prev24h > 0 ? ((total24h - prev24h) / prev24h) * 100 : 0;
+      const display = document.getElementById("liquidation-display");
+      const percent = document.getElementById("liquidation-change");
 
-    res.json({
-      total24h: Math.round(total24h),
-      total48h: Math.round(total48h),
-      change24h: +change.toFixed(2)
-    });
-  } catch (err) {
-    console.error("Error fetching aggregated liquidations:", err.message);
-    res.status(500).json({ error: "Failed to load liquidations", message: err.message });
+      // Format the total
+      if (display) {
+        let formatted;
+        if (total >= 1_000_000_000) formatted = "$" + (total / 1_000_000_000).toFixed(2) + "B";
+        else if (total >= 1_000_000) formatted = "$" + (total / 1_000_000).toFixed(2) + "M";
+        else if (total >= 1_000) formatted = "$" + (total / 1_000).toFixed(2) + "K";
+        else formatted = "$" + total.toFixed(2);
+        display.textContent = formatted;
+      }
+
+      // Format the percentage change
+      if (percent) {
+        const formattedChange = (change >= 0 ? "+" : "") + change.toFixed(2) + "%";
+        percent.textContent = formattedChange;
+        percent.classList.remove("positive-change", "negative-change");
+        percent.classList.add(change >= 0 ? "positive-change" : "negative-change");
+      }
+    } catch (err) {
+      console.error("Liquidation data load error:", err);
+    }
   }
-});
+
+  document.addEventListener("DOMContentLoaded", fetchLiquidationData);
+})();
+</script>
+
 
 // Export the app for Vercel's serverless function deployment
 module.exports = app;
