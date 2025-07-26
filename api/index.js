@@ -37,27 +37,29 @@ app.get("/api/liquidations", async (req, res) => {
 });
 
 // ====== 2. Long/Short Account Ratio (/api/longshort) ======
-app.get("/api/longshort-ratio", async (req, res) => {
+app.get("/api/longshort", async (req, res) => {
   try {
     const headers = { "CG-API-KEY": COINGLASS_API_KEY };
-    const url = "https://open-api-v4.coinglass.com/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=1d";
 
-    const response = await axios.get(url, { headers });
-    const data = response.data?.data || [];
-
-    // Find the most recent non-null entry
-    const latest = [...data].reverse().find(item =>
-      item.global_account_long_percent != null && item.global_account_short_percent != null
+    const response = await axios.get(
+      "https://open-api-v4.coinglass.com/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=1d",
+      { headers }
     );
 
-    if (!latest) {
-      throw new Error("No valid long/short ratio data found");
+    const data = response.data?.data || [];
+
+    if (data.length === 0) {
+      return res.json({ long: null, short: null });
     }
 
-    const long = +latest.global_account_long_percent.toFixed(2);
-    const short = +latest.global_account_short_percent.toFixed(2);
+    // Use the most recent entry
+    const latest = data[data.length - 1];
+
+    const long = latest.global_account_long_percent;
+    const short = latest.global_account_short_percent;
 
     res.json({ long, short });
+
   } catch (err) {
     console.error("Error fetching long/short ratio:", err.message);
     res.status(500).json({
@@ -66,6 +68,7 @@ app.get("/api/longshort-ratio", async (req, res) => {
     });
   }
 });
+
 
 
 
