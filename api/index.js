@@ -161,6 +161,33 @@ app.get("/api/liquidations-table", async (req, res) => {
   }
 });
 
+// ====== 5. Max Pain Options (/api/max-pain) ======
+app.get("/api/max-pain", async (req, res) => {
+  try {
+    const { symbol = "BTC", exchange = "Binance" } = req.query;
+    const headers = {
+      accept: "application/json",
+      "CG-API-KEY": COINGLASS_API_KEY,
+    };
+
+    const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
+    const response = await axios.get(url, { headers });
+
+    const data = response.data?.data?.[0]; // Only pull most recent
+
+    if (!data) {
+      return res.status(404).json({ error: "No max pain data found" });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error fetching Max Pain data:", err.message);
+    res.status(500).json({
+      error: "Failed to load Max Pain data",
+      message: err.message,
+    });
+  }
+});
 
 
 module.exports = app;
