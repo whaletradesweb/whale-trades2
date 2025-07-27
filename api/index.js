@@ -161,33 +161,52 @@ app.get("/api/liquidations-table", async (req, res) => {
   }
 });
 
-// ====== 5. Max Pain Options (/api/max-pain) ======
+// ====== 5. Max Pain Options Data (/api/max-pain?symbol=BTC|ETH) ======
 app.get("/api/max-pain", async (req, res) => {
   try {
-    const { symbol = "BTC", exchange = "Binance" } = req.query;
+    const symbol = req.query.symbol || "BTC"; // BTC or ETH
     const headers = {
       accept: "application/json",
-      "CG-API-KEY": COINGLASS_API_KEY,
+      "CG-API-KEY": COINGLASS_API_KEY
     };
 
-    const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
+    const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=Binance`;
     const response = await axios.get(url, { headers });
-
-    const data = response.data?.data?.[0]; // Only pull most recent
+    const data = response.data?.data?.[0];
 
     if (!data) {
       return res.status(404).json({ error: "No max pain data found" });
     }
 
-    res.json(data);
-  } catch (err) {
-    console.error("Error fetching Max Pain data:", err.message);
-    res.status(500).json({
-      error: "Failed to load Max Pain data",
-      message: err.message,
+    // Format number to USD abbreviated
+    const formatUSD = (val) => {
+      if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
+      if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
+      if (val >= 1e3) return `$${(val / 1e3).toFixed(2)}K`;
+      return `$${val.toFixed(2)}`;
+    };
+
+    const formatDate = (YYMMDD) => {
+      const d = new Date(`20${YYMMDD.slice(0, 2)}-${YYMMDD.slice(2, 4)}-${YYMMDD.slice(4, 6)}`);
+      return d.toISOString().split("T")[0]; // YYYY-MM-DD
+    };
+
+    res.json({
+      max_pain_price: `$${Number(data.max_pain_price).toLocaleString()}`,
+      call_open_interest_market_value: formatUSD(data.call_open_interest_market_value),
+      put_open_interest_market_value: formatUSD(data.put_open_interest_market_value),
+      call_open_interest: data.call_open_interest.toFixed(2),
+      put_open_interest: data.put_open_interest.toFixed(2),
+      call_open_interest_notional: formatUSD(data.call_open_interest_notional),
+      put_open_interest_notional: formatUSD(data.put_open_interest_notional),
+      options_expiry_date: formatDate(data.date)
     });
+  } catch (err) {
+    console.error("Error fetching max pain:", err.message);
+    res.status(500).json({ error: "Failed to load max pain data" });
   }
 });
+
 
 
 module.exports = app;
