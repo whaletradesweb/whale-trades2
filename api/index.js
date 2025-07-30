@@ -161,123 +161,57 @@ app.get("/api/liquidations-table", async (req, res) => {
   }
 });
 
-// ====== 5. Max Pain Options Data (/api/max-pain) ======
-app.get("/api/max-pain", async (req, res) => {
+// ====== 6. Pi Cycle Top Indicator (Coinglass Parsed) ======
+app.get("/api/pi-cycle", async (req, res) => {
   try {
-    const { symbol = "BTC", exchange = "Binance" } = req.query;
-    const headers = {
-      accept: "application/json",
-      "CG-API-KEY": COINGLASS_API_KEY
-    };
+    const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
+    const url = "https://open-api-v4.coinglass.com/api/index/pi-cycle-indicator";
 
-    const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
     const response = await axios.get(url, { headers });
+    const rawData = response.data?.data || [];
 
-    const data = response.data?.data?.[0];
-    if (!data) throw new Error("Max Pain data unavailable");
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      throw new Error("Pi Cycle data empty or malformed");
+    }
+
+    // Parse response
+    const prices = rawData.map((d) => ({
+      date: new Date(d.timestamp),
+      price: d.price
+    }));
+
+    const dma111 = rawData.map((d) => d.ma_110 || null);
+    const dma350x2 = rawData.map((d) => d.ma_350_mu_2 || null);
+
+    // Detect crossovers (111DMA crossing above 350DMAx2)
+    const crossovers = [];
+    for (let i = 1; i < rawData.length; i++) {
+      if (dma111[i] && dma350x2[i]) {
+        const prevDiff = dma111[i - 1] - dma350x2[i - 1];
+        const currDiff = dma111[i] - dma350x2[i];
+        if (prevDiff < 0 && currDiff > 0) {
+          crossovers.push({
+            date: prices[i].date,
+            price: prices[i].price
+          });
+        }
+      }
+    }
 
     res.json({
-      date: data.date,
-      call_open_interest_market_value: data.call_open_interest_market_value,
-      put_open_interest_market_value: data.put_open_interest_market_value,
-      max_pain_price: data.max_pain_price,
-      call_open_interest: data.call_open_interest,
-      put_open_interest: data.put_open_interest,
-      call_open_interest_notional: data.call_open_interest_notional,
-      put_open_interest_notional: data.put_open_interest_notional
+      prices,
+      dma111,
+      dma350x2,
+      crossovers
     });
   } catch (err) {
-    console.error("Error fetching Max Pain data:", err.message);
-    res.status(500).json({ error: "Failed to load Max Pain data", message: err.message });
+    console.error("Error fetching Pi Cycle data:", err.message);
+    res.status(500).json({
+      error: "Failed to load Pi Cycle data",
+      message: err.message
+    });
   }
 });
-
-<div id="pi-cycle-indicator" style="width: 100%; height: 600px;"></div>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script>
-async function renderPiCycle() {
-  const res = await fetch("https://whale-trades2.vercel.app/api/pi-cycle");
-  const data = await res.json();
-
-  const dates = data.prices.map(p => new Date(p.date));
-  const price = data.prices.map(p => p.price);
-
-  // Main lines
-  const tracePrice = { 
-    x: dates, y: price, type: "scatter", mode: "lines", 
-    name: "BTC Price", line: { color: "#cccccc", width: 1.5 }, 
-    hovertemplate: "BTC Price: $%{y:,.2f}<extra></extra>"
-  };
-  const trace111 = { 
-    x: dates, y: data.dma111, type: "scatter", mode: "lines", 
-    name: "111DMA", line: { color: "red", width: 1.5 }, 
-    hovertemplate: "111DMA: $%{y:,.2f}<extra></extra>"
-  };
-  const trace350x2 = { 
-    x: dates, y: data.dma350x2, type: "scatter", mode: "lines", 
-    name: "350DMA x 2", line: { color: "green", width: 1.5 }, 
-    hovertemplate: "350DMA x2: $%{y:,.2f}<extra></extra>"
-  };
-
-  // Pi Top markers
-  const traceCrossovers = {
-    x: data.crossovers.map(c => new Date(c.date)),
-    y: data.crossovers.map(c => c.price),
-    mode: "markers+text",
-    name: "Pi Cycle Tops",
-    text: data.crossovers.map(() => "⬆"),
-    textposition: "top center",
-    marker: { color: "#ff4e00", size: 8, symbol: "circle" },
-    hovertemplate: "<b>Pi Cycle Top</b><br>Date: %{x|%d %b %Y}<br>Price: $%{y:,.2f}<extra></extra>"
-  };
-
-  const layout = {
-    template: "plotly_dark",
-    title: { text: "Pi Cycle Top Indicator", font: { size: 22, color: "#fff", family: "Mona Sans" } },
-    xaxis: {
-      title: { text: "Date", font: { family: "Mona Sans" }},
-      rangeselector: {
-        buttons: [
-          { count: 1, label: "1m", step: "month", stepmode: "backward" },
-          { count: 6, label: "6m", step: "month", stepmode: "backward" },
-          { count: 1, label: "1y", step: "year", stepmode: "backward" },
-          { step: "all", label: "all" }
-        ],
-        activecolor: "#ff4e00", // selected button fill
-        bgcolor: "rgba(0,0,0,0)", // make background transparent
-        bordercolor: "#494949"
-      },
-      rangeslider: { visible: true, bgcolor: "#242424" },
-      type: "date",
-      gridcolor: "rgba(255,255,255,0.05)"
-    },
-    yaxis: { 
-      title: { text: "Price (USD)", font: { family: "Mona Sans" }},
-      type: "log",
-      gridcolor: "rgba(255,255,255,0.05)"
-    },
-    hovermode: "x unified",
-    font: { color: "white", family: "Mona Sans" },
-    plot_bgcolor: "rgba(24,24,24,1)",
-    paper_bgcolor: "rgba(24,24,24,1)",
-    legend: { orientation: "h", y: -0.25, font: { color: "#ccc", family: "Mona Sans" } }
-  };
-
-  // Custom button styling
-  Plotly.newPlot("pi-cycle-indicator", [tracePrice, trace111, trace350x2, traceCrossovers], layout, { responsive: true });
-
-  // Post-render: Style range selector buttons manually
-  const buttons = document.querySelectorAll('.button');
-  buttons.forEach(btn => {
-    btn.style.border = "1px solid #494949";
-    btn.style.borderRadius = "12px";
-    btn.style.backgroundColor = "transparent";
-    btn.style.fontFamily = "Mona Sans";
-    btn.style.color = "#ccc";
-  });
-}
-renderPiCycle();
-</script>
 
 
 
