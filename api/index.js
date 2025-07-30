@@ -245,44 +245,5 @@ app.get("/api/pi-cycle", async (req, res) => {
   }
 });
 
-// ====== 7. Puell Multiple ======
-import axios from "axios";
-
-export default async function handler(req, res) {
-  try {
-    const headers = {
-      accept: "application/json",
-      "CG-API-KEY": process.env.COINGLASS_API_KEY,
-    };
-
-    const url = "https://open-api-v4.coinglass.com/api/index/puell-multiple";
-    const response = await axios.get(url, { headers });
-
-    const rawData = response.data?.data || [];
-    if (!rawData.length) {
-      throw new Error("No Puell Multiple data returned");
-    }
-
-    // Format data for Plotly (convert timestamp to readable date)
-    const formattedData = rawData.map((d) => ({
-      date: new Date(d.timestamp).toISOString().split("T")[0], // YYYY-MM-DD
-      price: d.price,
-      puell_multiple: d.puell_multiple,
-    }));
-
-    // Identify threshold markers (overbought >4, oversold <0.5)
-    const overbought = formattedData.filter((d) => d.puell_multiple > 4);
-    const oversold = formattedData.filter((d) => d.puell_multiple < 0.5);
-
-    res.status(200).json({
-      data: formattedData,
-      markers: { overbought, oversold },
-    });
-  } catch (err) {
-    console.error("Puell API error:", err.message);
-    res.status(500).json({ error: "Failed to fetch Puell Multiple data" });
-  }
-}
-
 
 module.exports = app;
