@@ -192,51 +192,42 @@ app.get("/api/max-pain", async (req, res) => {
   }
 });
 
-// ====== 6. Pi Cycle Top Indicator with Crossovers (/api/pi-cycle) ======
+// ====== 6. Pi Cycle Top Indicator (from Coinglass) ======
 app.get("/api/pi-cycle", async (req, res) => {
   try {
     const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
-    const url = "https://open-api-v4.coinglass.com/api/pro/chart/spot_chart?symbol=BTC";
+    const url = "https://open-api-v4.coinglass.com/api/index/pi-cycle-indicator";
 
     const response = await axios.get(url, { headers });
-    const rawData = response.data?.data?.line?.[0]?.data || [];
+    const rawData = response.data?.data || {};
 
-    if (!rawData.length) throw new Error("No Pi Cycle data available");
+    if (!rawData?.price || !rawData?.pi111 || !rawData?.pi350) {
+      throw new Error("Invalid Pi Cycle data from Coinglass");
+    }
 
-    const prices = rawData.map((d) => ({
+    // Extract and format
+    const prices = rawData.price.map(d => ({
       date: new Date(d.t),
-      price: d.c
+      price: d.v
     }));
 
-    // Moving average helper
-    const calcMA = (arr, window) =>
-      arr.map((_, idx, full) =>
-        idx >= window
-          ? full.slice(idx - window, idx).reduce((sum, v) => sum + v.price, 0) / window
-          : null
-      );
+    const dma111 = rawData.pi111.map(d => d.v);
+    const dma350x2 = rawData.pi350.map(d => d.v);
 
-    const dma111 = calcMA(prices, 111);
-    const dma350 = calcMA(prices, 350);
-    const dma350x2 = dma350.map((v) => (v ? v * 2 : null));
-
-    // Detect crossovers: when 111DMA crosses above 350DMAx2
+    // Detect crossovers
     const crossovers = [];
-    for (let i = 1; i < prices.length; i++) {
+    for (let i = 1; i < dma111.length; i++) {
       if (dma111[i] && dma350x2[i]) {
         const prevDiff = dma111[i - 1] - dma350x2[i - 1];
         const currDiff = dma111[i] - dma350x2[i];
         if (prevDiff < 0 && currDiff > 0) {
-          crossovers.push({
-            date: prices[i].date,
-            price: prices[i].price
-          });
+          crossovers.push({ date: prices[i].date, price: prices[i].price });
         }
       }
     }
 
     res.json({
-      prices: prices.map((p) => ({ date: p.date, price: p.price })),
+      prices: prices.map(p => ({ date: p.date, price: p.price })),
       dma111,
       dma350x2,
       crossovers
@@ -249,6 +240,7 @@ app.get("/api/pi-cycle", async (req, res) => {
     });
   }
 });
+
 
 
 module.exports = app;
