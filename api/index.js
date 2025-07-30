@@ -161,20 +161,34 @@ app.get("/api/liquidations-table", async (req, res) => {
   }
 });
 
-// ====== 5. Max Pain API ======
+// ====== 5. Max Pain Options Data (/api/max-pain) ======
 app.get("/api/max-pain", async (req, res) => {
   try {
-    const { symbol } = req.query;
-    if (!symbol) return res.status(400).json({ error: "Missing symbol" });
+    const { symbol = "BTC", exchange = "Binance" } = req.query;
+    const headers = {
+      accept: "application/json",
+      "CG-API-KEY": COINGLASS_API_KEY
+    };
 
-    const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
-    const url = `https://open-api-v4.coinglass.com/api/options/max-pain-price?symbol=${symbol}`;
-
+    const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
     const response = await axios.get(url, { headers });
-    res.json(response.data);
+
+    const data = response.data?.data?.[0];
+    if (!data) throw new Error("Max Pain data unavailable");
+
+    res.json({
+      date: data.date,
+      call_open_interest_market_value: data.call_open_interest_market_value,
+      put_open_interest_market_value: data.put_open_interest_market_value,
+      max_pain_price: data.max_pain_price,
+      call_open_interest: data.call_open_interest,
+      put_open_interest: data.put_open_interest,
+      call_open_interest_notional: data.call_open_interest_notional,
+      put_open_interest_notional: data.put_open_interest_notional
+    });
   } catch (err) {
-    console.error("Error fetching Max Pain:", err.message);
-    res.status(500).json({ error: "Failed to fetch max pain" });
+    console.error("Error fetching Max Pain data:", err.message);
+    res.status(500).json({ error: "Failed to load Max Pain data", message: err.message });
   }
 });
 
