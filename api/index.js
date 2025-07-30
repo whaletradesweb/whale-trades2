@@ -161,65 +161,22 @@ app.get("/api/liquidations-table", async (req, res) => {
   }
 });
 
-// ====== 5. MAX Pain ======
-<script>
-  function fadeUpdate(field, newText, newRawValue) {
-    const el = document.querySelector(`.max-pain-value[data-field="${field}"]`);
-    if (!el) return;
+// ====== 5. Max Pain API ======
+app.get("/api/max-pain", async (req, res) => {
+  try {
+    const { symbol } = req.query;
+    if (!symbol) return res.status(400).json({ error: "Missing symbol" });
 
-    const currentText = el.textContent.replace(/[^0-9.-]/g, '');
-    const currentValue = parseFloat(currentText) || 0;
-    const direction = newRawValue > currentValue 
-      ? 'up' 
-      : newRawValue < currentValue 
-      ? 'down' 
-      : null;
+    const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
+    const url = `https://open-api-v4.coinglass.com/api/options/max-pain-price?symbol=${symbol}`;
 
-    el.style.opacity = '0';
-
-    setTimeout(() => {
-      el.textContent = newText;
-
-      if (direction === 'up') {
-        el.classList.add('up');
-        el.classList.remove('down');
-      } else if (direction === 'down') {
-        el.classList.add('down');
-        el.classList.remove('up');
-      } else {
-        el.classList.remove('up', 'down');
-      }
-
-      el.style.opacity = '1';
-
-      setTimeout(() => {
-        el.classList.remove('up', 'down');
-      }, 1000);
-    }, 300);
+    const response = await axios.get(url, { headers });
+    res.json(response.data);
+  } catch (err) {
+    console.error("Error fetching Max Pain:", err.message);
+    res.status(500).json({ error: "Failed to fetch max pain" });
   }
-
-  function formatDollar(value) {
-    if (!value) return '$--.--';
-    return '$' + Number(value).toLocaleString();
-  }
-
-  function formatNumber(value) {
-    if (!value) return '--';
-    return Number(value).toLocaleString();
-  }
-
-  function formatDate(value) {
-    if (!value) return '--/--/--';
-    const d = new Date(value);
-    return `${d.getFullYear()}-${(d.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
-  }
-
-  function updateMaxPain(data) {
-    fadeUpdate('max_pain_price', formatDollar(data.maxPainPrice), data.maxPainPrice);
-    fadeUpdate('call_market_value', formatDollar(data.callMarketValue), data.callMarketValue);
-    fadeUpdate('put_market_value', formatDollar(data.putMarketValue), data.putMarketVa
+});
 
 
 // ====== 6. Pi Cycle Top Indicator (Coinglass Parsed) ======
