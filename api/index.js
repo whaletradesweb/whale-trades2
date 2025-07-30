@@ -192,42 +192,45 @@ app.get("/api/max-pain", async (req, res) => {
   }
 });
 
-// ====== 6. Pi Cycle Top Indicator (from Coinglass) ======
+// ====== 6. Pi Cycle Top Indicator (Coinglass Parsed) ======
 app.get("/api/pi-cycle", async (req, res) => {
   try {
     const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
     const url = "https://open-api-v4.coinglass.com/api/index/pi-cycle-indicator";
 
     const response = await axios.get(url, { headers });
-    const rawData = response.data?.data || {};
+    const rawData = response.data?.data || [];
 
-    if (!rawData?.price || !rawData?.pi111 || !rawData?.pi350) {
-      throw new Error("Invalid Pi Cycle data from Coinglass");
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      throw new Error("Pi Cycle data empty or malformed");
     }
 
-    // Extract and format
-    const prices = rawData.price.map(d => ({
-      date: new Date(d.t),
-      price: d.v
+    // Parse response
+    const prices = rawData.map((d) => ({
+      date: new Date(d.timestamp),
+      price: d.price
     }));
 
-    const dma111 = rawData.pi111.map(d => d.v);
-    const dma350x2 = rawData.pi350.map(d => d.v);
+    const dma111 = rawData.map((d) => d.ma_110 || null);
+    const dma350x2 = rawData.map((d) => d.ma_350_mu_2 || null);
 
-    // Detect crossovers
+    // Detect crossovers (111DMA crossing above 350DMAx2)
     const crossovers = [];
-    for (let i = 1; i < dma111.length; i++) {
+    for (let i = 1; i < rawData.length; i++) {
       if (dma111[i] && dma350x2[i]) {
         const prevDiff = dma111[i - 1] - dma350x2[i - 1];
         const currDiff = dma111[i] - dma350x2[i];
         if (prevDiff < 0 && currDiff > 0) {
-          crossovers.push({ date: prices[i].date, price: prices[i].price });
+          crossovers.push({
+            date: prices[i].date,
+            price: prices[i].price
+          });
         }
       }
     }
 
     res.json({
-      prices: prices.map(p => ({ date: p.date, price: p.price })),
+      prices,
       dma111,
       dma350x2,
       crossovers
@@ -240,7 +243,6 @@ app.get("/api/pi-cycle", async (req, res) => {
     });
   }
 });
-
 
 
 module.exports = app;
