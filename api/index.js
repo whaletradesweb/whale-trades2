@@ -296,59 +296,60 @@ app.get("/api/puell-multiple", async (req, res) => {
 // ====== 8. Altcoin Season API (Vercel Endpoint) ======
 app.get("/api/altcoin-season", async (req, res) => {
   try {
+    console.log("DEBUG: COINGLASS_API_KEY loaded?", !!COINGLASS_API_KEY);
+
     const headers = { 
       accept: "application/json", 
-      "CG-API-KEY": COINGLASS_API_KEY // Ensure this is set in Vercel environment variables
+      "CG-API-KEY": COINGLASS_API_KEY 
     };
+    console.log("DEBUG: Requesting Altcoin Season from Coinglass...");
 
-    // Fetch Altcoin Season Index
     const altUrl = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
     const altResponse = await axios.get(altUrl, { headers });
 
-    if (altResponse.status !== 200 || !altResponse.data?.data) {
-      throw new Error("Unexpected response from Coinglass");
+    console.log("DEBUG: Coinglass Alt Response Status:", altResponse.status);
+
+    if (!altResponse.data?.data) {
+      console.log("DEBUG: Coinglass Raw Response:", altResponse.data);
+      throw new Error("No data returned from Coinglass");
     }
 
     const altRaw = altResponse.data.data;
-    if (!Array.isArray(altRaw) || altRaw.length === 0) {
-      throw new Error("Altcoin Season data empty or malformed");
-    }
-
-    // Parse Altcoin Season data
-    const altcoinData = altRaw.map((d) => ({
+    const altcoinData = altRaw.map(d => ({
       date: new Date(d.timestamp),
       altcoin_index: d.altcoin_index
     }));
 
+    console.log("DEBUG: Parsed Altcoin Data Length:", altcoinData.length);
+
     // Fetch BTC Price
     const btcUrl = "https://open-api-v4.coinglass.com/api/index/bitcoin-price";
     const btcResponse = await axios.get(btcUrl, { headers });
-    const btcRaw = btcResponse.data?.data || [];
+    console.log("DEBUG: BTC Price Response Status:", btcResponse.status);
 
-    const btcData = btcRaw.map((d) => ({
+    const btcRaw = btcResponse.data?.data || [];
+    const btcData = btcRaw.map(d => ({
       date: new Date(d.timestamp),
       btc_price: d.price
     }));
 
-    // Merge Altcoin Index + BTC Price
-    const merged = altcoinData.map((alt) => {
-      const btc = btcData.find((b) => b.date.getTime() === alt.date.getTime());
-      return {
-        date: alt.date,
-        altcoin_index: alt.altcoin_index,
-        btc_price: btc?.btc_price || null
-      };
+    const merged = altcoinData.map(alt => {
+      const btc = btcData.find(b => b.date.getTime() === alt.date.getTime());
+      return { date: alt.date, altcoin_index: alt.altcoin_index, btc_price: btc?.btc_price || null };
     });
 
+    console.log("DEBUG: Merged Data Points:", merged.length);
     res.json({ data: merged });
+
   } catch (err) {
-    console.error("Error fetching Altcoin Season data:", err.message);
+    console.error("FULL ERROR STACK:", err.stack || err.message);
     res.status(500).json({
       error: "Failed to load Altcoin Season data",
       message: err.message
     });
   }
 });
+
 
 
 
