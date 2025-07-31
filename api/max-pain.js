@@ -1,5 +1,5 @@
 // api/max-pain.js
-const coinglassAPI = require("../lib/coinglass");
+const coinglassAPI = require("./lib/coinglass");
 
 module.exports = async (req, res) => {
   try {
