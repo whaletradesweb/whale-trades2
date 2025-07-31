@@ -1,36 +1,20 @@
-const coinglassAPI = require("./lib/coinglass");
+const axios = require("axios");
+const { createClient } = require("@vercel/kv");
+const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
+
+// ✅ Explicit KV binding using your prefixed environment variables
+const kv = createClient({
+  url: process.env.KV_REST_API_KV_URL,
+  token: process.env.KV_REST_API_KV_REST_API_TOKEN,
+});
 
 module.exports = async (req, res) => {
   try {
-    // 1️⃣ Fetch market data
-    const response = await coinglassAPI.get("/futures/coins-markets?exchange_list=Binance");
+    const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
+    const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets?exchange_list=Binance";
+
+    const response = await axios.get(url, { headers });
     const coins = response.data?.data || [];
 
-    if (!Array.isArray(coins) || coins.length === 0) {
-      throw new Error("No market data received from Coinglass");
-    }
-
-    // 2️⃣ Calculate cumulative open interest
-    const cumulativeOpenInterest = coins.reduce(
-      (sum, coin) => sum + (coin.open_interest_usd || 0),
-      0
-    );
-
-    // 3️⃣ Send response
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate"); // 1 min cache
-
-    res.status(200).json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      cumulative_open_interest_usd: cumulativeOpenInterest,
-      count: coins.length
-    });
-  } catch (err) {
-    console.error("Error fetching Open Interest:", err.message);
-    res.status(500).json({
-      error: "Failed to load open interest",
-      message: err.message
-    });
-  }
-};
+    // ✅ Sum cumulative Open Interest USD
+    const totalOpenInterest = coins.reduce((sum, coin) => sum + (coin.open_interest_usd ||
