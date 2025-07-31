@@ -1,6 +1,12 @@
 const axios = require("axios");
-const { kv } = require("@vercel/kv"); // ✅ KV storage for persistence
+const { createClient } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
+
+// ✅ Manually connect KV using any detected variables
+const kv = createClient({
+  url: process.env.KV_REST_API_URL || process.env.KV_REST_API_KV_URL || process.env.STORAGE_URL,
+  token: process.env.KV_REST_API_TOKEN || process.env.KV_REST_API_KV_REST_API_TOKEN || process.env.STORAGE_TOKEN,
+});
 
 module.exports = async (req, res) => {
   try {
@@ -10,26 +16,26 @@ module.exports = async (req, res) => {
     const response = await axios.get(url, { headers });
     const coins = response.data?.data || [];
 
+    if (!Array.isArray(coins) || coins.length === 0) {
+      throw new Error("Coinglass returned empty or malformed data");
+    }
+
     // ✅ Sum cumulative Open Interest USD
     const totalOpenInterest = coins.reduce((sum, coin) => sum + (coin.open_interest_usd || 0), 0);
 
-    // ✅ Load baseline from KV
+    // ✅ Retrieve KV baseline
     let previousOI = await kv.get("open_interest:previous_total");
     let previousTimestamp = await kv.get("open_interest:timestamp");
     const now = Date.now();
     let percentChange = 0;
 
     if (previousOI && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
-      // Calculate rolling 24-hour % change
       percentChange = ((totalOpenInterest - previousOI) / previousOI) * 100;
-      console.log(`[Open Interest] % Change: ${percentChange.toFixed(2)}% (baseline: ${new Date(previousTimestamp).toUTCString()})`);
     } else {
-      // Store new baseline
       await kv.set("open_interest:previous_total", totalOpenInterest);
       await kv.set("open_interest:timestamp", now);
       previousOI = totalOpenInterest;
       previousTimestamp = now;
-      console.log(`[Open Interest] New baseline stored: ${previousOI.toFixed(2)} at ${new Date(previousTimestamp).toUTCString()}`);
     }
 
     res.setHeader("Access-Control-Allow-Origin", "*");
