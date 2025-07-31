@@ -1,12 +1,5 @@
 const axios = require("axios");
-const { createClient } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
-
-// ✅ Explicitly connect KV using the prefixed variables you have
-const kv = createClient({
-  url: process.env.KV_REST_API_KV_URL, 
-  token: process.env.KV_REST_API_KV_REST_API_TOKEN,
-});
 
 module.exports = async (req, res) => {
   try {
@@ -20,28 +13,12 @@ module.exports = async (req, res) => {
       throw new Error("Coinglass returned empty or malformed data");
     }
 
+    // ✅ Sum cumulative Open Interest USD across all coins
     const totalOpenInterest = coins.reduce((sum, coin) => sum + (coin.open_interest_usd || 0), 0);
-
-    // ✅ KV Baseline
-    let previousOI = await kv.get("open_interest:previous_total");
-    let previousTimestamp = await kv.get("open_interest:timestamp");
-    const now = Date.now();
-    let percentChange = 0;
-
-    if (previousOI && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
-      percentChange = ((totalOpenInterest - previousOI) / previousOI) * 100;
-    } else {
-      await kv.set("open_interest:previous_total", totalOpenInterest);
-      await kv.set("open_interest:timestamp", now);
-      previousOI = totalOpenInterest;
-      previousTimestamp = now;
-    }
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).json({
-      total_open_interest_usd: totalOpenInterest,
-      open_interest_change_24h: percentChange,
-      baseline_timestamp: new Date(previousTimestamp).toUTCString()
+      total_open_interest_usd: totalOpenInterest
     });
 
   } catch (err) {
