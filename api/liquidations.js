@@ -2,17 +2,23 @@ const coinglassAPI = require("./lib/coinglass");
 
 module.exports = async (req, res) => {
   try {
-    // Fetch liquidation data from Coinglass
+    // 1️⃣ Fetch liquidation coin list
     const response = await coinglassAPI.get("/futures/liquidation/coin-list");
+    const coins = response.data?.data || [];
 
-    const coinData = response.data?.data || [];
-    const total24h = coinData.reduce((sum, coin) => sum + (coin.liquidation_usd_24h || 0), 0);
+    if (!Array.isArray(coins) || coins.length === 0) {
+      throw new Error("No liquidation data received from Coinglass");
+    }
+
+    // 2️⃣ Calculate total liquidation for past 24H
+    const total24h = coins.reduce((sum, coin) => sum + (coin.liquidation_usd_24h || 0), 0);
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).json({
-      total24h: Math.round(total24h),
-      change24h: 0
+      total_liquidations_24h: total24h,
+      formatted: formatUSD(total24h)
     });
+
   } catch (err) {
     console.error("Error fetching Liquidations:", err.message);
     res.status(500).json({
@@ -21,3 +27,11 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+// Helper: Format USD (e.g., $1.23B)
+function formatUSD(value) {
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+  return `$${value.toFixed(2)}`;
+}
