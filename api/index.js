@@ -293,5 +293,49 @@ app.get("/api/puell-multiple", async (req, res) => {
   }
 });
 
+// ====== 8. Altcoin Index ======
+import axios from "axios";
+
+export default async function handler(req, res) {
+  try {
+    // Fetch Altcoin Season Index from Coinglass
+    const altcoinRes = await axios.get(
+      "https://open-api-v4.coinglass.com/api/index/altcoin-season",
+      {
+        headers: { "CG-API-KEY": process.env.COINGLASS_API_KEY || "f5eb5c54bd954087aaf022ce9ed28984" }
+      }
+    );
+
+    const altcoinData = altcoinRes.data.data.map((item) => ({
+      date: new Date(item.timestamp).toISOString().split("T")[0], // format YYYY-MM-DD
+      altcoin_index: item.altcoin_index
+    }));
+
+    // Fetch BTC price (reuse existing endpoint or Coinglass)
+    const btcRes = await axios.get(
+      "https://open-api-v4.coinglass.com/api/index/bitcoin-price",
+      {
+        headers: { "CG-API-KEY": process.env.COINGLASS_API_KEY || "f5eb5c54bd954087aaf022ce9ed28984" }
+      }
+    );
+
+    const btcData = btcRes.data.data.map((item) => ({
+      date: new Date(item.timestamp).toISOString().split("T")[0],
+      btc_price: item.price
+    }));
+
+    // Merge Altcoin Index with BTC Price by date
+    const mergedData = altcoinData.map((alt) => {
+      const btc = btcData.find((b) => b.date === alt.date);
+      return { date: alt.date, altcoin_index: alt.altcoin_index, btc_price: btc?.btc_price || null };
+    });
+
+    res.status(200).json({ data: mergedData });
+  } catch (error) {
+    console.error("Error fetching Altcoin Season Index:", error.message);
+    res.status(500).json({ error: "Failed to fetch Altcoin Season Index data" });
+  }
+}
+
 
 module.exports = app;
