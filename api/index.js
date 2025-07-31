@@ -245,5 +245,53 @@ app.get("/api/pi-cycle", async (req, res) => {
   }
 });
 
+// ====== 7. Puell Multiple Indicator (Coinglass Parsed) ======
+app.get("/api/puell-multiple", async (req, res) => {
+  try {
+    const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
+    const url = "https://open-api-v4.coinglass.com/api/index/puell-multiple";
+
+    const response = await axios.get(url, { headers });
+    const rawData = response.data?.data || [];
+
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      throw new Error("Puell Multiple data empty or malformed");
+    }
+
+    // Parse response
+    const prices = rawData.map((d) => ({
+      date: new Date(d.timestamp),
+      price: d.price
+    }));
+
+    const puellValues = rawData.map((d) => d.puell_multiple || null);
+
+    // Identify overbought (>4) and oversold (<0.5) zones
+    const overbought = [];
+    const oversold = [];
+    rawData.forEach((d, i) => {
+      if (d.puell_multiple > 4) {
+        overbought.push({ date: prices[i].date, value: d.puell_multiple });
+      }
+      if (d.puell_multiple < 0.5) {
+        oversold.push({ date: prices[i].date, value: d.puell_multiple });
+      }
+    });
+
+    res.json({
+      prices,
+      puellValues,
+      overbought,
+      oversold
+    });
+  } catch (err) {
+    console.error("Error fetching Puell Multiple data:", err.message);
+    res.status(500).json({
+      error: "Failed to load Puell Multiple data",
+      message: err.message
+    });
+  }
+});
+
 
 module.exports = app;
