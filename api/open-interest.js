@@ -2,10 +2,10 @@ const axios = require("axios");
 const { createClient } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 
-// ✅ Manually connect KV using any detected variables
+// ✅ Explicitly connect KV using the prefixed variables you have
 const kv = createClient({
-  url: process.env.KV_REST_API_URL || process.env.KV_REST_API_KV_URL || process.env.STORAGE_URL,
-  token: process.env.KV_REST_API_TOKEN || process.env.KV_REST_API_KV_REST_API_TOKEN || process.env.STORAGE_TOKEN,
+  url: process.env.KV_REST_API_KV_URL, 
+  token: process.env.KV_REST_API_KV_REST_API_TOKEN,
 });
 
 module.exports = async (req, res) => {
@@ -20,10 +20,9 @@ module.exports = async (req, res) => {
       throw new Error("Coinglass returned empty or malformed data");
     }
 
-    // ✅ Sum cumulative Open Interest USD
     const totalOpenInterest = coins.reduce((sum, coin) => sum + (coin.open_interest_usd || 0), 0);
 
-    // ✅ Retrieve KV baseline
+    // ✅ KV Baseline
     let previousOI = await kv.get("open_interest:previous_total");
     let previousTimestamp = await kv.get("open_interest:timestamp");
     const now = Date.now();
