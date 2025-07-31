@@ -293,35 +293,44 @@ app.get("/api/puell-multiple", async (req, res) => {
   }
 });
 
-// ====== 8. Altcoin Season Index (Coinglass Parsed) ======
+// ====== 8. Altcoin Season API (Vercel Endpoint) ======
 app.get("/api/altcoin-season", async (req, res) => {
   try {
-    const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
+    const headers = { 
+      accept: "application/json", 
+      "CG-API-KEY": COINGLASS_API_KEY // Ensure this is set in Vercel environment variables
+    };
 
-    // 1️⃣ Fetch Altcoin Season Index
+    // Fetch Altcoin Season Index
     const altUrl = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
     const altResponse = await axios.get(altUrl, { headers });
-    const altRaw = altResponse.data?.data || [];
 
+    if (altResponse.status !== 200 || !altResponse.data?.data) {
+      throw new Error("Unexpected response from Coinglass");
+    }
+
+    const altRaw = altResponse.data.data;
     if (!Array.isArray(altRaw) || altRaw.length === 0) {
       throw new Error("Altcoin Season data empty or malformed");
     }
 
+    // Parse Altcoin Season data
     const altcoinData = altRaw.map((d) => ({
       date: new Date(d.timestamp),
       altcoin_index: d.altcoin_index
     }));
 
-    // 2️⃣ Fetch BTC Price (Coinglass)
+    // Fetch BTC Price
     const btcUrl = "https://open-api-v4.coinglass.com/api/index/bitcoin-price";
     const btcResponse = await axios.get(btcUrl, { headers });
     const btcRaw = btcResponse.data?.data || [];
+
     const btcData = btcRaw.map((d) => ({
       date: new Date(d.timestamp),
       btc_price: d.price
     }));
 
-    // 3️⃣ Merge Altcoin Index + BTC Price by Date
+    // Merge Altcoin Index + BTC Price
     const merged = altcoinData.map((alt) => {
       const btc = btcData.find((b) => b.date.getTime() === alt.date.getTime());
       return {
@@ -340,6 +349,7 @@ app.get("/api/altcoin-season", async (req, res) => {
     });
   }
 });
+
 
 
 module.exports = app;
