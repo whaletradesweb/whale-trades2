@@ -11,30 +11,27 @@ module.exports = async (req, res) => {
 
     // Format daily data
     const daily = rawData.map(d => ({
-      date: new Date(d.timestamp).toISOString().split("T")[0],  // YYYY-MM-DD
-      totalFlow: d.flow_usd,                                    // Total inflow/outflow
-      price: d.price_usd,                                       // BTC price
+      date: new Date(d.timestamp).toISOString().split("T")[0],
+      totalFlow: d.flow_usd,
+      price: d.price_usd,
       etfs: d.etf_flows.map(etf => ({
         ticker: etf.etf_ticker,
         flow: etf.flow_usd
       }))
     }));
 
-    // Calculate weekly aggregates
+    // Weekly aggregate
     const weekly = [];
     for (let i = 0; i < daily.length; i += 7) {
       const chunk = daily.slice(i, i + 7);
       const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
       const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
       const etfMap = {};
-
-      // Sum ETF flows per ticker across the week
       chunk.forEach(day => {
         day.etfs.forEach(e => {
           etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
         });
       });
-
       weekly.push({
         weekStart: chunk[0].date,
         weekEnd: chunk[chunk.length - 1].date,
@@ -52,4 +49,3 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: "Failed to load ETF Flows data", message: err.message });
   }
 };
-
