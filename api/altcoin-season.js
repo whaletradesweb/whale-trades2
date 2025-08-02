@@ -4,7 +4,7 @@ const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 module.exports = async (req, res) => {
   try {
     const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
-    const url = "https://open-api-v4.coinglass.com/api/index/altcoinSeason"; // ✅ Corrected endpoint
+    const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
     const response = await axios.get(url, { headers });
 
     const rawData = response.data?.data || [];
