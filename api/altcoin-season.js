@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
     };
     
     // ✅ TESTING: altcoin-season-index endpoint
-    const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season-index";
+    const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
     
     console.log("Testing endpoint:", url);
     console.log("API Key present:", !!COINGLASS_API_KEY);
@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
         error: "Failed to load Altcoin Season data", 
         message: statusMessages[status] || err.message,
         status: status,
-        endpoint: "https://open-api-v4.coinglass.com/api/index/altcoin-season-index",
+        endpoint: "https://open-api-v4.coinglass.com/api/index/altcoin-season",
         responseData: err.response.data
       });
     } else if (err.request) {
@@ -79,13 +79,13 @@ module.exports = async (req, res) => {
       res.status(503).json({ 
         error: "Network error", 
         message: "Could not connect to CoinGlass API",
-        endpoint: "https://open-api-v4.coinglass.com/api/index/altcoin-season-index"
+        endpoint: "https://open-api-v4.coinglass.com/api/index/altcoin-season"
       });
     } else {
       res.status(500).json({ 
         error: "Failed to load Altcoin Season data", 
         message: err.message,
-        endpoint: "https://open-api-v4.coinglass.com/api/index/altcoin-season-index"
+        endpoint: "https://open-api-v4.coinglass.com/api/index/altcoin-season"
       });
     }
   }
