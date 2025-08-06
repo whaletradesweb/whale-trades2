@@ -432,34 +432,26 @@ module.exports = async (req, res) => {
 
 case "volume-total": {
   try {
-    const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-    const coins = response.data?.data || [];
+    // Pull all pairs markets (not symbol-restricted) to aggregate all trading volume
+    const url = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
+    const response = await axios.get(url, { headers });
 
-    if (!Array.isArray(coins) || coins.length === 0) {
-      throw new Error("No market data received from Coinglass");
+    const pairs = response.data?.data || [];
+    if (!Array.isArray(pairs) || pairs.length === 0) {
+      throw new Error("No pairs market data received from Coinglass");
     }
 
-    // ✅ Sum actual 24h trading volume field
-    const totalVolume24h = coins.reduce((sum, coin) =>
-      sum + (typeof coin.volUsd === "number" ? coin.volUsd : 0),
-    0);
+    // ✅ Calculate total 24h trading volume and average % change
+    const totalVolume24h = pairs.reduce((sum, p) => 
+      sum + (typeof p.volume_usd === "number" ? p.volume_usd : 0), 0);
 
-    const now = Date.now();
-    let percentChange = 0;
-    const prev = await kv.get("volume:previous_total");
-    const prevTs = await kv.get("volume:timestamp");
-
-    if (prev && prevTs && (now - prevTs) < 86400000) {
-      percentChange = ((totalVolume24h - prev) / prev) * 100;
-    } else {
-      await kv.set("volume:previous_total", totalVolume24h);
-      await kv.set("volume:timestamp", now);
-    }
+    const avgVolumeChangePct = 
+      pairs.reduce((sum, p) => sum + (p.volume_usd_change_percent_24h || 0), 0) / pairs.length;
 
     return res.json({
       total_volume_24h: totalVolume24h,
-      percent_change_24h: percentChange,
-      baseline_timestamp: prevTs ? new Date(prevTs).toUTCString() : new Date(now).toUTCString()
+      percent_change_24h: avgVolumeChangePct,
+      last_updated: new Date().toUTCString()
     });
 
   } catch (err) {
@@ -467,6 +459,7 @@ case "volume-total": {
     return res.status(500).json({ error: "Volume API failed", message: err.message });
   }
 }
+
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
