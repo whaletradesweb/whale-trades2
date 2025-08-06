@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, symbol = "BTC", exchange = "Binance", action } = req.query;
+  const { type, symbol = "BTC", exchange = "Binance", action, interval = "1h", limit = "100" } = req.query;
 
   try {
     console.log(`DEBUG: Processing request for type: ${type}`);
