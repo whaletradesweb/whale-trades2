@@ -264,11 +264,22 @@ module.exports = async (req, res) => {
       case "max-pain": {
         const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
         const response = await axios.get(url, { headers });
-        const data = response.data?.data?.[0];
-
-        if (!data) throw new Error("Max Pain data unavailable");
-
-        return res.json(data);
+        
+        console.log("DEBUG: Max Pain raw response:", response.data);
+        
+        // CoinGlass returns data directly, not nested
+        const maxPainData = response.data?.data || response.data;
+        
+        if (!maxPainData) {
+          throw new Error("Max Pain data unavailable");
+        }
+        
+        // If it's an array, take the first item, otherwise use as is
+        const finalData = Array.isArray(maxPainData) ? maxPainData[0] : maxPainData;
+        
+        console.log("DEBUG: Final Max Pain data:", finalData);
+        
+        return res.json({ data: finalData });
       }
 
       case "open-interest": {
