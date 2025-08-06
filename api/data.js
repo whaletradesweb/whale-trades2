@@ -430,6 +430,44 @@ module.exports = async (req, res) => {
         });
       }
 
+case "volume-total": {
+  try {
+    const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
+    const coins = response.data?.data || [];
+
+    if (!Array.isArray(coins) || coins.length === 0) {
+      throw new Error("No market data received from Coinglass");
+    }
+
+    const totalVolume24h = coins.reduce((sum, coin) => {
+      return sum + (typeof coin.volume_change_usd_24h === "number" ? Math.abs(coin.volume_change_usd_24h) : 0);
+    }, 0);
+
+    const now = Date.now();
+    let percentChange = 0;
+
+    const previousVolume = await kv.get("volume:previous_total");
+    const previousTimestamp = await kv.get("volume:timestamp");
+
+    if (previousVolume && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
+      percentChange = ((totalVolume24h - previousVolume) / previousVolume) * 100;
+    } else {
+      await kv.set("volume:previous_total", totalVolume24h);
+      await kv.set("volume:timestamp", now);
+    }
+
+    return res.json({
+      total_volume_24h: totalVolume24h,
+      percent_change_24h: percentChange,
+      baseline_timestamp: previousTimestamp ? new Date(previousTimestamp).toUTCString() : new Date(now).toUTCString()
+    });
+  } catch (err) {
+    console.error("[volume-total] API Error:", err.message);
+    return res.status(500).json({ error: "Volume API failed", message: err.message });
+  }
+}
+
+        
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
     }
