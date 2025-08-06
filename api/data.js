@@ -10,6 +10,17 @@ module.exports = async (req, res) => {
     const headers = { accept: "application/json", "CG-API-KEY": COINGLASS_API_KEY };
 
     switch (type) {
+      // 🔍 DEBUG ENVIRONMENT VARIABLE
+      case "debug-env": {
+        const key = process.env.COINGLASS_API_KEY;
+        return res.json({
+          exists: !!key,
+          length: key ? key.length : 0,
+          masked: key ? key.slice(0, 4) + "****" : null,
+          environment: process.env.VERCEL_ENV || "unknown"
+        });
+      }
+
       // 1️⃣ ALTCOIN SEASON
       case "altcoin-season": {
         const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
@@ -90,7 +101,7 @@ module.exports = async (req, res) => {
         return res.json({ data: data?.data || [] });
       }
 
-      // 🔟 COIN BAR RACE (CACHED HISTORY + LIVE FRAME)
+      // 🔟 COIN BAR RACE
       case "coin-bar-race": {
         const cacheKey = "coin-bar-race:frames";
         const cacheTimestampKey = "coin-bar-race:timestamp";
@@ -147,7 +158,7 @@ module.exports = async (req, res) => {
 
         const liveFrame = liveTop20.map(c => {
           const base = frames[0]?.ranked.find(h => h.name === c.symbol)?.value;
-          const basePrice = base !== undefined ? (base / 100) + 1 : 1; 
+          const basePrice = base !== undefined ? (base / 100) + 1 : 1;
           return {
             name: c.symbol,
             value: basePrice ? ((c.current_price / (c.current_price / basePrice)) - 1) * 100 : 0
@@ -165,4 +176,3 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch data", message: err.message });
   }
 };
-
