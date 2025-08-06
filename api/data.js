@@ -469,38 +469,38 @@ module.exports = async (req, res) => {
         message: err.message
       });
 
-      case "volume-total": {
-  const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-  const coins = response.data?.data || [];
+  case "volume-total": {
+    const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
+    const coins = response.data?.data || [];
 
-  if (!Array.isArray(coins) || coins.length === 0) {
-    throw new Error("No market data received from Coinglass");
+    if (!Array.isArray(coins) || coins.length === 0) {
+      throw new Error("No market data received from Coinglass");
+    }
+
+    const totalVolume24h = coins.reduce((sum, coin) => sum + Math.abs(coin.volume_change_usd_24h || 0), 0);
+    const now = Date.now();
+    let percentChange = 0;
+
+    const previousVolume = await kv.get("volume:previous_total");
+    const previousTimestamp = await kv.get("volume:timestamp");
+
+    if (previousVolume && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
+      percentChange = ((totalVolume24h - previousVolume) / previousVolume) * 100;
+      console.log(`[Volume API] % Change: ${percentChange.toFixed(2)}%`);
+    } else {
+      await kv.set("volume:previous_total", totalVolume24h);
+      await kv.set("volume:timestamp", now);
+    }
+
+    return res.json({
+      total_volume_24h: totalVolume24h,
+      percent_change_24h: percentChange,
+      baseline_timestamp: previousTimestamp ? new Date(previousTimestamp).toUTCString() : new Date(now).toUTCString()
+    });
   }
 
-  // Sum all coins' 24h volume
-  const totalVolume24h = coins.reduce((sum, coin) => sum + Math.abs(coin.volume_change_usd_24h || 0), 0);
-
-  const now = Date.now();
-  let percentChange = 0;
-
-  // Baseline for 24h % change
-  const previousVolume = await kv.get("volume:previous_total");
-  const previousTimestamp = await kv.get("volume:timestamp");
-
-  if (previousVolume && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
-    percentChange = ((totalVolume24h - previousVolume) / previousVolume) * 100;
-    console.log(`[Volume API] % Change: ${percentChange.toFixed(2)}%`);
-  } else {
-    await kv.set("volume:previous_total", totalVolume24h);
-    await kv.set("volume:timestamp", now);
-    console.log(`[Volume API] New baseline stored: ${totalVolume24h.toFixed(2)}`);
-  }
-
-  return res.json({
-    total_volume_24h: totalVolume24h,
-    percent_change_24h: percentChange,
-    baseline_timestamp: previousTimestamp ? new Date(previousTimestamp).toUTCString() : new Date(now).toUTCString()
-  });
+  default:
+    return res.status(400).json({ error: "Invalid type parameter" });
 }
 
     }
