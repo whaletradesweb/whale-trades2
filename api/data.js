@@ -347,64 +347,76 @@ module.exports = async (req, res) => {
       }
 
       case "coin-bar-race": {
-        const cacheKey = "coin-bar-race:frames";
-        const cacheTimestampKey = "coin-bar-race:timestamp";
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000;
-
-        let frames = await kv.get(cacheKey);
-        const cachedTimestamp = await kv.get(cacheTimestampKey);
-
-        if (!frames || !cachedTimestamp || (now - cachedTimestamp) >= oneDay) {
-          const marketRes = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-          const coins = marketRes.data?.data || [];
-          const top20 = coins.sort((a, b) => b.market_cap_usd - a.market_cap_usd).slice(0, 20).map(c => c.symbol);
-
-          const endTime = now;
-          const startTime = endTime - (4 * 365 * 24 * 60 * 60 * 1000); // 4 years
-          const interval = "1w";
-          const historyData = {};
-
-          for (const sym of top20) {
-            const priceUrl = `https://open-api-v4.coinglass.com/api/futures/price/history?symbol=${sym}USDT&interval=${interval}&start_time=${startTime}&end_time=${endTime}`;
-            const priceRes = await axios.get(priceUrl, { headers });
-            const prices = priceRes.data?.data || [];
-            if (prices.length) {
-              const base = prices[0].close;
-              historyData[sym] = prices.map(p => ({
-                date: new Date(p.time).toISOString().split("T")[0],
-                value: ((p.close / base) - 1) * 100,
-              }));
-            }
-          }
-
-          const allDates = [...new Set(Object.values(historyData).flat().map(d => d.date))].sort();
-          frames = allDates.map(date => {
-            const ranked = Object.entries(historyData)
-              .map(([coin, data]) => ({ name: coin, value: data.find(d => d.date === date)?.value || 0 }))
-              .sort((a, b) => b.value - a.value)
-              .slice(0, 20);
-            return { date, ranked };
-          });
-
-          await kv.set(cacheKey, frames);
-          await kv.set(cacheTimestampKey, now);
+        console.log("DEBUG: Starting simplified coin-bar-race...");
+        
+        // Get current market data for top coins
+        const marketRes = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
+        const coins = marketRes.data?.data || [];
+        
+        if (!coins.length) {
+          throw new Error("No market data received");
         }
-
-        const liveRes = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-        const liveCoins = liveRes.data?.data || [];
-        const liveTop20 = liveCoins.sort((a, b) => b.market_cap_usd - a.market_cap_usd).slice(0, 20);
-
-        const liveFrame = liveTop20.map(c => {
-          const base = frames[0]?.ranked.find(h => h.name === c.symbol)?.value;
-          const basePrice = base !== undefined ? (base / 100) + 1 : 1;
-          return {
+        
+        // Get top 15 coins by market cap
+        const top15 = coins
+          .sort((a, b) => b.market_cap_usd - a.market_cap_usd)
+          .slice(0, 15)
+          .map(c => c.symbol);
+          
+        console.log("DEBUG: Top 15 coins:", top15);
+        
+        // Create simplified frames using recent performance data
+        // We'll use 24h, 7d, 30d performance as mock historical frames
+        const frames = [];
+        const timeframes = ['24h', '7d', '30d'];
+        
+        timeframes.forEach((period, periodIndex) => {
+          const frameData = coins
+            .filter(c => top15.includes(c.symbol))
+            .map(c => {
+              let performance = 0;
+              // Use available percentage changes from market data
+              if (period === '24h') {
+                performance = c.price_change_percent_24h || 0;
+              } else if (period === '7d') {
+                performance = c.price_change_percent_7d || 0;
+              } else {
+                performance = c.price_change_percent_30d || 0;
+              }
+              return {
+                name: c.symbol,
+                value: performance
+              };
+            })
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 15);
+            
+          frames.push({
+            date: period === '24h' ? '1 Day' : period === '7d' ? '7 Days' : '30 Days',
+            ranked: frameData
+          });
+        });
+        
+        // Create live frame with current 24h performance
+        const liveFrame = coins
+          .filter(c => top15.includes(c.symbol))
+          .map(c => ({
             name: c.symbol,
-            value: basePrice ? ((c.current_price / (c.current_price / basePrice)) - 1) * 100 : 0
-          };
-        }).sort((a, b) => b.value - a.value);
-
-        return res.json({ frames, liveFrame, lastUpdated: new Date().toISOString() });
+            value: c.price_change_percent_24h || 0
+          }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 15);
+        
+        console.log("DEBUG: Created", frames.length, "frames and live frame with", liveFrame.length, "coins");
+        console.log("DEBUG: Sample frame:", frames[0]);
+        console.log("DEBUG: Sample live coin:", liveFrame[0]);
+        
+        return res.json({ 
+          frames, 
+          liveFrame, 
+          lastUpdated: new Date().toISOString(),
+          dataSource: "simplified"
+        });
       }
 
       default:
