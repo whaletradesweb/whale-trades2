@@ -439,8 +439,9 @@ case "volume-total": {
       throw new Error("No market data received from Coinglass");
     }
 
+    // ✅ Sum actual 24h trading volume, not volume change
     const totalVolume24h = coins.reduce((sum, coin) => {
-      return sum + (typeof coin.volume_change_usd_24h === "number" ? Math.abs(coin.volume_change_usd_24h) : 0);
+      return sum + (typeof coin.volume_usd_24h === "number" ? coin.volume_usd_24h : 0);
     }, 0);
 
     const now = Date.now();
