@@ -439,19 +439,18 @@ case "volume-total": {
       throw new Error("No market data received from Coinglass");
     }
 
-    // ✅ Sum actual 24h trading volume, not volume change
-    const totalVolume24h = coins.reduce((sum, coin) => {
-      return sum + (typeof coin.volume_usd_24h === "number" ? coin.volume_usd_24h : 0);
-    }, 0);
+    // ✅ Sum actual 24h trading volume field
+    const totalVolume24h = coins.reduce((sum, coin) =>
+      sum + (typeof coin.volUsd === "number" ? coin.volUsd : 0),
+    0);
 
     const now = Date.now();
     let percentChange = 0;
+    const prev = await kv.get("volume:previous_total");
+    const prevTs = await kv.get("volume:timestamp");
 
-    const previousVolume = await kv.get("volume:previous_total");
-    const previousTimestamp = await kv.get("volume:timestamp");
-
-    if (previousVolume && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
-      percentChange = ((totalVolume24h - previousVolume) / previousVolume) * 100;
+    if (prev && prevTs && (now - prevTs) < 86400000) {
+      percentChange = ((totalVolume24h - prev) / prev) * 100;
     } else {
       await kv.set("volume:previous_total", totalVolume24h);
       await kv.set("volume:timestamp", now);
@@ -460,14 +459,14 @@ case "volume-total": {
     return res.json({
       total_volume_24h: totalVolume24h,
       percent_change_24h: percentChange,
-      baseline_timestamp: previousTimestamp ? new Date(previousTimestamp).toUTCString() : new Date(now).toUTCString()
+      baseline_timestamp: prevTs ? new Date(prevTs).toUTCString() : new Date(now).toUTCString()
     });
+
   } catch (err) {
     console.error("[volume-total] API Error:", err.message);
     return res.status(500).json({ error: "Volume API failed", message: err.message });
   }
 }
-
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
