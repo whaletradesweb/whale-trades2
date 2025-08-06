@@ -479,136 +479,185 @@ case "volume-total": {
 }
 
 case "orderbook-heatmap": {
-        console.log(`DEBUG: Requesting orderbook heatmap for ${symbol}${exchange.toUpperCase() === 'BINANCE' ? 'USDT' : ''} on ${exchange}`);
-        
-        const symbolParam = exchange.toLowerCase() === 'binance' && !symbol.includes('USDT') 
-          ? `${symbol}USDT` 
-          : symbol;
-        
-        const url = `https://open-api-v4.coinglass.com/api/spot/orderbook/history`;
-        const params = {
-          exchange: exchange,
-          symbol: symbolParam,
-          interval: interval,
-          limit: limit
-        };
-        
-        console.log(`DEBUG: Requesting orderbook data with params:`, params);
-        
-        const response = await axios.get(url, { 
-          headers,
-          params,
-          timeout: 15000,
-          validateStatus: function (status) {
-            return status < 500;
-          }
-        });
-        
-        console.log("DEBUG: Orderbook Response Status:", response.status);
-        
-        if (response.status === 401) {
-          return res.status(401).json({
-            error: 'API Authentication Failed',
-            message: 'Invalid API key or insufficient permissions.'
+  console.log(`DEBUG: Requesting orderbook heatmap for ${symbol} on ${exchange} with interval ${interval}`);
+  
+  // Ensure we have the right symbol format for Binance
+  const symbolParam = exchange.toLowerCase() === 'binance' && !symbol.includes('USDT') 
+    ? `${symbol}USDT` 
+    : symbol;
+  
+  const url = `https://open-api-v4.coinglass.com/api/spot/orderbook/history`;
+  const params = {
+    exchange: exchange,
+    symbol: symbolParam,
+    interval: interval,
+    limit: parseInt(limit) // Convert to number
+  };
+  
+  console.log(`DEBUG: Requesting orderbook data with params:`, params);
+  
+  const response = await axios.get(url, { 
+    headers,
+    params,
+    timeout: 15000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Orderbook Response Status:", response.status);
+  console.log("DEBUG: Orderbook Response Data sample:", JSON.stringify(response.data).substring(0, 200));
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.msg || 'CoinGlass API returned error code',
+      code: response.data?.code,
+      fullResponse: response.data
+    });
+  }
+  
+  const rawData = response.data?.data || [];
+  
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    return res.status(400).json({
+      error: 'No Data Available',
+      message: 'No orderbook data found for the specified parameters',
+      requestedParams: params
+    });
+  }
+  
+  // Process the orderbook data for heatmap visualization
+  const processedData = {
+    heatmapData: [],
+    priceRange: { min: Infinity, max: -Infinity },
+    timeRange: [],
+    bidData: [],
+    askData: []
+  };
+  
+  rawData.forEach((entry, timeIndex) => {
+    const [timestamp, bids, asks] = entry;
+    const date = new Date(timestamp * 1000);
+    processedData.timeRange.push(date.toISOString());
+    
+    // Process bids (buy orders) - typically shown in green
+    if (Array.isArray(bids)) {
+      bids.forEach(([price, quantity], orderIndex) => {
+        if (price && quantity && price > 0 && quantity > 0) {
+          processedData.heatmapData.push([
+            timeIndex,
+            price,
+            quantity,
+            'bid'
+          ]);
+          processedData.bidData.push({
+            time: timeIndex,
+            price: price,
+            quantity: quantity,
+            value: price * quantity
           });
+          processedData.priceRange.min = Math.min(processedData.priceRange.min, price);
+          processedData.priceRange.max = Math.max(processedData.priceRange.max, price);
         }
-        
-        if (response.status === 403) {
-          return res.status(403).json({
-            error: 'API Access Forbidden',
-            message: 'Your API plan does not include access to this endpoint.'
+      });
+    }
+    
+    // Process asks (sell orders) - typically shown in red
+    if (Array.isArray(asks)) {
+      asks.forEach(([price, quantity], orderIndex) => {
+        if (price && quantity && price > 0 && quantity > 0) {
+          processedData.heatmapData.push([
+            timeIndex,
+            price,
+            quantity,
+            'ask'
+          ]);
+          processedData.askData.push({
+            time: timeIndex,
+            price: price,
+            quantity: quantity,
+            value: price * quantity
           });
+          processedData.priceRange.min = Math.min(processedData.priceRange.min, price);
+          processedData.priceRange.max = Math.max(processedData.priceRange.max, price);
         }
-        
-        if (response.status !== 200) {
-          return res.status(response.status).json({
-            error: 'API Request Failed',
-            message: `CoinGlass API returned status ${response.status}`,
-            details: response.data
-          });
-        }
-        
-        const rawData = response.data?.data || [];
-        
-        if (!Array.isArray(rawData) || rawData.length === 0) {
-          return res.status(400).json({
-            error: 'No Data Available',
-            message: 'No orderbook data found for the specified parameters'
-          });
-        }
-        
-        // Process the orderbook data for heatmap visualization
-        const processedData = {
-          heatmapData: [],
-          candlestickData: [],
-          priceRange: { min: Infinity, max: -Infinity },
-          timeRange: []
-        };
-        
-        rawData.forEach((entry, timeIndex) => {
-          const [timestamp, bids, asks] = entry;
-          const date = new Date(timestamp * 1000);
-          processedData.timeRange.push(date.toISOString());
-          
-          // Process bids (buy orders) - typically shown in green
-          if (Array.isArray(bids)) {
-            bids.forEach(([price, quantity]) => {
-              if (price && quantity) {
-                processedData.heatmapData.push([
-                  timeIndex,
-                  price,
-                  quantity,
-                  'bid'
-                ]);
-                processedData.priceRange.min = Math.min(processedData.priceRange.min, price);
-                processedData.priceRange.max = Math.max(processedData.priceRange.max, price);
-              }
-            });
-          }
-          
-          // Process asks (sell orders) - typically shown in red
-          if (Array.isArray(asks)) {
-            asks.forEach(([price, quantity]) => {
-              if (price && quantity) {
-                processedData.heatmapData.push([
-                  timeIndex,
-                  price,
-                  quantity,
-                  'ask'
-                ]);
-                processedData.priceRange.min = Math.min(processedData.priceRange.min, price);
-                processedData.priceRange.max = Math.max(processedData.priceRange.max, price);
-              }
-            });
-          }
-        });
-        
-        // Get current price for context (from the latest orderbook data)
-        let currentPrice = null;
-        if (rawData.length > 0) {
-          const latestEntry = rawData[rawData.length - 1];
-          const [, bids, asks] = latestEntry;
-          if (bids && bids[0] && asks && asks[0]) {
-            // Mid price between best bid and ask
-            currentPrice = (bids[0][0] + asks[0][0]) / 2;
-          }
-        }
-        
-        return res.json({
-          success: true,
-          data: processedData,
-          metadata: {
-            symbol: symbolParam,
-            exchange: exchange,
-            interval: interval,
-            dataPoints: processedData.heatmapData.length,
-            timePoints: processedData.timeRange.length,
-            priceRange: processedData.priceRange,
-            currentPrice: currentPrice,
-            lastUpdated: new Date().toISOString()
-          }
-        });
-      }
+      });
+    }
+  });
+  
+  // Get current price for context (from the latest orderbook data)
+  let currentPrice = null;
+  let bestBid = null;
+  let bestAsk = null;
+  
+  if (rawData.length > 0) {
+    const latestEntry = rawData[rawData.length - 1];
+    const [, bids, asks] = latestEntry;
+    if (bids && bids[0] && bids[0][0]) {
+      bestBid = bids[0][0];
+    }
+    if (asks && asks[0] && asks[0][0]) {
+      bestAsk = asks[0][0];
+    }
+    if (bestBid && bestAsk) {
+      currentPrice = (bestBid + bestAsk) / 2;
+    } else if (bestBid) {
+      currentPrice = bestBid;
+    } else if (bestAsk) {
+      currentPrice = bestAsk;
+    }
+  }
+  
+  return res.json({
+    success: true,
+    data: processedData,
+    metadata: {
+      symbol: symbolParam,
+      exchange: exchange,
+      interval: interval,
+      limit: parseInt(limit),
+      dataPoints: processedData.heatmapData.length,
+      timePoints: processedData.timeRange.length,
+      priceRange: processedData.priceRange,
+      currentPrice: currentPrice,
+      bestBid: bestBid,
+      bestAsk: bestAsk,
+      spread: bestBid && bestAsk ? ((bestAsk - bestBid) / bestBid * 100).toFixed(4) + '%' : null,
+      lastUpdated: new Date().toISOString()
+    },
+    debug: {
+      rawDataLength: rawData.length,
+      sampleEntry: rawData[0] ? {
+        timestamp: rawData[0][0],
+        bidsCount: rawData[0][1]?.length || 0,
+        asksCount: rawData[0][2]?.length || 0
+      } : null
+    }
+  });
+}
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
