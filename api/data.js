@@ -478,6 +478,156 @@ case "volume-total": {
   }
 }
 
+
+case "rsi-heatmap": {
+  const { interval = "1h" } = req.query;
+  
+  // Validate interval parameter
+  const validIntervals = ["15m", "1h", "4h", "8h", "12h", "1d", "1w"];
+  if (!validIntervals.includes(interval)) {
+    return res.status(400).json({ 
+      error: "Invalid interval", 
+      message: "Interval must be one of: " + validIntervals.join(", ")
+    });
+  }
+  
+  console.log(`DEBUG: Requesting RSI data for interval: ${interval}`);
+  
+  const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
+  const response = await axios.get(url, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: RSI Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  const rawData = response.data.data || [];
+  
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    return res.status(404).json({
+      error: 'No Data',
+      message: 'No RSI data available for the requested interval'
+    });
+  }
+  
+  // Process and format the RSI data based on actual API response structure
+  const processedData = rawData.map(coin => {
+    const rsiData = {
+      "15m": coin.rsi_15m || null,
+      "1h": coin.rsi_1h || null,
+      "4h": coin.rsi_4h || null,
+      "12h": coin.rsi_12h || null,
+      "24h": coin.rsi_24h || null,
+      "1w": coin.rsi_1w || null
+    };
+    
+    const priceChangeData = {
+      "15m": coin.price_change_percent_15m || 0,
+      "1h": coin.price_change_percent_1h || 0,
+      "4h": coin.price_change_percent_4h || 0,
+      "12h": coin.price_change_percent_12h || 0,
+      "24h": coin.price_change_percent_24h || 0,
+      "1w": coin.price_change_percent_1w || 0
+    };
+    
+    // Map interval parameter to API keys
+    const intervalMap = {
+      "15m": "15m",
+      "1h": "1h", 
+      "4h": "4h",
+      "8h": "4h", // Use 4h as fallback for 8h
+      "12h": "12h",
+      "1d": "24h", // Map 1d to 24h
+      "1w": "1w"
+    };
+    
+    const mappedInterval = intervalMap[interval] || "1h";
+    
+    return {
+      symbol: coin.symbol || 'UNKNOWN',
+      current_price: coin.current_price || 0,
+      rsi: rsiData,
+      price_change_percent: priceChangeData,
+      current_rsi: rsiData[mappedInterval], // RSI for the requested interval
+      current_price_change: priceChangeData[mappedInterval] // Price change for the requested interval
+    };
+  })
+  .filter(coin => coin.current_rsi !== null && coin.current_rsi !== undefined)
+  .sort((a, b) => {
+    // Sort by current price descending (as proxy for market cap), then by RSI
+    if (b.current_price !== a.current_price) {
+      return b.current_price - a.current_price;
+    }
+    return b.current_rsi - a.current_rsi;
+  })
+  .slice(0, 150); // Limit to top 150 coins for performance
+  
+  // Calculate distribution statistics
+  const rsiValues = processedData.map(coin => coin.current_rsi);
+  const overbought = rsiValues.filter(rsi => rsi >= 70).length;
+  const oversold = rsiValues.filter(rsi => rsi <= 30).length;
+  const neutral = rsiValues.filter(rsi => rsi > 30 && rsi < 70).length;
+  const strong = rsiValues.filter(rsi => rsi >= 60 && rsi < 70).length;
+  const weak = rsiValues.filter(rsi => rsi > 30 && rsi <= 40).length;
+  
+  const stats = {
+    total_coins: processedData.length,
+    overbought_count: overbought,
+    oversold_count: oversold,
+    neutral_count: neutral,
+    strong_count: strong,
+    weak_count: weak,
+    overbought_percent: ((overbought / processedData.length) * 100).toFixed(1),
+    oversold_percent: ((oversold / processedData.length) * 100).toFixed(1),
+    average_rsi: (rsiValues.reduce((sum, rsi) => sum + rsi, 0) / rsiValues.length).toFixed(2)
+  };
+  
+  console.log(`DEBUG: Processed ${processedData.length} coins for ${interval} interval`);
+  console.log("DEBUG: RSI Distribution:", stats);
+  
+  return res.json({ 
+    success: true,
+    data: processedData,
+    interval: interval,
+    statistics: stats,
+    lastUpdated: new Date().toISOString(),
+    nextUpdate: new Date(Date.now() + 15 * 60 * 1000).toISOString() // Next update in 15 minutes
+  });
+}
+
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
