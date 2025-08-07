@@ -19,13 +19,6 @@ module.exports = async (req, res) => {
 
   const { type, symbol = "BTC", exchange = "Binance", action, interval = "1h", limit = "100" } = req.query;
 
-  const allowedSymbols = [
-  "AVAX", "BCH", "BTC", "BNB", "ADA", "LINK", "DOGE", "ETH", "HBAR",
-  "INJ", "LTC", "ONDO", "PEPE", "DOT", "SHIB", "SOL", "XLM", "SUI",
-  "TON", "TRX", "UNI", "XRP"
-];
-
-
   try {
     console.log(`DEBUG: Processing request for type: ${type}`);
     
@@ -634,25 +627,6 @@ case "rsi-heatmap": {
     nextUpdate: new Date(Date.now() + 15 * 60 * 1000).toISOString() // Next update in 15 minutes
   });
 }
-
-case "coins-price-change": {
-  const url = "https://open-api-v4.coinglass.com/api/futures/coins-price-change";
-  const response = await axios.get(url, { headers });
-
-  const raw = response.data?.data || [];
-
-  const filtered = raw
-    .filter(c => allowedSymbols.includes(c.symbol))
-    .map(c => ({
-      symbol: c.symbol,
-      current_price: c.current_price,
-      price_change_percent_24h: c.price_change_percent_24h
-    }))
-    .sort((a, b) => b.current_price - a.current_price); // Sort by price or market cap proxy
-
-  return res.json({ data: filtered, lastUpdated: new Date().toISOString() });
-}
-
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
