@@ -627,6 +627,77 @@ case "rsi-heatmap": {
     nextUpdate: new Date(Date.now() + 15 * 60 * 1000).toISOString() // Next update in 15 minutes
   });
 }
+
+  case "bitcoin-dominance": {
+  console.log("DEBUG: Requesting Bitcoin Dominance from Coinglass...");
+  
+  const btcDominanceUrl = "https://open-api-v4.coinglass.com/api/index/bitcoin-dominance";
+  const btcResponse = await axios.get(btcDominanceUrl, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Coinglass Response Status:", btcResponse.status);
+  
+  if (btcResponse.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (btcResponse.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (btcResponse.status === 404) {
+    return res.status(404).json({
+      error: 'API Endpoint Not Found',
+      message: 'The bitcoin dominance endpoint may have changed. Check CoinGlass API documentation.'
+    });
+  }
+  
+  if (btcResponse.status !== 200) {
+    return res.status(btcResponse.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${btcResponse.status}`,
+      details: btcResponse.data
+    });
+  }
+  
+  if (!btcResponse.data || btcResponse.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: btcResponse.data?.message || 'CoinGlass API returned error code',
+      code: btcResponse.data?.code
+    });
+  }
+  
+  const btcRaw = btcResponse.data.data;
+  const btcDominanceData = btcRaw.map(d => ({
+    timestamp: d.timestamp,
+    price: d.price,
+    bitcoin_dominance: d.bitcoin_dominance,
+    market_cap: d.market_cap
+  }));
+  
+  // Sort by timestamp to ensure chronological order
+  btcDominanceData.sort((a, b) => a.timestamp - b.timestamp);
+  
+  return res.json({ 
+    success: true,
+    data: btcDominanceData,
+    lastUpdated: new Date().toISOString(),
+    dataPoints: btcDominanceData.length
+  });
+}
+
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
