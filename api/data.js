@@ -168,25 +168,27 @@ case "etf-eth-flows": {
   const weekly = [];
   for (let i = 0; i < daily.length; i += 7) {
     const chunk = daily.slice(i, i + 7);
-    const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
-    const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
-    const etfMap = {};
-    chunk.forEach(day => {
-      day.etfs.forEach(e => {
-        etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
+    if (chunk.length === 7) {
+      const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
+      const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
+      const etfMap = {};
+      chunk.forEach(day => {
+        day.etfs.forEach(e => {
+          etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
+        });
       });
-    });
-    weekly.push({
-      weekStart: chunk[0].date,
-      weekEnd: chunk[chunk.length - 1].date,
-      totalFlow,
-      avgPrice: parseFloat(avgPrice.toFixed(2)),
-      etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
-    });
+      weekly.push({
+        weekStart: chunk[0].date,
+        weekEnd: chunk[chunk.length - 1].date,
+        totalFlow,
+        avgPrice: parseFloat(avgPrice.toFixed(2)),
+        etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
+      });
+    }
   }
   return res.json({ daily, weekly });
 }
-
+        
       case "liquidations-total": {
         const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list", { headers });
         const coins = response.data?.data || [];
