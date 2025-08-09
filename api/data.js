@@ -154,14 +154,14 @@ case "etf-eth-flows": {
   const url = "https://open-api-v4.coinglass.com/api/etf/ethereum/flow-history";
   const response = await axios.get(url, { headers });
   const rawData = response.data?.data || [];
-  // Format daily data
+  // Format daily data - using same field names as BTC
   const daily = rawData.map(d => ({
     date: new Date(d.timestamp).toISOString().split("T")[0],
-    totalFlow: d.change_usd,
-    price: d.price,
+    totalFlow: d.flow_usd,        // Same as BTC
+    price: d.price_usd,           // Same as BTC
     etfs: d.etf_flows.map(etf => ({
-      ticker: etf.ticker,
-      flow: etf.change_usd
+      ticker: etf.etf_ticker,     // Same as BTC
+      flow: etf.flow_usd          // Same as BTC
     }))
   }));
   // Weekly aggregate
