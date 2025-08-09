@@ -113,45 +113,79 @@ module.exports = async (req, res) => {
         });
       }
 
-      case "etf-btc-flows": {
-        const url = "https://open-api-v4.coinglass.com/api/etf/bitcoin/flow-history";
-        const response = await axios.get(url, { headers });
-        const rawData = response.data?.data || [];
+  case "etf-btc-flows": {
+  const url = "https://open-api-v4.coinglass.com/api/etf/bitcoin/flow-history";
+  const response = await axios.get(url, { headers });
+  const rawData = response.data?.data || [];
+  // Format daily data
+  const daily = rawData.map(d => ({
+    date: new Date(d.timestamp).toISOString().split("T")[0],
+    totalFlow: d.flow_usd,
+    price: d.price_usd,
+    etfs: d.etf_flows.map(etf => ({
+      ticker: etf.etf_ticker,
+      flow: etf.flow_usd
+    }))
+  }));
+  // Weekly aggregate
+  const weekly = [];
+  for (let i = 0; i < daily.length; i += 7) {
+    const chunk = daily.slice(i, i + 7);
+    const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
+    const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
+    const etfMap = {};
+    chunk.forEach(day => {
+      day.etfs.forEach(e => {
+        etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
+      });
+    });
+    weekly.push({
+      weekStart: chunk[0].date,
+      weekEnd: chunk[chunk.length - 1].date,
+      totalFlow,
+      avgPrice: parseFloat(avgPrice.toFixed(2)),
+      etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
+    });
+  }
+  return res.json({ daily, weekly });
+}
 
-        // Format daily data
-        const daily = rawData.map(d => ({
-          date: new Date(d.timestamp).toISOString().split("T")[0],
-          totalFlow: d.flow_usd,
-          price: d.price_usd,
-          etfs: d.etf_flows.map(etf => ({
-            ticker: etf.etf_ticker,
-            flow: etf.flow_usd
-          }))
-        }));
-
-        // Weekly aggregate
-        const weekly = [];
-        for (let i = 0; i < daily.length; i += 7) {
-          const chunk = daily.slice(i, i + 7);
-          const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
-          const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
-          const etfMap = {};
-          chunk.forEach(day => {
-            day.etfs.forEach(e => {
-              etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
-            });
-          });
-          weekly.push({
-            weekStart: chunk[0].date,
-            weekEnd: chunk[chunk.length - 1].date,
-            totalFlow,
-            avgPrice: parseFloat(avgPrice.toFixed(2)),
-            etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
-          });
-        }
-
-        return res.json({ daily, weekly });
-      }
+case "etf-eth-flows": {
+  const url = "https://open-api-v4.coinglass.com/api/etf/ethereum/flow-history";
+  const response = await axios.get(url, { headers });
+  const rawData = response.data?.data || [];
+  // Format daily data
+  const daily = rawData.map(d => ({
+    date: new Date(d.timestamp).toISOString().split("T")[0],
+    totalFlow: d.change_usd,
+    price: d.price,
+    etfs: d.etf_flows.map(etf => ({
+      ticker: etf.ticker,
+      flow: etf.change_usd
+    }))
+  }));
+  // Weekly aggregate
+  const weekly = [];
+  for (let i = 0; i < daily.length; i += 7) {
+    const chunk = daily.slice(i, i + 7);
+    const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
+    const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
+    const etfMap = {};
+    chunk.forEach(day => {
+      day.etfs.forEach(e => {
+        etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
+      });
+    });
+    weekly.push({
+      weekStart: chunk[0].date,
+      weekEnd: chunk[chunk.length - 1].date,
+      totalFlow,
+      avgPrice: parseFloat(avgPrice.toFixed(2)),
+      etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
+    });
+  }
+  return res.json({ daily, weekly });
+}
 
       case "liquidations-total": {
         const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list", { headers });
