@@ -734,6 +734,84 @@ case "rsi-heatmap": {
   });
 }
 
+
+case "crypto-ticker": {
+  console.log("DEBUG: Requesting crypto ticker data from Coinglass...");
+  
+  const url = "https://open-api-v4.coinglass.com/api/futures/coins-price-change";
+  const response = await axios.get(url, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Coinglass Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  const rawData = response.data.data || [];
+  
+  // Define the coins you want to show, ordered by market cap
+  const targetCoins = [
+    'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'TRX', 'TON', 'AVAX',
+    'LINK', 'DOT', 'LTC', 'BCH', 'UNI', 'XLM', 'HBAR', 'SUI', 'PEPE', 'SHIB',
+    'INJ', 'ONDO'
+  ];
+  
+  // Filter and sort the data based on your target coins
+  const filteredData = rawData
+    .filter(coin => targetCoins.includes(coin.symbol))
+    .map(coin => ({
+      symbol: coin.symbol,
+      current_price: coin.current_price,
+      price_change_percent_24h: coin.price_change_percent_24h || 0,
+      // Add logo URL pointing to your GitHub logos
+      logo_url: `https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/logos/${coin.symbol.toLowerCase()}.svg`
+    }))
+    .sort((a, b) => {
+      // Sort by the order in targetCoins array (market cap order)
+      return targetCoins.indexOf(a.symbol) - targetCoins.indexOf(b.symbol);
+    });
+  
+  console.log(`DEBUG: Filtered ${filteredData.length} coins for ticker`);
+  
+  return res.json({ 
+    success: true,
+    data: filteredData,
+    lastUpdated: new Date().toISOString(),
+    totalCoins: filteredData.length
+  });
+}
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
