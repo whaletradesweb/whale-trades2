@@ -815,6 +815,212 @@ case "crypto-ticker": {
     totalCoins: filteredData.length
   });
 }
+
+  case "mvrv-z-score": {
+  console.log("DEBUG: Requesting MVRV-Z Score data from Coinglass...");
+  
+  try {
+    // Fetch all required data in parallel
+    const [sthRealizedPriceRes, lthRealizedPriceRes, sthSupplyRes, lthSupplyRes] = await Promise.all([
+      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-sth-realized-price", { headers }),
+      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-lth-realized-price", { headers }),
+      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-short-term-holder-supply", { headers }),
+      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-long-term-holder-supply", { headers })
+    ]);
+
+    // Validate all responses
+    const responses = [sthRealizedPriceRes, lthRealizedPriceRes, sthSupplyRes, lthSupplyRes];
+    const endpointNames = ['STH Realized Price', 'LTH Realized Price', 'STH Supply', 'LTH Supply'];
+    
+    for (let i = 0; i < responses.length; i++) {
+      const response = responses[i];
+      if (response.status !== 200 || !response.data || response.data.code !== "0") {
+        return res.status(response.status || 400).json({
+          error: `${endpointNames[i]} API Error`,
+          message: response.data?.message || `Failed to fetch ${endpointNames[i]} data`,
+          code: response.data?.code
+        });
+      }
+    }
+
+    // Extract data arrays
+    const sthRealizedPriceData = sthRealizedPriceRes.data.data || [];
+    const lthRealizedPriceData = lthRealizedPriceRes.data.data || [];
+    const sthSupplyData = sthSupplyRes.data.data || [];
+    const lthSupplyData = lthSupplyRes.data.data || [];
+
+    console.log(`DEBUG: Data lengths - STH Price: ${sthRealizedPriceData.length}, LTH Price: ${lthRealizedPriceData.length}, STH Supply: ${sthSupplyData.length}, LTH Supply: ${lthSupplyData.length}`);
+
+    // Create lookup maps for efficient data matching
+    const sthPriceMap = new Map();
+    const lthPriceMap = new Map();
+    const sthSupplyMap = new Map();
+    const lthSupplyMap = new Map();
+
+    sthRealizedPriceData.forEach(d => sthPriceMap.set(d.timestamp, d));
+    lthRealizedPriceData.forEach(d => lthPriceMap.set(d.timestamp, d));
+    sthSupplyData.forEach(d => sthSupplyMap.set(d.timestamp, d));
+    lthSupplyData.forEach(d => lthSupplyMap.set(d.timestamp, d));
+
+    // Get all unique timestamps and sort them
+    const allTimestamps = new Set([
+      ...sthRealizedPriceData.map(d => d.timestamp),
+      ...lthRealizedPriceData.map(d => d.timestamp),
+      ...sthSupplyData.map(d => d.timestamp),
+      ...lthSupplyData.map(d => d.timestamp)
+    ]);
+
+    const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+    console.log(`DEBUG: Processing ${sortedTimestamps.length} unique timestamps`);
+
+    // Calculate MVRV-Z Score for each timestamp
+    const mvrvData = [];
+    const marketCapDiffs = []; // Store (Market Cap - Realized Cap) for std dev calculation
+
+    sortedTimestamps.forEach(timestamp => {
+      const sthPrice = sthPriceMap.get(timestamp);
+      const lthPrice = lthPriceMap.get(timestamp);
+      const sthSupply = sthSupplyMap.get(timestamp);
+      const lthSupply = lthSupplyMap.get(timestamp);
+
+      // Skip if any required data is missing
+      if (!sthPrice || !lthPrice || !sthSupply || !lthSupply) {
+        return;
+      }
+
+      // Extract values with fallbacks
+      const price = sthPrice.price || lthPrice.price || 0;
+      const sthRealizedPrice = sthPrice.sth_realized_price || 0;
+      const lthRealizedPrice = lthPrice.lth_realized_price || 0;
+      const sthSupplyValue = sthSupply.short_term_holder_supply || 0;
+      const lthSupplyValue = lthSupply.long_term_holder_supply || 0;
+
+      // Calculate Market Cap and Realized Market Cap
+      const totalSupply = sthSupplyValue + lthSupplyValue;
+      const marketCap = price * totalSupply;
+      const realizedMarketCap = (sthRealizedPrice * sthSupplyValue) + (lthRealizedPrice * lthSupplyValue);
+      
+      // Store the difference for std dev calculation
+      const marketCapDiff = marketCap - realizedMarketCap;
+      marketCapDiffs.push(marketCapDiff);
+
+      mvrvData.push({
+        timestamp,
+        date: new Date(timestamp).toISOString().split('T')[0],
+        price,
+        market_cap: marketCap,
+        realized_market_cap: realizedMarketCap,
+        market_cap_diff: marketCapDiff,
+        sth_realized_price: sthRealizedPrice,
+        lth_realized_price: lthRealizedPrice,
+        sth_supply: sthSupplyValue,
+        lth_supply: lthSupplyValue,
+        total_supply: totalSupply
+      });
+    });
+
+    console.log(`DEBUG: Created ${mvrvData.length} data points for MVRV calculation`);
+
+    // Calculate rolling standard deviation (365-day window)
+    const windowSize = 365;
+    const mvrvZScores = [];
+
+    for (let i = 0; i < mvrvData.length; i++) {
+      const current = mvrvData[i];
+      
+      // Get the window of data for std dev calculation
+      const startIndex = Math.max(0, i - windowSize + 1);
+      const windowData = mvrvData.slice(startIndex, i + 1);
+      
+      if (windowData.length < 30) {
+        // Skip if we don't have enough data for meaningful std dev
+        continue;
+      }
+
+      // Calculate mean and standard deviation of market cap differences in the window
+      const windowDiffs = windowData.map(d => d.market_cap_diff);
+      const mean = windowDiffs.reduce((sum, val) => sum + val, 0) / windowDiffs.length;
+      const variance = windowDiffs.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / windowDiffs.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Calculate MVRV-Z Score
+      const mvrvZScore = stdDev > 0 ? current.market_cap_diff / stdDev : 0;
+
+      mvrvZScores.push({
+        timestamp: current.timestamp,
+        date: current.date,
+        price: current.price,
+        market_cap: current.market_cap,
+        realized_market_cap: current.realized_market_cap,
+        mvrv_ratio: current.realized_market_cap > 0 ? current.market_cap / current.realized_market_cap : 0,
+        mvrv_z_score: mvrvZScore,
+        std_dev_window: windowData.length
+      });
+    }
+
+    console.log(`DEBUG: Calculated MVRV-Z Score for ${mvrvZScores.length} data points`);
+
+    // Sort by timestamp to ensure chronological order
+    mvrvZScores.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Calculate statistics
+    const zScores = mvrvZScores.map(d => d.mvrv_z_score);
+    const avgZScore = zScores.reduce((sum, val) => sum + val, 0) / zScores.length;
+    const maxZScore = Math.max(...zScores);
+    const minZScore = Math.min(...zScores);
+    const currentZScore = mvrvZScores[mvrvZScores.length - 1]?.mvrv_z_score || 0;
+
+    // Identify significant events (Z-Score > 7 for peaks, < -0.5 for bottoms)
+    const peaks = mvrvZScores.filter(d => d.mvrv_z_score > 7);
+    const bottoms = mvrvZScores.filter(d => d.mvrv_z_score < -0.5);
+
+    return res.json({
+      success: true,
+      data: mvrvZScores,
+      statistics: {
+        total_data_points: mvrvZScores.length,
+        current_z_score: currentZScore,
+        average_z_score: avgZScore.toFixed(4),
+        max_z_score: maxZScore.toFixed(4),
+        min_z_score: minZScore.toFixed(4),
+        peaks_count: peaks.length,
+        bottoms_count: bottoms.length
+      },
+      significant_events: {
+        peaks: peaks.slice(-10), // Last 10 peaks
+        bottoms: bottoms.slice(-10) // Last 10 bottoms
+      },
+      lastUpdated: new Date().toISOString(),
+      calculation_method: "365-day rolling standard deviation",
+      data_range: {
+        start_date: mvrvZScores[0]?.date,
+        end_date: mvrvZScores[mvrvZScores.length - 1]?.date
+      }
+    });
+
+  } catch (err) {
+    console.error("[MVRV-Z Score] API Error:", err.message);
+    
+    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        error: "Network connection failed",
+        message: "Unable to connect to CoinGlass API. Please try again later."
+      });
+    }
+    
+    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+      return res.status(504).json({
+        error: "Request timeout",
+        message: "CoinGlass API request timed out. Please try again."
+      });
+    }
+    
+    return res.status(500).json({
+      error: "MVRV-Z Score calculation failed",
+      message: err.message
+    });
+  }
+}
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
