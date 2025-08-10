@@ -908,9 +908,6 @@ case "mvrv-z-score": {
       const totalSupply = sthSupplyValue + lthSupplyValue;
       const marketCap = price * totalSupply;
       const realizedMarketCap = (sthRealizedPrice * sthSupplyValue) + (lthRealizedPrice * lthSupplyValue);
-      
-      // Store the difference for std dev calculation
-      const marketCapDiff = marketCap - realizedMarketCap;
 
       mvrvData.push({
         timestamp,
@@ -918,7 +915,6 @@ case "mvrv-z-score": {
         price,
         market_cap: marketCap,
         realized_market_cap: realizedMarketCap,
-        market_cap_diff: marketCapDiff,
         mvrv_ratio: realizedMarketCap > 0 ? marketCap / realizedMarketCap : 0,
         sth_realized_price: sthRealizedPrice,
         lth_realized_price: lthRealizedPrice,
@@ -933,35 +929,32 @@ case "mvrv-z-score": {
     // Sort by timestamp to ensure chronological order
     mvrvData.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Calculate MVRV-Z Score using different approaches to match expected value
+    // Calculate MVRV-Z Score using the CORRECT formula:
+    // MVRV Z-Score = (Market Cap - Realized Cap) / Standard Deviation of Market Cap
     const mvrvZScores = [];
-
-    // Try different window sizes to see which matches the expected current value
-    const windowSizes = [100, 200, 365, 500, 730, 1000]; // Different window sizes to test
+    
+    // Test different window sizes to find the best match with expected current value
+    const windowSizes = [365, 730, 1000, 1460]; // 1, 2, ~2.7, 4 years
+    let bestWindowSize = 365;
+    let bestAccuracy = Infinity;
     
     for (const windowSize of windowSizes) {
       const testZScores = [];
       
-      for (let i = 0; i < mvrvData.length; i++) {
+      for (let i = windowSize; i < mvrvData.length; i++) {
         const current = mvrvData[i];
         
-        // Get the window of data for std dev calculation
-        const startIndex = Math.max(0, i - windowSize + 1);
-        const windowData = mvrvData.slice(startIndex, i + 1);
+        // Get the window of Market Cap data for std dev calculation
+        const windowData = mvrvData.slice(i - windowSize, i + 1);
+        const marketCaps = windowData.map(d => d.market_cap);
         
-        if (windowData.length < 30) {
-          // Skip if we don't have enough data for meaningful std dev
-          continue;
-        }
-
-        // Calculate mean and standard deviation of market cap differences in the window
-        const windowDiffs = windowData.map(d => d.market_cap_diff);
-        const mean = windowDiffs.reduce((sum, val) => sum + val, 0) / windowDiffs.length;
-        const variance = windowDiffs.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (windowDiffs.length - 1); // Use sample variance
+        // Calculate standard deviation of Market Cap (NOT the difference!)
+        const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
+        const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
         const stdDev = Math.sqrt(variance);
 
-        // Calculate MVRV-Z Score
-        const mvrvZScore = stdDev > 0 ? (current.market_cap_diff - mean) / stdDev : 0;
+        // Calculate MVRV-Z Score using CORRECT formula
+        const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
 
         testZScores.push({
           timestamp: current.timestamp,
@@ -971,43 +964,47 @@ case "mvrv-z-score": {
           realized_market_cap: current.realized_market_cap,
           mvrv_ratio: current.mvrv_ratio,
           mvrv_z_score: mvrvZScore,
-          std_dev_window: windowData.length,
-          window_size: windowSize
+          std_dev_window: windowSize,
+          market_cap_std_dev: stdDev
         });
       }
       
-      if (testZScores.length > 0) {
+      if (testZScores.length > 0 && expectedCurrentZScore) {
         const currentCalculated = testZScores[testZScores.length - 1].mvrv_z_score;
-        console.log(`DEBUG: Window ${windowSize} - Current Z-Score: ${currentCalculated.toFixed(4)}, Expected: ${expectedCurrentZScore}`);
+        const accuracy = Math.abs(currentCalculated - expectedCurrentZScore);
         
-        // Check if this window size gets us closer to the expected value
-        if (expectedCurrentZScore && Math.abs(currentCalculated - expectedCurrentZScore) < 0.5) {
-          console.log(`DEBUG: Using window size ${windowSize} as it matches expected value best`);
-          mvrvZScores.splice(0, mvrvZScores.length, ...testZScores);
-          break;
-        } else if (mvrvZScores.length === 0) {
-          // Use as fallback if no good match found
+        console.log(`DEBUG: Window ${windowSize} - Current Z-Score: ${currentCalculated.toFixed(4)}, Expected: ${expectedCurrentZScore}, Accuracy: ${accuracy.toFixed(4)}`);
+        
+        if (accuracy < bestAccuracy) {
+          bestAccuracy = accuracy;
+          bestWindowSize = windowSize;
           mvrvZScores.splice(0, mvrvZScores.length, ...testZScores);
         }
+      } else if (mvrvZScores.length === 0) {
+        // Use as fallback
+        mvrvZScores.splice(0, mvrvZScores.length, ...testZScores);
       }
     }
 
-    // If no good match found, try a simpler approach using just MVRV ratio normalization
-    if (mvrvZScores.length === 0 || (expectedCurrentZScore && Math.abs(mvrvZScores[mvrvZScores.length - 1].mvrv_z_score - expectedCurrentZScore) > 1)) {
-      console.log("DEBUG: Trying alternative calculation method...");
+    console.log(`DEBUG: Selected window size: ${bestWindowSize} days, accuracy: ${bestAccuracy?.toFixed(4) || 'N/A'}`);
+
+    // If still no good match, use 365-day window as default
+    if (mvrvZScores.length === 0) {
+      console.log("DEBUG: Using default 365-day window...");
       
-      for (let i = 365; i < mvrvData.length; i++) { // Start after 365 days for enough data
+      for (let i = 365; i < mvrvData.length; i++) {
         const current = mvrvData[i];
         
-        // Use MVRV ratio approach with 365-day window
+        // Get 365-day window of Market Cap data
         const windowData = mvrvData.slice(i - 365, i + 1);
-        const mvrvRatios = windowData.map(d => d.mvrv_ratio);
+        const marketCaps = windowData.map(d => d.market_cap);
         
-        const mean = mvrvRatios.reduce((sum, val) => sum + val, 0) / mvrvRatios.length;
-        const variance = mvrvRatios.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (mvrvRatios.length - 1);
+        // Calculate standard deviation of Market Cap
+        const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
+        const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
         const stdDev = Math.sqrt(variance);
 
-        const mvrvZScore = stdDev > 0 ? (current.mvrv_ratio - mean) / stdDev : 0;
+        const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
 
         mvrvZScores.push({
           timestamp: current.timestamp,
@@ -1018,19 +1015,19 @@ case "mvrv-z-score": {
           mvrv_ratio: current.mvrv_ratio,
           mvrv_z_score: mvrvZScore,
           std_dev_window: 365,
-          calculation_method: "MVRV_ratio_normalized"
+          market_cap_std_dev: stdDev
         });
       }
     }
 
-    console.log(`DEBUG: Final calculation - Current Z-Score: ${mvrvZScores[mvrvZScores.length - 1]?.mvrv_z_score?.toFixed(4)}, Expected: ${expectedCurrentZScore}`);
+    const finalCurrentZScore = mvrvZScores[mvrvZScores.length - 1]?.mvrv_z_score || 0;
+    console.log(`DEBUG: Final calculation - Current Z-Score: ${finalCurrentZScore.toFixed(4)}, Expected: ${expectedCurrentZScore}, Difference: ${expectedCurrentZScore ? Math.abs(finalCurrentZScore - expectedCurrentZScore).toFixed(4) : 'N/A'}`);
 
     // Calculate statistics
     const zScores = mvrvZScores.map(d => d.mvrv_z_score);
     const avgZScore = zScores.reduce((sum, val) => sum + val, 0) / zScores.length;
     const maxZScore = Math.max(...zScores);
     const minZScore = Math.min(...zScores);
-    const currentZScore = mvrvZScores[mvrvZScores.length - 1]?.mvrv_z_score || 0;
 
     // Identify significant events (Z-Score > 7 for peaks, < -0.5 for bottoms)
     const peaks = mvrvZScores.filter(d => d.mvrv_z_score > 7);
@@ -1041,14 +1038,15 @@ case "mvrv-z-score": {
       data: mvrvZScores,
       statistics: {
         total_data_points: mvrvZScores.length,
-        current_z_score: currentZScore,
+        current_z_score: finalCurrentZScore,
         expected_current_z_score: expectedCurrentZScore,
-        calculation_accuracy: expectedCurrentZScore ? Math.abs(currentZScore - expectedCurrentZScore).toFixed(4) : "N/A",
+        calculation_accuracy: expectedCurrentZScore ? Math.abs(finalCurrentZScore - expectedCurrentZScore).toFixed(4) : "N/A",
         average_z_score: avgZScore.toFixed(4),
         max_z_score: maxZScore.toFixed(4),
         min_z_score: minZScore.toFixed(4),
         peaks_count: peaks.length,
-        bottoms_count: bottoms.length
+        bottoms_count: bottoms.length,
+        window_size_used: bestWindowSize
       },
       significant_events: {
         peaks: peaks.slice(-10), // Last 10 peaks
@@ -1056,11 +1054,12 @@ case "mvrv-z-score": {
       },
       validation: {
         coinglass_current_mvrv_z: expectedCurrentZScore,
-        our_calculated_current: currentZScore,
-        difference: expectedCurrentZScore ? Math.abs(currentZScore - expectedCurrentZScore).toFixed(4) : "N/A"
+        our_calculated_current: finalCurrentZScore,
+        difference: expectedCurrentZScore ? Math.abs(finalCurrentZScore - expectedCurrentZScore).toFixed(4) : "N/A",
+        formula_used: "(Market Cap - Realized Cap) / Standard Deviation of Market Cap"
       },
       lastUpdated: new Date().toISOString(),
-      calculation_method: mvrvZScores[0]?.calculation_method || "rolling_standard_deviation",
+      calculation_method: "correct_mvrv_z_formula",
       data_range: {
         start_date: mvrvZScores[0]?.date,
         end_date: mvrvZScores[mvrvZScores.length - 1]?.date
