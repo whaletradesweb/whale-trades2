@@ -269,36 +269,36 @@ case "etf-eth-flows": {
         return res.json(formatted);
       }
 
-      case "long-short": {
-        const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-        const coins = response.data?.data || [];
-
-        if (!Array.isArray(coins) || coins.length === 0) {
-          throw new Error("No market data received from Coinglass");
-        }
-
-        const top10 = coins
-          .filter(c => c.long_short_ratio_24h != null)
-          .sort((a, b) => b.market_cap_usd - a.market_cap_usd)
-          .slice(0, 10);
-
-        if (top10.length === 0) throw new Error("No valid long/short ratios found for top coins");
-
-        const avgRatio = top10.reduce((sum, coin) => sum + coin.long_short_ratio_24h, 0) / top10.length;
-        const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
-        const avgShortPct = 100 - avgLongPct;
-
-        return res.json({
-          long_pct: avgLongPct.toFixed(2),
-          short_pct: avgShortPct.toFixed(2),
-          average_ratio: avgRatio.toFixed(4),
-          sampled_coins: top10.map(c => ({
-            symbol: c.symbol,
-            market_cap_usd: c.market_cap_usd,
-            long_short_ratio_24h: c.long_short_ratio_24h
-          }))
-        });
-      }
+  case "long-short": {
+  const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
+  const coins = response.data?.data || [];
+  if (!Array.isArray(coins) || coins.length === 0) {
+    throw new Error("No market data received from Coinglass");
+  }
+  const top10 = coins
+    .filter(c => c.long_short_ratio_24h != null)
+    .sort((a, b) => b.market_cap_usd - a.market_cap_usd)
+    .slice(0, 10);
+  if (top10.length === 0) throw new Error("No valid long/short ratios found for top coins");
+  const avgRatio = top10.reduce((sum, coin) => sum + coin.long_short_ratio_24h, 0) / top10.length;
+  const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
+  const avgShortPct = 100 - avgLongPct;
+  
+  // Calculate the differential (skew)
+  const differential = Math.abs(avgLongPct - avgShortPct);
+  
+  return res.json({
+    long_pct: avgLongPct.toFixed(2),
+    short_pct: avgShortPct.toFixed(2),
+    differential: differential.toFixed(2), // New field
+    average_ratio: avgRatio.toFixed(4),
+    sampled_coins: top10.map(c => ({
+      symbol: c.symbol,
+      market_cap_usd: c.market_cap_usd,
+      long_short_ratio_24h: c.long_short_ratio_24h
+    }))
+  });
+}
 
       case "max-pain": {
         const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
