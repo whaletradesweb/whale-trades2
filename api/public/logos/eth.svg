@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xodm="http://www.corel.com/coreldraw/odm/2003" version="1.1" viewBox="0 0 792 792">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #343434;
+      }
+
+      .cls-1, .cls-2, .cls-3, .cls-4, .cls-5, .cls-6 {
+        stroke-width: 0px;
+      }
+
+      .cls-2 {
+        fill: #3c3c3b;
+      }
+
+      .cls-3 {
+        fill: #8c8c8c;
+      }
+
+      .cls-4 {
+        fill: #141414;
+      }
+
+      .cls-5 {
+        fill: #393939;
+      }
+
+      .cls-6 {
+        fill: #fff;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1" data-name="Layer 1" image-rendering="optimizeQuality" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+    <circle class="cls-6" cx="396" cy="396" r="396"/>
+    <g id="Layer_1-2" data-name="Layer_1">
+      <g id="_1421394342400" data-name=" 1421394342400">
+        <g>
+          <polygon class="cls-1" points="395.9 18 390.9 35.3 390.9 535.1 395.9 540.1 627.9 403 395.9 18"/>
+          <polygon class="cls-3" points="395.9 18 163.9 403 395.9 540.1 395.9 297.6 395.9 18"/>
+          <polygon class="cls-2" points="395.9 584.1 393.1 587.6 393.1 765.6 395.9 773.9 628.1 447 395.9 584.1"/>
+          <polygon class="cls-3" points="395.9 773.9 395.9 584.1 163.9 447 395.9 773.9"/>
+          <polygon class="cls-4" points="395.9 540.1 627.9 403 395.9 297.6 395.9 540.1"/>
+          <polygon class="cls-5" points="163.9 403 395.9 540.1 395.9 297.6 163.9 403"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
