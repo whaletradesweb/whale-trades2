@@ -816,11 +816,13 @@ case "crypto-ticker": {
   });
 }
 
+
+
 case "mvrv-z-score": {
   console.log("DEBUG: Requesting MVRV-Z Score data from Coinglass...");
   
   try {
-    // Fetch all required data in parallel, including current MVRV-Z Score for validation
+    // Fetch historical data and current indicator value in parallel
     const [sthRealizedPriceRes, lthRealizedPriceRes, sthSupplyRes, lthSupplyRes, bullMarketRes] = await Promise.all([
       axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-sth-realized-price", { headers }),
       axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-lth-realized-price", { headers }),
@@ -844,16 +846,27 @@ case "mvrv-z-score": {
       }
     }
 
-    // Extract current MVRV-Z Score from Bull Market Indicators for validation
+    // Extract current MVRV-Z Score from Bull Market Indicators (HYBRID APPROACH)
     const bullMarketData = bullMarketRes.data.data || [];
     const currentMVRVIndicator = bullMarketData.find(indicator => 
       indicator.indicator_name === "MVRV Z-Score"
     );
-    const expectedCurrentZScore = currentMVRVIndicator ? parseFloat(currentMVRVIndicator.current_value) : null;
     
-    console.log(`DEBUG: Expected current MVRV-Z Score from Coinglass: ${expectedCurrentZScore}`);
+    if (!currentMVRVIndicator) {
+      return res.status(404).json({
+        error: 'MVRV Z-Score Not Found',
+        message: 'MVRV Z-Score indicator not available in Bull Market Peak Indicators'
+      });
+    }
+    
+    const currentMVRVFromAPI = parseFloat(currentMVRVIndicator.current_value);
+    const previousMVRVFromAPI = parseFloat(currentMVRVIndicator.previous_value);
+    const targetMVRVFromAPI = parseFloat(currentMVRVIndicator.target_value);
+    const changeMVRVFromAPI = parseFloat(currentMVRVIndicator.change_value);
+    
+    console.log(`DEBUG: Current MVRV-Z Score from CoinGlass API: ${currentMVRVFromAPI}`);
 
-    // Extract data arrays
+    // Extract historical data arrays
     const sthRealizedPriceData = sthRealizedPriceRes.data.data || [];
     const lthRealizedPriceData = lthRealizedPriceRes.data.data || [];
     const sthSupplyData = sthSupplyRes.data.data || [];
@@ -929,101 +942,49 @@ case "mvrv-z-score": {
     // Sort by timestamp to ensure chronological order
     mvrvData.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Calculate MVRV-Z Score using the CORRECT formula:
-    // MVRV Z-Score = (Market Cap - Realized Cap) / Standard Deviation of Market Cap
+    // Calculate historical MVRV-Z Score using 365-day window (simplified approach)
     const mvrvZScores = [];
+    const windowSize = 365;
     
-    // Test different window sizes to find the best match with expected current value
-    const windowSizes = [365, 730, 1000, 1460]; // 1, 2, ~2.7, 4 years
-    let bestWindowSize = 365;
-    let bestAccuracy = Infinity;
-    
-    for (const windowSize of windowSizes) {
-      const testZScores = [];
+    for (let i = windowSize; i < mvrvData.length; i++) {
+      const current = mvrvData[i];
       
-      for (let i = windowSize; i < mvrvData.length; i++) {
-        const current = mvrvData[i];
-        
-        // Get the window of Market Cap data for std dev calculation
-        const windowData = mvrvData.slice(i - windowSize, i + 1);
-        const marketCaps = windowData.map(d => d.market_cap);
-        
-        // Calculate standard deviation of Market Cap (NOT the difference!)
-        const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
-        const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
-        const stdDev = Math.sqrt(variance);
-
-        // Calculate MVRV-Z Score using CORRECT formula
-        const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
-
-        testZScores.push({
-          timestamp: current.timestamp,
-          date: current.date,
-          price: current.price,
-          market_cap: current.market_cap,
-          realized_market_cap: current.realized_market_cap,
-          mvrv_ratio: current.mvrv_ratio,
-          mvrv_z_score: mvrvZScore,
-          std_dev_window: windowSize,
-          market_cap_std_dev: stdDev
-        });
-      }
+      // Get the window of Market Cap data for std dev calculation
+      const windowData = mvrvData.slice(i - windowSize, i + 1);
+      const marketCaps = windowData.map(d => d.market_cap);
       
-      if (testZScores.length > 0 && expectedCurrentZScore) {
-        const currentCalculated = testZScores[testZScores.length - 1].mvrv_z_score;
-        const accuracy = Math.abs(currentCalculated - expectedCurrentZScore);
-        
-        console.log(`DEBUG: Window ${windowSize} - Current Z-Score: ${currentCalculated.toFixed(4)}, Expected: ${expectedCurrentZScore}, Accuracy: ${accuracy.toFixed(4)}`);
-        
-        if (accuracy < bestAccuracy) {
-          bestAccuracy = accuracy;
-          bestWindowSize = windowSize;
-          mvrvZScores.splice(0, mvrvZScores.length, ...testZScores);
-        }
-      } else if (mvrvZScores.length === 0) {
-        // Use as fallback
-        mvrvZScores.splice(0, mvrvZScores.length, ...testZScores);
-      }
+      // Calculate standard deviation of Market Cap
+      const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
+      const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
+      const stdDev = Math.sqrt(variance);
+
+      // Calculate MVRV-Z Score using correct formula
+      const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
+
+      mvrvZScores.push({
+        timestamp: current.timestamp,
+        date: current.date,
+        price: current.price,
+        market_cap: current.market_cap,
+        realized_market_cap: current.realized_market_cap,
+        mvrv_ratio: current.mvrv_ratio,
+        mvrv_z_score: mvrvZScore,
+        std_dev_window: windowSize,
+        market_cap_std_dev: stdDev
+      });
     }
 
-    console.log(`DEBUG: Selected window size: ${bestWindowSize} days, accuracy: ${bestAccuracy?.toFixed(4) || 'N/A'}`);
-
-    // If still no good match, use 365-day window as default
-    if (mvrvZScores.length === 0) {
-      console.log("DEBUG: Using default 365-day window...");
-      
-      for (let i = 365; i < mvrvData.length; i++) {
-        const current = mvrvData[i];
-        
-        // Get 365-day window of Market Cap data
-        const windowData = mvrvData.slice(i - 365, i + 1);
-        const marketCaps = windowData.map(d => d.market_cap);
-        
-        // Calculate standard deviation of Market Cap
-        const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
-        const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
-        const stdDev = Math.sqrt(variance);
-
-        const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
-
-        mvrvZScores.push({
-          timestamp: current.timestamp,
-          date: current.date,
-          price: current.price,
-          market_cap: current.market_cap,
-          realized_market_cap: current.realized_market_cap,
-          mvrv_ratio: current.mvrv_ratio,
-          mvrv_z_score: mvrvZScore,
-          std_dev_window: 365,
-          market_cap_std_dev: stdDev
-        });
-      }
+    // HYBRID APPROACH: Replace the most recent calculated value with CoinGlass current value
+    if (mvrvZScores.length > 0) {
+      const lastIndex = mvrvZScores.length - 1;
+      mvrvZScores[lastIndex].mvrv_z_score = currentMVRVFromAPI;
+      mvrvZScores[lastIndex].coinglass_current = true; // Flag to indicate this is from CoinGlass API
+      console.log(`DEBUG: Replaced most recent calculated value (${mvrvZScores[lastIndex].mvrv_z_score}) with CoinGlass current value: ${currentMVRVFromAPI}`);
     }
 
-    const finalCurrentZScore = mvrvZScores[mvrvZScores.length - 1]?.mvrv_z_score || 0;
-    console.log(`DEBUG: Final calculation - Current Z-Score: ${finalCurrentZScore.toFixed(4)}, Expected: ${expectedCurrentZScore}, Difference: ${expectedCurrentZScore ? Math.abs(finalCurrentZScore - expectedCurrentZScore).toFixed(4) : 'N/A'}`);
+    console.log(`DEBUG: Final MVRV-Z Score calculation completed with ${mvrvZScores.length} data points`);
 
-    // Calculate statistics
+    // Calculate statistics using the hybrid data
     const zScores = mvrvZScores.map(d => d.mvrv_z_score);
     const avgZScore = zScores.reduce((sum, val) => sum + val, 0) / zScores.length;
     const maxZScore = Math.max(...zScores);
@@ -1038,28 +999,31 @@ case "mvrv-z-score": {
       data: mvrvZScores,
       statistics: {
         total_data_points: mvrvZScores.length,
-        current_z_score: finalCurrentZScore,
-        expected_current_z_score: expectedCurrentZScore,
-        calculation_accuracy: expectedCurrentZScore ? Math.abs(finalCurrentZScore - expectedCurrentZScore).toFixed(4) : "N/A",
+        current_z_score: currentMVRVFromAPI,
+        previous_z_score: previousMVRVFromAPI,
+        target_z_score: targetMVRVFromAPI,
+        change_24h: changeMVRVFromAPI,
         average_z_score: avgZScore.toFixed(4),
         max_z_score: maxZScore.toFixed(4),
         min_z_score: minZScore.toFixed(4),
         peaks_count: peaks.length,
         bottoms_count: bottoms.length,
-        window_size_used: bestWindowSize
+        hit_target: currentMVRVIndicator.hit_status
       },
       significant_events: {
         peaks: peaks.slice(-10), // Last 10 peaks
         bottoms: bottoms.slice(-10) // Last 10 bottoms
       },
-      validation: {
-        coinglass_current_mvrv_z: expectedCurrentZScore,
-        our_calculated_current: finalCurrentZScore,
-        difference: expectedCurrentZScore ? Math.abs(finalCurrentZScore - expectedCurrentZScore).toFixed(4) : "N/A",
-        formula_used: "(Market Cap - Realized Cap) / Standard Deviation of Market Cap"
+      coinglass_data: {
+        current_value: currentMVRVIndicator.current_value,
+        target_value: currentMVRVIndicator.target_value,
+        previous_value: currentMVRVIndicator.previous_value,
+        change_value: currentMVRVIndicator.change_value,
+        comparison_type: currentMVRVIndicator.comparison_type,
+        hit_status: currentMVRVIndicator.hit_status
       },
       lastUpdated: new Date().toISOString(),
-      calculation_method: "correct_mvrv_z_formula",
+      calculation_method: "hybrid_approach",
       data_range: {
         start_date: mvrvZScores[0]?.date,
         end_date: mvrvZScores[mvrvZScores.length - 1]?.date
@@ -1089,6 +1053,7 @@ case "mvrv-z-score": {
     });
   }
 }
+
 
 
 
