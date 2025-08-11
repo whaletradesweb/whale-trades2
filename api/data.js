@@ -1090,6 +1090,8 @@ case "mvrv-z-score": {
   }
 }
 
+
+
 case "mayer-multiple": {
   console.log("DEBUG: Requesting Mayer Multiple data from Coinglass...");
   
@@ -1105,6 +1107,27 @@ case "mayer-multiple": {
     });
     
     console.log("DEBUG: Bull Market Indicators Response Status:", indicatorsResponse.status);
+    
+    if (indicatorsResponse.status === 401) {
+      return res.status(401).json({
+        error: 'API Authentication Failed',
+        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+      });
+    }
+    
+    if (indicatorsResponse.status === 403) {
+      return res.status(403).json({
+        error: 'API Access Forbidden',
+        message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+      });
+    }
+    
+    if (indicatorsResponse.status === 404) {
+      return res.status(404).json({
+        error: 'API Endpoint Not Found',
+        message: 'The bull market indicators endpoint may have changed. Check CoinGlass API documentation.'
+      });
+    }
     
     if (indicatorsResponse.status !== 200) {
       return res.status(indicatorsResponse.status).json({
@@ -1198,15 +1221,9 @@ case "mayer-multiple": {
       
       mayerMultipleData.push({
         timestamp: currentDay.timestamp,
-        date: new Date(currentDay.timestamp).toISOString().split('T')[0],
         price: currentPrice,
         moving_average_200: movingAverage200,
-        mayer_multiple: mayerMultiple,
-        // Add signal indicators
-        is_overbought: mayerMultiple >= 2.4, // Speculative bubble threshold
-        is_oversold: mayerMultiple <= 0.8,   // Potential buying opportunity
-        is_bullish: mayerMultiple > 1,       // Above 200-day MA
-        is_bearish: mayerMultiple < 1        // Below 200-day MA
+        mayer_multiple: mayerMultiple
       });
     }
     
@@ -1220,57 +1237,22 @@ case "mayer-multiple": {
     if (mayerMultipleData.length > 0) {
       const lastIndex = mayerMultipleData.length - 1;
       mayerMultipleData[lastIndex].mayer_multiple = currentMayerFromAPI;
-      mayerMultipleData[lastIndex].is_overbought = currentMayerFromAPI >= 2.4;
-      mayerMultipleData[lastIndex].is_oversold = currentMayerFromAPI <= 0.8;
-      mayerMultipleData[lastIndex].is_bullish = currentMayerFromAPI > 1;
-      mayerMultipleData[lastIndex].is_bearish = currentMayerFromAPI < 1;
       mayerMultipleData[lastIndex].coinglass_current = true; // Flag to indicate this is from CoinGlass
     }
     
-    // Calculate statistics using historical data but current from CoinGlass
-    const historicalMayerValues = mayerMultipleData.slice(0, -1).map(d => d.mayer_multiple); // Exclude last (CoinGlass) value
-    const maxMayer = Math.max(...mayerMultipleData.map(d => d.mayer_multiple));
-    const minMayer = Math.min(...mayerMultipleData.map(d => d.mayer_multiple));
-    const avgMayer = historicalMayerValues.reduce((sum, val) => sum + val, 0) / historicalMayerValues.length;
+    // Sort by timestamp to ensure chronological order
+    mayerMultipleData.sort((a, b) => a.timestamp - b.timestamp);
     
-    // Find significant events
-    const overboughtPeriods = mayerMultipleData.filter(d => d.is_overbought);
-    const oversoldPeriods = mayerMultipleData.filter(d => d.is_oversold);
-    const currentSignal = currentMayerFromAPI >= 2.4 ? "BUBBLE_WARNING" : 
-                         currentMayerFromAPI <= 0.8 ? "BUY_OPPORTUNITY" :
-                         currentMayerFromAPI > 1 ? "BULLISH" : "BEARISH";
-    
-    console.log(`DEBUG: Calculated Mayer Multiple for ${mayerMultipleData.length} days`);
-    console.log(`DEBUG: Current Mayer Multiple (CoinGlass): ${currentMayerFromAPI.toFixed(4)}`);
-    console.log(`DEBUG: Current Signal: ${currentSignal}`);
-    
+    // Match the same response format as bitcoin-dominance
     return res.json({ 
       success: true,
       data: mayerMultipleData,
       statistics: {
-        total_data_points: mayerMultipleData.length,
         current_mayer_multiple: currentMayerFromAPI,
         previous_mayer_multiple: previousMayerFromAPI,
         target_mayer_multiple: targetMayerFromAPI,
         change_24h: changeFromAPI,
-        current_signal: currentSignal,
-        max_mayer_multiple: maxMayer,
-        min_mayer_multiple: minMayer,
-        average_mayer_multiple: avgMayer,
-        overbought_periods: overboughtPeriods.length,
-        oversold_periods: oversoldPeriods.length,
-        hit_target: mayerIndicator.hit_status // From CoinGlass
-      },
-      thresholds: {
-        bubble_warning: 2.4,
-        buy_opportunity: 0.8,
-        neutral_upper: 1.0,
-        coinglass_target: targetMayerFromAPI,
-        description: "Above 2.4 = Speculative bubble, Below 0.8 = Potential buy, Above 1.0 = Bullish (above 200-day MA)"
-      },
-      recent_signals: {
-        last_overbought: overboughtPeriods.length > 0 ? overboughtPeriods[overboughtPeriods.length - 1] : null,
-        last_oversold: oversoldPeriods.length > 0 ? oversoldPeriods[oversoldPeriods.length - 1] : null
+        hit_target: mayerIndicator.hit_status
       },
       coinglass_data: {
         current_value: mayerIndicator.current_value,
@@ -1281,12 +1263,7 @@ case "mayer-multiple": {
         hit_status: mayerIndicator.hit_status
       },
       lastUpdated: new Date().toISOString(),
-      calculation_method: "Historical: Current Price / 200-Day SMA from Pi Cycle Data | Current: CoinGlass Bull Market Peak Indicators",
-      data_source: "Pi Cycle Indicator endpoint for historical prices",
-      data_range: {
-        start_date: mayerMultipleData[0]?.date,
-        end_date: mayerMultipleData[mayerMultipleData.length - 1]?.date
-      }
+      dataPoints: mayerMultipleData.length
     });
 
   } catch (err) {
@@ -1312,6 +1289,9 @@ case "mayer-multiple": {
     });
   }
 }
+
+
+        
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
