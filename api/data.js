@@ -1137,78 +1137,59 @@ case "mayer-multiple": {
     
     console.log("DEBUG: Current Mayer Multiple from CoinGlass:", mayerIndicator.current_value);
     
-    // Now get historical price data for chart
-    const priceUrl = "https://open-api-v4.coinglass.com/api/price/ohlc-history";
-    const priceResponse = await axios.get(priceUrl, { 
+    // Get historical Bitcoin price data from Pi Cycle indicator (reusing existing successful endpoint)
+    const piCycleUrl = "https://open-api-v4.coinglass.com/api/index/pi-cycle-indicator";
+    const piCycleResponse = await axios.get(piCycleUrl, { 
       headers,
-      params: {
-        symbol: "BTC",
-        interval: "1d", // Daily intervals for 200-day MA calculation
-        limit: 500 // Get enough data to calculate 200-day MA reliably
-      },
       timeout: 10000,
       validateStatus: function (status) {
         return status < 500;
       }
     });
     
-    console.log("DEBUG: Price Response Status:", priceResponse.status);
+    console.log("DEBUG: Pi Cycle Response Status:", piCycleResponse.status);
     
-    if (priceResponse.status === 401) {
-      return res.status(401).json({
-        error: 'API Authentication Failed',
-        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    if (piCycleResponse.status !== 200) {
+      return res.status(piCycleResponse.status).json({
+        error: 'Historical Data Request Failed',
+        message: `CoinGlass API returned status ${piCycleResponse.status}`,
+        details: piCycleResponse.data
       });
     }
     
-    if (priceResponse.status === 403) {
-      return res.status(403).json({
-        error: 'API Access Forbidden',
-        message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-      });
-    }
-    
-    if (priceResponse.status !== 200) {
-      return res.status(priceResponse.status).json({
-        error: 'API Request Failed',
-        message: `CoinGlass API returned status ${priceResponse.status}`,
-        details: priceResponse.data
-      });
-    }
-    
-    if (!priceResponse.data || priceResponse.data.code !== "0") {
+    if (!piCycleResponse.data || piCycleResponse.data.code !== "0") {
       return res.status(400).json({
-        error: 'API Error',
-        message: priceResponse.data?.message || 'CoinGlass API returned error code',
-        code: priceResponse.data?.code
+        error: 'Historical Data API Error',
+        message: piCycleResponse.data?.message || 'CoinGlass API returned error code',
+        code: piCycleResponse.data?.code
       });
     }
     
-    const priceData = priceResponse.data.data || [];
+    const historicalData = piCycleResponse.data.data || [];
     
-    if (!Array.isArray(priceData) || priceData.length < 200) {
+    if (!Array.isArray(historicalData) || historicalData.length < 200) {
       return res.status(404).json({
-        error: 'Insufficient Data',
-        message: `Need at least 200 days of price data for Mayer Multiple calculation. Received: ${priceData.length} days`
+        error: 'Insufficient Historical Data',
+        message: `Need at least 200 days of price data for Mayer Multiple calculation. Received: ${historicalData.length} days`
       });
     }
     
-    console.log(`DEBUG: Received ${priceData.length} days of price data`);
+    console.log(`DEBUG: Received ${historicalData.length} days of historical price data from Pi Cycle endpoint`);
     
     // Sort data by timestamp to ensure chronological order
-    priceData.sort((a, b) => a.timestamp - b.timestamp);
+    historicalData.sort((a, b) => a.timestamp - b.timestamp);
     
-    // Calculate historical Mayer Multiple for chart (starting from day 200)
+    // Calculate historical Mayer Multiple using 200-day moving average
     const mayerMultipleData = [];
     
-    for (let i = 199; i < priceData.length; i++) { // Start from index 199 (200th day)
-      const currentDay = priceData[i];
-      const currentPrice = currentDay.close || currentDay.price || 0;
+    for (let i = 199; i < historicalData.length; i++) { // Start from index 199 (200th day)
+      const currentDay = historicalData[i];
+      const currentPrice = currentDay.price || 0;
       
       // Calculate 200-day moving average
       let sum = 0;
       for (let j = i - 199; j <= i; j++) {
-        sum += (priceData[j].close || priceData[j].price || 0);
+        sum += (historicalData[j].price || 0);
       }
       const movingAverage200 = sum / 200;
       
@@ -1235,7 +1216,7 @@ case "mayer-multiple": {
     const targetMayerFromAPI = parseFloat(mayerIndicator.target_value);
     const changeFromAPI = parseFloat(mayerIndicator.change_value);
     
-    // Update the most recent data point with CoinGlass current value
+    // Update the most recent data point with CoinGlass current value if available
     if (mayerMultipleData.length > 0) {
       const lastIndex = mayerMultipleData.length - 1;
       mayerMultipleData[lastIndex].mayer_multiple = currentMayerFromAPI;
@@ -1300,7 +1281,8 @@ case "mayer-multiple": {
         hit_status: mayerIndicator.hit_status
       },
       lastUpdated: new Date().toISOString(),
-      calculation_method: "Historical: Current Price / 200-Day SMA | Current: CoinGlass Bull Market Peak Indicators",
+      calculation_method: "Historical: Current Price / 200-Day SMA from Pi Cycle Data | Current: CoinGlass Bull Market Peak Indicators",
+      data_source: "Pi Cycle Indicator endpoint for historical prices",
       data_range: {
         start_date: mayerMultipleData[0]?.date,
         end_date: mayerMultipleData[mayerMultipleData.length - 1]?.date
