@@ -1255,6 +1255,46 @@ case "mayer-multiple": {
   }
 }
 
+case "debug-mayer-multiple": {
+  console.log("DEBUG: Requesting Bull Market Peak Indicators from Coinglass...");
+  
+  const indicatorsUrl = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
+  const indicatorsResponse = await axios.get(indicatorsUrl, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Bull Market Indicators Response Status:", indicatorsResponse.status);
+  
+  if (indicatorsResponse.status !== 200 || !indicatorsResponse.data || indicatorsResponse.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: indicatorsResponse.data?.message || 'Failed to fetch Bull Market indicators',
+      code: indicatorsResponse.data?.code
+    });
+  }
+  
+  const indicators = indicatorsResponse.data.data || [];
+  const mayerIndicator = indicators.find(indicator => 
+    indicator.indicator_name === "Mayer Multiple"
+  );
+  
+  return res.json({
+    success: true,
+    total_indicators: indicators.length,
+    all_indicator_names: indicators.map(i => i.indicator_name),
+    mayer_indicator_found: !!mayerIndicator,
+    mayer_indicator_data: mayerIndicator,
+    raw_response_sample: {
+      code: indicatorsResponse.data.code,
+      message: indicatorsResponse.data.msg,
+      data_length: indicators.length
+    }
+  });
+}
 
         
         
