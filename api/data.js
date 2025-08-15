@@ -1196,7 +1196,9 @@ case "mayer-multiple": {
     const currentMayerFromAPI = parseFloat(mayerIndicator.current_value);
     const previousMayerFromAPI = parseFloat(mayerIndicator.previous_value);
     const targetMayerFromAPI = parseFloat(mayerIndicator.target_value);
-    const changeFromAPI = parseFloat(mayerIndicator.change_value);
+    
+    // Calculate proper percentage change
+    const properPercentageChange = ((currentMayerFromAPI - previousMayerFromAPI) / previousMayerFromAPI) * 100;
     
     // Update the most recent data point with CoinGlass current value if available
     if (mayerMultipleData.length > 0) {
@@ -1216,7 +1218,7 @@ case "mayer-multiple": {
         current_mayer_multiple: currentMayerFromAPI,
         previous_mayer_multiple: previousMayerFromAPI,
         target_mayer_multiple: targetMayerFromAPI,
-        change_24h: changeFromAPI,
+        change_24h: properPercentageChange, // ✅ FIXED: Now shows proper percentage like -0.85%
         hit_target: mayerIndicator.hit_status
       },
       coinglass_data: {
@@ -1253,47 +1255,6 @@ case "mayer-multiple": {
       message: err.message
     });
   }
-}
-
-case "debug-mayer-multiple": {
-  console.log("DEBUG: Requesting Bull Market Peak Indicators from Coinglass...");
-  
-  const indicatorsUrl = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
-  const indicatorsResponse = await axios.get(indicatorsUrl, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
-    }
-  });
-  
-  console.log("DEBUG: Bull Market Indicators Response Status:", indicatorsResponse.status);
-  
-  if (indicatorsResponse.status !== 200 || !indicatorsResponse.data || indicatorsResponse.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: indicatorsResponse.data?.message || 'Failed to fetch Bull Market indicators',
-      code: indicatorsResponse.data?.code
-    });
-  }
-  
-  const indicators = indicatorsResponse.data.data || [];
-  const mayerIndicator = indicators.find(indicator => 
-    indicator.indicator_name === "Mayer Multiple"
-  );
-  
-  return res.json({
-    success: true,
-    total_indicators: indicators.length,
-    all_indicator_names: indicators.map(i => i.indicator_name),
-    mayer_indicator_found: !!mayerIndicator,
-    mayer_indicator_data: mayerIndicator,
-    raw_response_sample: {
-      code: indicatorsResponse.data.code,
-      message: indicatorsResponse.data.msg,
-      data_length: indicators.length
-    }
-  });
 }
 
         
