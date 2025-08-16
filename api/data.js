@@ -1338,6 +1338,104 @@ case "mayer-multiple": {
   }
 }
 
+// Risk Calculator
+
+case "supported-coins": {
+  console.log("DEBUG: Requesting supported coins from Coinglass...");
+  
+  const url = "https://open-api-v4.coinglass.com/api/futures/supported-coins";
+  const response = await axios.get(url, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Supported Coins Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  return res.json(response.data);
+}
+
+case "coins-markets": {
+  console.log("DEBUG: Requesting coins markets from Coinglass...");
+  
+  const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const response = await axios.get(url, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Coins Markets Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  return res.json(response.data);
+}
+
+
+        
         
         
       default:
