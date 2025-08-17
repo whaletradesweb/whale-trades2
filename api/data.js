@@ -1641,6 +1641,73 @@ case "hyperliquid-whale-position": {
     dataSource: 'hyperliquid_raw_whale_positions'
   });
 }
+
+
+// Add this case to your existing switch statement in data.js
+
+case "hyperliquid-whale-alert": {
+  console.log("DEBUG: Requesting Hyperliquid whale alerts...");
+  
+  const url = "https://open-api-v4.coinglass.com/api/hyperliquid/whale-alert";
+  const response = await axios.get(url, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Hyperliquid Whale Alert Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  const rawData = response.data.data || [];
+  
+  if (!Array.isArray(rawData)) {
+    return res.status(404).json({
+      error: 'No Data',
+      message: 'No Hyperliquid whale alert data available'
+    });
+  }
+  
+  console.log(`DEBUG: Processed ${rawData.length} whale alerts`);
+  
+  return res.json({ 
+    success: true,
+    data: rawData,
+    lastUpdated: new Date().toISOString(),
+    dataSource: 'hyperliquid_whale_alerts'
+  });
+}
+
         
         
       default:
