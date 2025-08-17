@@ -1436,6 +1436,149 @@ case "coins-markets": {
 
 
         
+
+case "hyperliquid-long-short": {
+  console.log("DEBUG: Requesting Hyperliquid whale positions...");
+  
+  const url = "https://open-api-v4.coinglass.com/api/hyperliquid/whale-position";
+  const response = await axios.get(url, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Hyperliquid Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  const rawData = response.data.data || [];
+  
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    return res.status(404).json({
+      error: 'No Data',
+      message: 'No Hyperliquid whale position data available'
+    });
+  }
+  
+  // Group positions by symbol and calculate long/short ratios
+  const symbolData = {};
+  
+  rawData.forEach(position => {
+    const symbol = position.symbol;
+    const positionSize = position.position_size || 0;
+    const positionValueUsd = Math.abs(position.position_value_usd || 0);
+    
+    if (!symbolData[symbol]) {
+      symbolData[symbol] = {
+        symbol: symbol,
+        longValue: 0,
+        shortValue: 0,
+        totalValue: 0,
+        positionCount: 0
+      };
+    }
+    
+    if (positionSize > 0) {
+      // Long position
+      symbolData[symbol].longValue += positionValueUsd;
+    } else if (positionSize < 0) {
+      // Short position
+      symbolData[symbol].shortValue += positionValueUsd;
+    }
+    
+    symbolData[symbol].totalValue += positionValueUsd;
+    symbolData[symbol].positionCount += 1;
+  });
+  
+  // Calculate percentages and format data
+  const processedData = Object.values(symbolData)
+    .filter(data => data.totalValue > 0) // Only include symbols with positions
+    .map(data => {
+      const longPct = data.totalValue > 0 ? (data.longValue / data.totalValue) * 100 : 0;
+      const shortPct = data.totalValue > 0 ? (data.shortValue / data.totalValue) * 100 : 0;
+      const differential = Math.abs(longPct - shortPct);
+      
+      return {
+        symbol: data.symbol,
+        longValue: data.longValue,
+        shortValue: data.shortValue,
+        totalValue: data.totalValue,
+        longPct: parseFloat(longPct.toFixed(2)),
+        shortPct: parseFloat(shortPct.toFixed(2)),
+        differential: parseFloat(differential.toFixed(2)),
+        positionCount: data.positionCount,
+        // Determine market sentiment
+        sentiment: longPct > shortPct ? 'bullish' : 'bearish',
+        dominance: Math.max(longPct, shortPct)
+      };
+    })
+    .sort((a, b) => b.totalValue - a.totalValue) // Sort by total position value
+    .slice(0, 20); // Top 20 coins
+  
+  // Calculate overall market metrics
+  const totalLongValue = processedData.reduce((sum, coin) => sum + coin.longValue, 0);
+  const totalShortValue = processedData.reduce((sum, coin) => sum + coin.shortValue, 0);
+  const totalValue = totalLongValue + totalShortValue;
+  
+  const overallLongPct = totalValue > 0 ? (totalLongValue / totalValue) * 100 : 0;
+  const overallShortPct = totalValue > 0 ? (totalShortValue / totalValue) * 100 : 0;
+  const overallDifferential = Math.abs(overallLongPct - overallShortPct);
+  
+  const marketMetrics = {
+    totalLongValue,
+    totalShortValue,
+    totalValue,
+    overallLongPct: parseFloat(overallLongPct.toFixed(2)),
+    overallShortPct: parseFloat(overallShortPct.toFixed(2)),
+    overallDifferential: parseFloat(overallDifferential.toFixed(2)),
+    marketSentiment: overallLongPct > overallShortPct ? 'bullish' : 'bearish',
+    totalCoins: processedData.length,
+    bullishCoins: processedData.filter(coin => coin.sentiment === 'bullish').length,
+    bearishCoins: processedData.filter(coin => coin.sentiment === 'bearish').length
+  };
+  
+  console.log(`DEBUG: Processed ${processedData.length} coins with total value $${(totalValue / 1e6).toFixed(2)}M`);
+  console.log(`DEBUG: Overall ratio - Long: ${overallLongPct.toFixed(2)}%, Short: ${overallShortPct.toFixed(2)}%`);
+  
+  return res.json({ 
+    success: true,
+    data: processedData,
+    marketMetrics: marketMetrics,
+    lastUpdated: new Date().toISOString(),
+    dataSource: 'hyperliquid_whale_positions'
+  });
+}
+        
         
         
       default:
