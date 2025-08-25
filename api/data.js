@@ -430,14 +430,13 @@ case "etf-eth-flows": {
       }
 
 
-// Replace your existing "volume-total" case with this corrected version
 case "volume-total": {
   try {
-    console.log("DEBUG: Calculating total futures volume using supported-exchange-pairs method...");
+    console.log("DEBUG: Calculating total futures volume by summing each coin's volume across all exchanges...");
     
-    // Step 1: Get all supported exchange pairs
-    console.log("DEBUG: Fetching supported exchange pairs...");
-    const supportedPairsResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/supported-exchange-pairs", { 
+    // Get pairs-markets data which has volume per trading pair per exchange
+    console.log("DEBUG: Fetching pairs markets data...");
+    const pairsResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/pairs-markets", { 
       headers,
       timeout: 20000,
       validateStatus: function (status) {
@@ -445,157 +444,140 @@ case "volume-total": {
       }
     });
 
-    if (supportedPairsResponse.status !== 200 || supportedPairsResponse.data?.code !== "0") {
-      throw new Error(`Supported pairs API failed: ${supportedPairsResponse.data?.msg || 'Unknown error'}`);
+    if (pairsResponse.status !== 200 || pairsResponse.data?.code !== "0") {
+      throw new Error(`Pairs markets API failed: ${pairsResponse.data?.msg || 'Unknown error'}`);
     }
 
-    const supportedExchanges = supportedPairsResponse.data.data || {};
-    console.log(`DEBUG: Found ${Object.keys(supportedExchanges).length} exchanges`);
+    const pairs = pairsResponse.data.data || [];
+    console.log(`DEBUG: Retrieved ${pairs.length} trading pairs across all exchanges`);
     
-    // Count total pairs across all exchanges
-    let totalPairs = 0;
-    Object.values(supportedExchanges).forEach(pairs => {
-      totalPairs += pairs.length;
-    });
-    console.log(`DEBUG: Total trading pairs across all exchanges: ${totalPairs}`);
-
-    // Step 2: Get coins markets data for volume information
-    console.log("DEBUG: Fetching coins markets data...");
-    const coinsResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { 
-      headers,
-      timeout: 15000
-    });
-
-    if (coinsResponse.status !== 200 || coinsResponse.data?.code !== "0") {
-      throw new Error(`Coins markets API failed: ${coinsResponse.data?.msg || 'Unknown error'}`);
-    }
-
-    const coins = coinsResponse.data.data || [];
-    console.log(`DEBUG: Retrieved data for ${coins.length} coins`);
-    
-    // Debug: Log the structure of the first coin to see available fields
-    if (coins.length > 0) {
-      console.log("DEBUG: Sample coin data fields:", Object.keys(coins[0]));
-      console.log("DEBUG: Sample coin:", {
-        symbol: coins[0].symbol,
-        long_volume_usd_24h: coins[0].long_volume_usd_24h,
-        short_volume_usd_24h: coins[0].short_volume_usd_24h,
-        volume_change_percent_24h: coins[0].volume_change_percent_24h
+    // Debug: Log structure of first few pairs to understand the data
+    if (pairs.length > 0) {
+      console.log("DEBUG: Sample pair fields:", Object.keys(pairs[0]));
+      console.log("DEBUG: First 3 pairs sample:");
+      pairs.slice(0, 3).forEach((pair, i) => {
+        console.log(`  ${i + 1}:`, {
+          symbol: pair.symbol,
+          exchange: pair.exchange,
+          instrument_id: pair.instrument_id,
+          volume_usd: pair.volume_usd,
+          volume_usd_change_percent_24h: pair.volume_usd_change_percent_24h
+        });
       });
     }
 
-    // Step 3: Calculate total volume correctly
-    // The key insight is that coins-markets already provides aggregated volume across all exchanges
-    // We should use volume_usd_24h which represents total 24h volume for each coin across all supported exchanges
-    
+    // Group by coin symbol and sum volumes across all exchanges and pairs
+    const coinVolumeMap = {};
     let totalVolume24h = 0;
     let totalWeightedVolumeChange = 0;
-    let validCoinsWithVolumeChange = 0;
-    
-    const coinVolumeData = [];
-    
-    coins.forEach(coin => {
-      // Based on the API response structure, we need to calculate volume from long + short volume
-      const longVolume24h = coin.long_volume_usd_24h || 0;
-      const shortVolume24h = coin.short_volume_usd_24h || 0;
-      const coinVolume24h = longVolume24h + shortVolume24h;
-      const volumeChangePercent = coin.volume_change_percent_24h;
+    let validPairsWithChange = 0;
+
+    pairs.forEach(pair => {
+      const symbol = pair.symbol || pair.base_asset;
+      const exchange = pair.exchange;
+      const pairVolume = pair.volume_usd || 0;
+      const volumeChangePercent = pair.volume_usd_change_percent_24h;
       
-      if (coinVolume24h > 0) {
-        totalVolume24h += coinVolume24h;
-        
-        // Store coin data for debugging
-        coinVolumeData.push({
-          symbol: coin.symbol,
-          volume_24h: coinVolume24h,
-          long_volume_24h: longVolume24h,
-          short_volume_24h: shortVolume24h,
-          volume_change_percent: volumeChangePercent,
-          market_cap: coin.market_cap_usd || 0
+      if (!symbol) {
+        console.log("DEBUG: Skipping pair with no symbol:", pair);
+        return;
+      }
+      
+      // Initialize coin entry if it doesn't exist
+      if (!coinVolumeMap[symbol]) {
+        coinVolumeMap[symbol] = {
+          symbol: symbol,
+          totalVolume: 0,
+          exchanges: new Set(),
+          pairs: [],
+          volumeChangeData: []
+        };
+      }
+      
+      // Add this pair's volume to the coin's total
+      if (pairVolume > 0) {
+        coinVolumeMap[symbol].totalVolume += pairVolume;
+        coinVolumeMap[symbol].exchanges.add(exchange);
+        coinVolumeMap[symbol].pairs.push({
+          exchange,
+          instrument_id: pair.instrument_id,
+          volume: pairVolume,
+          volumeChange: volumeChangePercent
         });
         
-        // Calculate weighted volume change
+        // Track volume change data for weighted average calculation
         if (typeof volumeChangePercent === "number" && !isNaN(volumeChangePercent)) {
-          totalWeightedVolumeChange += coinVolume24h * volumeChangePercent;
-          validCoinsWithVolumeChange++;
+          coinVolumeMap[symbol].volumeChangeData.push({
+            volume: pairVolume,
+            change: volumeChangePercent
+          });
         }
       }
     });
 
-    // Calculate weighted average volume change
-    const averageVolumeChange = totalVolume24h > 0 ? totalWeightedVolumeChange / totalVolume24h : 0;
-    
-    // Sort coins by volume for debugging
-    coinVolumeData.sort((a, b) => b.volume_24h - a.volume_24h);
-    const top10CoinsByVolume = coinVolumeData.slice(0, 10);
-    
-    console.log(`DEBUG: Calculated total volume: $${(totalVolume24h / 1e9).toFixed(2)}B`);
-    console.log(`DEBUG: Calculated volume change: ${averageVolumeChange.toFixed(2)}%`);
-    console.log(`DEBUG: CoinGlass target: $498.04B +107.68%`);
-    console.log(`DEBUG: Our result vs target:`);
-    console.log(`  Volume difference: $${((totalVolume24h - 498038439118) / 1e9).toFixed(2)}B`);
-    console.log(`  Change difference: ${(averageVolumeChange - 107.68).toFixed(2)}%`);
-
-    // Alternative calculation method using pairs data if needed
-    let alternativeCalculation = null;
-    if (Math.abs(totalVolume24h - 498038439118) > 50e9) { // If difference is more than $50B
-      console.log("DEBUG: Large discrepancy detected, attempting alternative calculation...");
+    // Calculate totals and weighted average change
+    Object.values(coinVolumeMap).forEach(coin => {
+      totalVolume24h += coin.totalVolume;
       
-      // Try to get more granular data using pairs-markets if available
-      try {
-        const pairsResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/pairs-markets", { 
-          headers,
-          timeout: 20000,
-          validateStatus: function (status) {
-            return status < 500;
-          }
-        });
-
-        if (pairsResponse.status === 200 && pairsResponse.data?.code === "0") {
-          const pairs = pairsResponse.data.data || [];
-          console.log(`DEBUG: Alternative method - Retrieved ${pairs.length} trading pairs`);
-          
-          let alternativeVolume = 0;
-          let alternativeWeightedChange = 0;
-          let validPairs = 0;
-
-          pairs.forEach(pair => {
-            const pairVolume = pair.volume_usd || 0;
-            const pairVolumeChange = pair.volume_usd_change_percent_24h;
-            
-            if (pairVolume > 0) {
-              alternativeVolume += pairVolume;
-              
-              if (typeof pairVolumeChange === "number" && !isNaN(pairVolumeChange)) {
-                alternativeWeightedChange += pairVolume * pairVolumeChange;
-                validPairs++;
-              }
-            }
-          });
-
-          const alternativeChange = alternativeVolume > 0 ? alternativeWeightedChange / alternativeVolume : 0;
-          
-          alternativeCalculation = {
-            volume: alternativeVolume,
-            volume_formatted: `$${(alternativeVolume / 1e9).toFixed(2)}B`,
-            change: alternativeChange,
-            pairs_processed: pairs.length,
-            pairs_with_volume: validPairs
-          };
-          
-          console.log(`DEBUG: Alternative calculation: $${(alternativeVolume / 1e9).toFixed(2)}B ${alternativeChange > 0 ? '+' : ''}${alternativeChange.toFixed(2)}%`);
-          
-          // Use alternative if it's closer to the target
-          if (Math.abs(alternativeVolume - 498038439118) < Math.abs(totalVolume24h - 498038439118)) {
-            console.log("DEBUG: Using alternative calculation as it's closer to target");
-            totalVolume24h = alternativeVolume;
-            averageVolumeChange = alternativeChange;
-          }
+      // Calculate weighted average change for this coin
+      if (coin.volumeChangeData.length > 0) {
+        const coinTotalVolume = coin.volumeChangeData.reduce((sum, d) => sum + d.volume, 0);
+        const coinWeightedChange = coin.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0);
+        
+        if (coinTotalVolume > 0) {
+          const coinAvgChange = coinWeightedChange / coinTotalVolume;
+          totalWeightedVolumeChange += coin.totalVolume * coinAvgChange;
+          validPairsWithChange++;
         }
-      } catch (altError) {
-        console.log(`DEBUG: Alternative calculation failed: ${altError.message}`);
       }
-    }
+    });
+
+    const averageVolumeChange = totalVolume24h > 0 ? totalWeightedVolumeChange / totalVolume24h : 0;
+
+    // Sort coins by total volume for analysis
+    const coinsSortedByVolume = Object.values(coinVolumeMap)
+      .sort((a, b) => b.totalVolume - a.totalVolume)
+      .slice(0, 15);
+
+    // Create detailed breakdown for top coins
+    const topCoinsDetailed = coinsSortedByVolume.map(coin => {
+      // Calculate weighted average change for this coin
+      let coinAvgChange = 0;
+      if (coin.volumeChangeData.length > 0) {
+        const coinTotalVolume = coin.volumeChangeData.reduce((sum, d) => sum + d.volume, 0);
+        const coinWeightedChange = coin.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0);
+        coinAvgChange = coinTotalVolume > 0 ? coinWeightedChange / coinTotalVolume : 0;
+      }
+      
+      return {
+        symbol: coin.symbol,
+        total_volume_formatted: `$${(coin.totalVolume / 1e9).toFixed(2)}B`,
+        exchanges_count: coin.exchanges.size,
+        pairs_count: coin.pairs.length,
+        volume_change_percent: parseFloat(coinAvgChange.toFixed(2)),
+        exchanges: Array.from(coin.exchanges),
+        // Show top 3 pairs by volume
+        top_pairs: coin.pairs
+          .sort((a, b) => b.volume - a.volume)
+          .slice(0, 3)
+          .map(p => ({
+            exchange: p.exchange,
+            instrument: p.instrument_id,
+            volume_formatted: `$${(p.volume / 1e9).toFixed(2)}B`
+          }))
+      };
+    });
+
+    console.log(`DEBUG: Processed ${Object.keys(coinVolumeMap).length} unique coins`);
+    console.log(`DEBUG: Total volume: $${(totalVolume24h / 1e9).toFixed(2)}B`);
+    console.log(`DEBUG: Average volume change: ${averageVolumeChange.toFixed(2)}%`);
+    console.log(`DEBUG: CoinGlass target: $498.04B +107.68%`);
+    
+    // Calculate accuracy metrics
+    const volumeAccuracy = 100 - Math.abs((totalVolume24h - 498038439118) / 498038439118 * 100);
+    const changeAccuracy = 100 - Math.abs((averageVolumeChange - 107.68) / 107.68 * 100);
+    
+    console.log(`DEBUG: Our accuracy: ${volumeAccuracy.toFixed(2)}% volume, ${changeAccuracy.toFixed(2)}% change`);
 
     return res.json({
       total_volume_24h: totalVolume24h,
@@ -610,32 +592,34 @@ case "volume-total": {
         volume_difference: totalVolume24h - 498038439118,
         volume_difference_formatted: `$${((totalVolume24h - 498038439118) / 1e9).toFixed(2)}B`,
         change_difference: parseFloat((averageVolumeChange - 107.68).toFixed(2)),
-        volume_accuracy: `${(100 - Math.abs((totalVolume24h - 498038439118) / 498038439118 * 100)).toFixed(2)}%`,
-        change_accuracy: `${(100 - Math.abs((averageVolumeChange - 107.68) / 107.68 * 100)).toFixed(2)}%`
+        volume_accuracy: `${volumeAccuracy.toFixed(2)}%`,
+        change_accuracy: `${changeAccuracy.toFixed(2)}%`
       },
-      calculation_details: {
-        total_coins_processed: coins.length,
-        coins_with_volume_data: coinVolumeData.length,
-        coins_with_volume_change_data: validCoinsWithVolumeChange,
-        supported_exchanges: Object.keys(supportedExchanges).length,
-        total_trading_pairs: totalPairs,
-        method_used: "coins-markets aggregated volume"
+      calculation_method: {
+        description: "Sum of each coin's volume across all exchanges and trading pairs",
+        total_unique_coins: Object.keys(coinVolumeMap).length,
+        total_trading_pairs: pairs.length,
+        pairs_with_volume_change_data: validPairsWithChange,
+        methodology: "Each coin's volume = sum of all its trading pairs across all exchanges"
       },
-      alternative_calculation: alternativeCalculation,
-      top_coins_by_volume: top10CoinsByVolume.map(coin => ({
-        symbol: coin.symbol,
-        volume_24h_formatted: `$${(coin.volume_24h / 1e9).toFixed(2)}B`,
-        volume_change_percent: coin.volume_change_percent,
-        market_cap_formatted: `$${(coin.market_cap / 1e9).toFixed(2)}B`
-      })),
+      top_coins_by_volume: topCoinsDetailed,
+      volume_distribution: {
+        total_coins: Object.keys(coinVolumeMap).length,
+        coins_over_1b: coinsSortedByVolume.filter(c => c.totalVolume > 1e9).length,
+        coins_over_10b: coinsSortedByVolume.filter(c => c.totalVolume > 10e9).length,
+        coins_over_50b: coinsSortedByVolume.filter(c => c.totalVolume > 50e9).length,
+        top_10_volume_share: `${((coinsSortedByVolume.slice(0, 10).reduce((sum, c) => sum + c.totalVolume, 0) / totalVolume24h) * 100).toFixed(1)}%`
+      },
       debug_info: {
-        api_endpoints_used: [
-          "futures/supported-exchange-pairs",
-          "futures/coins-markets",
-          alternativeCalculation ? "futures/pairs-markets" : null
-        ].filter(Boolean),
-        calculation_method: "Volume aggregated from coins-markets endpoint which provides cross-exchange totals",
-        last_updated: new Date().toISOString()
+        calculation_method: "pairs-markets endpoint - sum each coin across all exchanges",
+        data_source: "futures/pairs-markets",
+        last_updated: new Date().toISOString(),
+        sample_calculation: coinsSortedByVolume.length > 0 ? {
+          coin: coinsSortedByVolume[0].symbol,
+          exchanges: coinsSortedByVolume[0].exchanges.size,
+          pairs: coinsSortedByVolume[0].pairs.length,
+          total_volume: `$${(coinsSortedByVolume[0].totalVolume / 1e9).toFixed(2)}B`
+        } : null
       }
     });
 
@@ -644,7 +628,7 @@ case "volume-total": {
     return res.status(500).json({ 
       error: "Volume calculation failed", 
       message: err.message,
-      debug: "Check API endpoints and network connectivity"
+      debug: "Failed to calculate volume by summing each coin across all exchanges"
     });
   }
 }
