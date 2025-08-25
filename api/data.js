@@ -356,46 +356,6 @@ case "etf-eth-flows": {
         });
       }
 
-      case "pi-cycle": {
-        const url = "https://open-api-v4.coinglass.com/api/index/pi-cycle-indicator";
-        const response = await axios.get(url, { headers });
-        const rawData = response.data?.data || [];
-        
-        const prices = rawData.map(d => ({ date: new Date(d.timestamp), price: d.price }));
-        const dma111 = rawData.map(d => d.ma_110 || null);
-        const dma350x2 = rawData.map(d => d.ma_350_mu_2 || null);
-
-        const crossovers = [];
-        for (let i = 1; i < rawData.length; i++) {
-          if (dma111[i] && dma350x2[i]) {
-            const prevDiff = dma111[i-1] - dma350x2[i-1];
-            const currDiff = dma111[i] - dma350x2[i];
-            if (prevDiff < 0 && currDiff > 0) {
-              crossovers.push({ date: prices[i].date, price: prices[i].price });
-            }
-          }
-        }
-
-        return res.json({ prices, dma111, dma350x2, crossovers });
-      }
-
-      case "puell-multiple": {
-        const url = "https://open-api-v4.coinglass.com/api/index/puell-multiple";
-        const response = await axios.get(url, { headers });
-        const rawData = response.data?.data || [];
-        
-        const prices = rawData.map(d => ({ date: new Date(d.timestamp), price: d.price }));
-        const puellValues = rawData.map(d => d.puell_multiple || null);
-
-        const overbought = [], oversold = [];
-        rawData.forEach((d, i) => {
-          if (d.puell_multiple > 4) overbought.push({ date: prices[i].date, value: d.puell_multiple });
-          if (d.puell_multiple < 0.5) oversold.push({ date: prices[i].date, value: d.puell_multiple });
-        });
-
-        return res.json({ prices, puellValues, overbought, oversold });
-      }
-
       case "coin-bar-race": {
         console.log("DEBUG: Starting simplified coin-bar-race...");
         
@@ -817,527 +777,6 @@ case "crypto-ticker": {
 }
 
 
-
-case "mvrv-z-score": {
-  console.log("DEBUG: Requesting MVRV-Z Score data from Coinglass...");
-  
-  try {
-    // Get current MVRV-Z Score value from Bull Market Indicators
-    const indicatorsUrl = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
-    const indicatorsResponse = await axios.get(indicatorsUrl, { headers });
-    
-    if (indicatorsResponse.status !== 200 || !indicatorsResponse.data || indicatorsResponse.data.code !== "0") {
-      return res.status(indicatorsResponse.status || 400).json({
-        error: 'Bull Market Indicators API Error',
-        message: indicatorsResponse.data?.message || 'Failed to fetch current MVRV-Z Score',
-        code: indicatorsResponse.data?.code
-      });
-    }
-    
-    const indicators = indicatorsResponse.data.data || [];
-    const currentMVRVIndicator = indicators.find(indicator => 
-      indicator.indicator_name === "MVRV Z-Score"
-    );
-    
-    if (!currentMVRVIndicator) {
-      return res.status(404).json({
-        error: 'MVRV Z-Score Not Found',
-        message: 'MVRV Z-Score indicator not available in Bull Market Peak Indicators'
-      });
-    }
-    
-    const currentMVRVFromAPI = parseFloat(currentMVRVIndicator.current_value);
-    const previousMVRVFromAPI = parseFloat(currentMVRVIndicator.previous_value);
-    const targetMVRVFromAPI = parseFloat(currentMVRVIndicator.target_value);
-    const changeMVRVFromAPI = parseFloat(currentMVRVIndicator.change_value);
-    
-    console.log(`DEBUG: Current MVRV-Z Score from CoinGlass API: ${currentMVRVFromAPI}`);
-
-    // Fetch all required historical data for calculation
-    const [sthRealizedPriceRes, lthRealizedPriceRes, sthSupplyRes, lthSupplyRes] = await Promise.all([
-      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-sth-realized-price", { headers }),
-      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-lth-realized-price", { headers }),
-      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-short-term-holder-supply", { headers }),
-      axios.get("https://open-api-v4.coinglass.com/api/index/bitcoin-long-term-holder-supply", { headers })
-    ]);
-
-    // Validate all responses
-    const responses = [sthRealizedPriceRes, lthRealizedPriceRes, sthSupplyRes, lthSupplyRes];
-    const endpointNames = ['STH Realized Price', 'LTH Realized Price', 'STH Supply', 'LTH Supply'];
-    
-    for (let i = 0; i < responses.length; i++) {
-      const response = responses[i];
-      if (response.status !== 200 || !response.data || response.data.code !== "0") {
-        return res.status(response.status || 400).json({
-          error: `${endpointNames[i]} API Error`,
-          message: response.data?.message || `Failed to fetch ${endpointNames[i]} data`,
-          code: response.data?.code
-        });
-      }
-    }
-
-    // Extract historical data arrays
-    const sthRealizedPriceData = sthRealizedPriceRes.data.data || [];
-    const lthRealizedPriceData = lthRealizedPriceRes.data.data || [];
-    const sthSupplyData = sthSupplyRes.data.data || [];
-    const lthSupplyData = lthSupplyRes.data.data || [];
-
-    console.log(`DEBUG: Data lengths - STH Price: ${sthRealizedPriceData.length}, LTH Price: ${lthRealizedPriceData.length}, STH Supply: ${sthSupplyData.length}, LTH Supply: ${lthSupplyData.length}`);
-
-    // Create lookup maps for efficient data matching
-    const sthPriceMap = new Map();
-    const lthPriceMap = new Map();
-    const sthSupplyMap = new Map();
-    const lthSupplyMap = new Map();
-
-    sthRealizedPriceData.forEach(d => sthPriceMap.set(d.timestamp, d));
-    lthRealizedPriceData.forEach(d => lthPriceMap.set(d.timestamp, d));
-    sthSupplyData.forEach(d => sthSupplyMap.set(d.timestamp, d));
-    lthSupplyData.forEach(d => lthSupplyMap.set(d.timestamp, d));
-
-    // Get all unique timestamps and sort them
-    const allTimestamps = new Set([
-      ...sthRealizedPriceData.map(d => d.timestamp),
-      ...lthRealizedPriceData.map(d => d.timestamp),
-      ...sthSupplyData.map(d => d.timestamp),
-      ...lthSupplyData.map(d => d.timestamp)
-    ]);
-
-    const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
-    console.log(`DEBUG: Processing ${sortedTimestamps.length} unique timestamps`);
-
-    // Calculate Market Cap and Realized Market Cap for each timestamp
-    const mvrvData = [];
-
-    sortedTimestamps.forEach(timestamp => {
-      const sthPrice = sthPriceMap.get(timestamp);
-      const lthPrice = lthPriceMap.get(timestamp);
-      const sthSupply = sthSupplyMap.get(timestamp);
-      const lthSupply = lthSupplyMap.get(timestamp);
-
-      // Skip if any required data is missing
-      if (!sthPrice || !lthPrice || !sthSupply || !lthSupply) {
-        return;
-      }
-
-      // Extract values with fallbacks
-      const price = sthPrice.price || lthPrice.price || 0;
-      const sthRealizedPrice = sthPrice.sth_realized_price || 0;
-      const lthRealizedPrice = lthPrice.lth_realized_price || 0;
-      const sthSupplyValue = sthSupply.short_term_holder_supply || 0;
-      const lthSupplyValue = lthSupply.long_term_holder_supply || 0;
-
-      // Calculate Market Cap and Realized Market Cap
-      const totalSupply = sthSupplyValue + lthSupplyValue;
-      const marketCap = price * totalSupply;
-      const realizedMarketCap = (sthRealizedPrice * sthSupplyValue) + (lthRealizedPrice * lthSupplyValue);
-
-      mvrvData.push({
-        timestamp,
-        date: new Date(timestamp).toISOString().split('T')[0],
-        price,
-        market_cap: marketCap,
-        realized_market_cap: realizedMarketCap,
-        mvrv_ratio: realizedMarketCap > 0 ? marketCap / realizedMarketCap : 0,
-        total_supply: totalSupply
-      });
-    });
-
-    console.log(`DEBUG: Created ${mvrvData.length} data points for MVRV calculation`);
-
-    // Sort by timestamp to ensure chronological order
-    mvrvData.sort((a, b) => a.timestamp - b.timestamp);
-
-    // Test multiple approaches to find the best match with CoinGlass current value
-    const approaches = [
-      { name: 'glassnode_formula', windowSize: 730 }, // Glassnode: cumulative std dev from start
-      { name: 'rolling_window_365', windowSize: 365 },  // 1-year rolling window
-      { name: 'rolling_window_730', windowSize: 730 },  // 2-year rolling window
-      { name: 'rolling_window_1095', windowSize: 1095 } // 3-year rolling window
-    ];
-    
-    let bestApproach = null;
-    let bestAccuracy = Infinity;
-    let bestZScores = [];
-    
-    for (const approach of approaches) {
-      const testZScores = [];
-      
-      if (approach.name === 'glassnode_formula') {
-        // Glassnode method: cumulative standard deviation from the beginning
-        for (let i = approach.windowSize; i < mvrvData.length; i++) {
-          const current = mvrvData[i];
-          
-          // Use all data from start to current point for std dev calculation
-          const cumulativeData = mvrvData.slice(0, i + 1);
-          const marketCaps = cumulativeData.map(d => d.market_cap);
-          
-          const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
-          const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
-          const stdDev = Math.sqrt(variance);
-
-          const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
-
-          testZScores.push({
-            timestamp: current.timestamp,
-            date: current.date,
-            price: current.price,
-            market_cap: current.market_cap,
-            realized_market_cap: current.realized_market_cap,
-            mvrv_ratio: current.mvrv_ratio,
-            mvrv_z_score: mvrvZScore,
-            calculation_method: approach.name
-          });
-        }
-      } else {
-        // Rolling window methods
-        for (let i = approach.windowSize; i < mvrvData.length; i++) {
-          const current = mvrvData[i];
-          
-          // Use rolling window for std dev calculation
-          const windowData = mvrvData.slice(i - approach.windowSize, i + 1);
-          const marketCaps = windowData.map(d => d.market_cap);
-          
-          const mean = marketCaps.reduce((sum, val) => sum + val, 0) / marketCaps.length;
-          const variance = marketCaps.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (marketCaps.length - 1);
-          const stdDev = Math.sqrt(variance);
-
-          const mvrvZScore = stdDev > 0 ? (current.market_cap - current.realized_market_cap) / stdDev : 0;
-
-          testZScores.push({
-            timestamp: current.timestamp,
-            date: current.date,
-            price: current.price,
-            market_cap: current.market_cap,
-            realized_market_cap: current.realized_market_cap,
-            mvrv_ratio: current.mvrv_ratio,
-            mvrv_z_score: mvrvZScore,
-            calculation_method: approach.name,
-            window_size: approach.windowSize
-          });
-        }
-      }
-      
-      if (testZScores.length > 0) {
-        const currentCalculated = testZScores[testZScores.length - 1].mvrv_z_score;
-        const accuracy = Math.abs(currentCalculated - currentMVRVFromAPI);
-        
-        console.log(`DEBUG: ${approach.name} - Current Z-Score: ${currentCalculated.toFixed(4)}, Expected: ${currentMVRVFromAPI}, Accuracy: ${accuracy.toFixed(4)}`);
-        
-        if (accuracy < bestAccuracy) {
-          bestAccuracy = accuracy;
-          bestApproach = approach;
-          bestZScores = [...testZScores];
-        }
-      }
-    }
-
-    console.log(`DEBUG: Best approach: ${bestApproach?.name}, accuracy: ${bestAccuracy.toFixed(4)}`);
-
-    // Apply fine-tuning to get even closer to CoinGlass value
-    if (bestZScores.length > 0) {
-      const calculatedCurrent = bestZScores[bestZScores.length - 1].mvrv_z_score;
-      const calibrationFactor = currentMVRVFromAPI / calculatedCurrent;
-      
-      console.log(`DEBUG: Applying calibration factor: ${calibrationFactor.toFixed(4)}`);
-      
-      // Apply gradual calibration to the most recent 60 days for smooth transition
-      const calibrationDays = 60;
-      const calibrationStart = Math.max(0, bestZScores.length - calibrationDays);
-      
-      for (let i = calibrationStart; i < bestZScores.length; i++) {
-        const progress = (i - calibrationStart) / (calibrationDays - 1);
-        const smoothingFactor = 1 + (calibrationFactor - 1) * Math.pow(progress, 2); // Quadratic easing
-        bestZScores[i].mvrv_z_score *= smoothingFactor;
-      }
-      
-      // Ensure the last point exactly matches CoinGlass
-      bestZScores[bestZScores.length - 1].mvrv_z_score = currentMVRVFromAPI;
-      bestZScores[bestZScores.length - 1].coinglass_calibrated = true;
-    }
-    
-    // Sort by timestamp to ensure chronological order
-    bestZScores.sort((a, b) => a.timestamp - b.timestamp);
-
-    // Calculate statistics
-    const zScores = bestZScores.map(d => d.mvrv_z_score);
-    const avgZScore = zScores.reduce((sum, val) => sum + val, 0) / zScores.length;
-    const maxZScore = Math.max(...zScores);
-    const minZScore = Math.min(...zScores);
-
-    // Identify significant events
-    const peaks = bestZScores.filter(d => d.mvrv_z_score > 7);
-    const bottoms = bestZScores.filter(d => d.mvrv_z_score < -0.5);
-
-    return res.json({
-      success: true,
-      data: bestZScores,
-      statistics: {
-        total_data_points: bestZScores.length,
-        current_z_score: currentMVRVFromAPI,
-        previous_z_score: previousMVRVFromAPI,
-        target_z_score: targetMVRVFromAPI,
-        change_24h: changeMVRVFromAPI,
-        average_z_score: avgZScore.toFixed(4),
-        max_z_score: maxZScore.toFixed(4),
-        min_z_score: minZScore.toFixed(4),
-        peaks_count: peaks.length,
-        bottoms_count: bottoms.length,
-        hit_target: currentMVRVIndicator.hit_status,
-        calculation_accuracy: bestAccuracy.toFixed(4)
-      },
-      significant_events: {
-        peaks: peaks.slice(-10),
-        bottoms: bottoms.slice(-10)
-      },
-      coinglass_data: {
-        current_value: currentMVRVIndicator.current_value,
-        target_value: currentMVRVIndicator.target_value,
-        previous_value: currentMVRVIndicator.previous_value,
-        change_value: currentMVRVIndicator.change_value,
-        comparison_type: currentMVRVIndicator.comparison_type,
-        hit_status: currentMVRVIndicator.hit_status
-      },
-      metadata: {
-        calculation_method: bestApproach?.name || 'rolling_window_365',
-        window_size: bestApproach?.windowSize,
-        calibration_applied: true,
-        data_source: 'calculated_with_coinglass_calibration'
-      },
-      lastUpdated: new Date().toISOString(),
-      data_range: {
-        start_date: bestZScores[0]?.date,
-        end_date: bestZScores[bestZScores.length - 1]?.date
-      }
-    });
-
-  } catch (err) {
-    console.error("[MVRV-Z Score] API Error:", err.message);
-    
-    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-      return res.status(503).json({
-        error: "Network connection failed",
-        message: "Unable to connect to CoinGlass API. Please try again later."
-      });
-    }
-    
-    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-      return res.status(504).json({
-        error: "Request timeout",
-        message: "CoinGlass API request timed out. Please try again."
-      });
-    }
-    
-    return res.status(500).json({
-      error: "MVRV-Z Score calculation failed",
-      message: err.message
-    });
-  }
-}
-
-
-
-
-case "mayer-multiple": {
-  console.log("DEBUG: Requesting Mayer Multiple data from Coinglass...");
-  
-  try {
-    // First, get current Mayer Multiple from Bull Market Peak Indicators
-    const indicatorsUrl = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
-    const indicatorsResponse = await axios.get(indicatorsUrl, { 
-      headers,
-      timeout: 10000,
-      validateStatus: function (status) {
-        return status < 500;
-      }
-    });
-    
-    console.log("DEBUG: Bull Market Indicators Response Status:", indicatorsResponse.status);
-    
-    if (indicatorsResponse.status === 401) {
-      return res.status(401).json({
-        error: 'API Authentication Failed',
-        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-      });
-    }
-    
-    if (indicatorsResponse.status === 403) {
-      return res.status(403).json({
-        error: 'API Access Forbidden',
-        message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-      });
-    }
-    
-    if (indicatorsResponse.status === 404) {
-      return res.status(404).json({
-        error: 'API Endpoint Not Found',
-        message: 'The bull market indicators endpoint may have changed. Check CoinGlass API documentation.'
-      });
-    }
-    
-    if (indicatorsResponse.status !== 200) {
-      return res.status(indicatorsResponse.status).json({
-        error: 'API Request Failed',
-        message: `CoinGlass API returned status ${indicatorsResponse.status}`,
-        details: indicatorsResponse.data
-      });
-    }
-    
-    if (!indicatorsResponse.data || indicatorsResponse.data.code !== "0") {
-      return res.status(400).json({
-        error: 'API Error',
-        message: indicatorsResponse.data?.message || 'CoinGlass API returned error code',
-        code: indicatorsResponse.data?.code
-      });
-    }
-    
-    // Find Mayer Multiple indicator
-    const indicators = indicatorsResponse.data.data || [];
-    const mayerIndicator = indicators.find(indicator => 
-      indicator.indicator_name === "Mayer Multiple"
-    );
-    
-    if (!mayerIndicator) {
-      return res.status(404).json({
-        error: 'Mayer Multiple Not Found',
-        message: 'Mayer Multiple indicator not available in Bull Market Peak Indicators'
-      });
-    }
-    
-    console.log("DEBUG: Current Mayer Multiple from CoinGlass:", mayerIndicator.current_value);
-    
-    // Get historical Bitcoin price data from Pi Cycle indicator (reusing existing successful endpoint)
-    const piCycleUrl = "https://open-api-v4.coinglass.com/api/index/pi-cycle-indicator";
-    const piCycleResponse = await axios.get(piCycleUrl, { 
-      headers,
-      timeout: 10000,
-      validateStatus: function (status) {
-        return status < 500;
-      }
-    });
-    
-    console.log("DEBUG: Pi Cycle Response Status:", piCycleResponse.status);
-    
-    if (piCycleResponse.status !== 200) {
-      return res.status(piCycleResponse.status).json({
-        error: 'Historical Data Request Failed',
-        message: `CoinGlass API returned status ${piCycleResponse.status}`,
-        details: piCycleResponse.data
-      });
-    }
-    
-    if (!piCycleResponse.data || piCycleResponse.data.code !== "0") {
-      return res.status(400).json({
-        error: 'Historical Data API Error',
-        message: piCycleResponse.data?.message || 'CoinGlass API returned error code',
-        code: piCycleResponse.data?.code
-      });
-    }
-    
-    const historicalData = piCycleResponse.data.data || [];
-    
-    if (!Array.isArray(historicalData) || historicalData.length < 200) {
-      return res.status(404).json({
-        error: 'Insufficient Historical Data',
-        message: `Need at least 200 days of price data for Mayer Multiple calculation. Received: ${historicalData.length} days`
-      });
-    }
-    
-    console.log(`DEBUG: Received ${historicalData.length} days of historical price data from Pi Cycle endpoint`);
-    
-    // Sort data by timestamp to ensure chronological order
-    historicalData.sort((a, b) => a.timestamp - b.timestamp);
-    
-    // Calculate historical Mayer Multiple using 200-day moving average
-    const mayerMultipleData = [];
-    
-    for (let i = 199; i < historicalData.length; i++) { // Start from index 199 (200th day)
-      const currentDay = historicalData[i];
-      const currentPrice = currentDay.price || 0;
-      
-      // Calculate 200-day moving average
-      let sum = 0;
-      for (let j = i - 199; j <= i; j++) {
-        sum += (historicalData[j].price || 0);
-      }
-      const movingAverage200 = sum / 200;
-      
-      // Calculate Mayer Multiple
-      const mayerMultiple = movingAverage200 > 0 ? currentPrice / movingAverage200 : 0;
-      
-      mayerMultipleData.push({
-        timestamp: currentDay.timestamp,
-        price: currentPrice,
-        moving_average_200: movingAverage200,
-        mayer_multiple: mayerMultiple
-      });
-    }
-    
-    // Use the current Mayer Multiple from CoinGlass for the latest value
-    const currentMayerFromAPI = parseFloat(mayerIndicator.current_value);
-    const previousMayerFromAPI = parseFloat(mayerIndicator.previous_value);
-    const targetMayerFromAPI = parseFloat(mayerIndicator.target_value);
-    
-    // Calculate proper percentage change
-    const properPercentageChange = ((currentMayerFromAPI - previousMayerFromAPI) / previousMayerFromAPI) * 100;
-    
-    // Update the most recent data point with CoinGlass current value if available
-    if (mayerMultipleData.length > 0) {
-      const lastIndex = mayerMultipleData.length - 1;
-      mayerMultipleData[lastIndex].mayer_multiple = currentMayerFromAPI;
-      mayerMultipleData[lastIndex].coinglass_current = true; // Flag to indicate this is from CoinGlass
-    }
-    
-    // Sort by timestamp to ensure chronological order
-    mayerMultipleData.sort((a, b) => a.timestamp - b.timestamp);
-    
-    // Match the same response format as bitcoin-dominance
-    return res.json({ 
-      success: true,
-      data: mayerMultipleData,
-      statistics: {
-        current_mayer_multiple: currentMayerFromAPI,
-        previous_mayer_multiple: previousMayerFromAPI,
-        target_mayer_multiple: targetMayerFromAPI,
-        change_24h: properPercentageChange, // ✅ FIXED: Now shows proper percentage like -0.85%
-        hit_target: mayerIndicator.hit_status
-      },
-      coinglass_data: {
-        current_value: mayerIndicator.current_value,
-        target_value: mayerIndicator.target_value,
-        previous_value: mayerIndicator.previous_value,
-        change_value: mayerIndicator.change_value,
-        comparison_type: mayerIndicator.comparison_type,
-        hit_status: mayerIndicator.hit_status
-      },
-      lastUpdated: new Date().toISOString(),
-      dataPoints: mayerMultipleData.length
-    });
-
-  } catch (err) {
-    console.error("[Mayer Multiple] API Error:", err.message);
-    
-    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-      return res.status(503).json({
-        error: "Network connection failed",
-        message: "Unable to connect to CoinGlass API. Please try again later."
-      });
-    }
-    
-    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-      return res.status(504).json({
-        error: "Request timeout",
-        message: "CoinGlass API request timed out. Please try again."
-      });
-    }
-    
-    return res.status(500).json({
-      error: "Mayer Multiple calculation failed",
-      message: err.message
-    });
-  }
-}
-
 // Risk Calculator
 
 case "supported-coins": {
@@ -1708,6 +1147,124 @@ case "hyperliquid-whale-alert": {
   });
 }
 
+// Add this new case to your switch statement in data.js
+
+case "bull-market-peak-indicators": {
+  console.log("DEBUG: Requesting Bull Market Peak Indicators from Coinglass...");
+  
+  const bullMarketUrl = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
+  const bullResponse = await axios.get(bullMarketUrl, { 
+    headers,
+    timeout: 10000,
+    validateStatus: function (status) {
+      return status < 500;
+    }
+  });
+  
+  console.log("DEBUG: Bull Market Peak Indicators Response Status:", bullResponse.status);
+  
+  if (bullResponse.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (bullResponse.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden',
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (bullResponse.status === 404) {
+    return res.status(404).json({
+      error: 'API Endpoint Not Found',
+      message: 'The bull market peak indicators endpoint may have changed. Check CoinGlass API documentation.'
+    });
+  }
+  
+  if (bullResponse.status !== 200) {
+    return res.status(bullResponse.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${bullResponse.status}`,
+      details: bullResponse.data
+    });
+  }
+  
+  if (!bullResponse.data || bullResponse.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: bullResponse.data?.message || 'CoinGlass API returned error code',
+      code: bullResponse.data?.code
+    });
+  }
+  
+  const indicators = bullResponse.data.data || [];
+  
+  // Target indicators we want to display
+  const targetIndicators = [
+    "Pi Cycle Top Indicator",
+    "Puell Multiple", 
+    "Bitcoin Rainbow Chart",
+    "MV-RV Z-Score",
+    "Altcoin Season Index",
+    "Bitcoin Dominance", 
+    "Bitcoin Net Unrealized Profit/Loss (NUPL)",
+    "Bitcoin 4-Year Moving Average"
+  ];
+  
+  // Process and format the indicators data
+  const processedIndicators = {};
+  
+  indicators.forEach(indicator => {
+    if (targetIndicators.includes(indicator.indicator_name)) {
+      const current = parseFloat(indicator.current_value) || 0;
+      const target = parseFloat(indicator.target_value) || 0;
+      const previous = parseFloat(indicator.previous_value) || 0;
+      const change = parseFloat(indicator.change_value) || 0;
+      
+      // Calculate progress percentage
+      let progressPercentage = 0;
+      if (indicator.comparison_type === ">=") {
+        // For >= comparisons, calculate how close we are to the target
+        progressPercentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+      } else if (indicator.comparison_type === "<=") {
+        // For <= comparisons, calculate how close we are (inverted)
+        progressPercentage = target > 0 ? Math.max(100 - ((current / target) * 100), 0) : 0;
+      }
+      
+      // Calculate distance to target
+      const distance = Math.abs(target - current);
+      
+      // Calculate percentage change from previous
+      const percentageChange = previous !== 0 ? ((current - previous) / previous) * 100 : 0;
+      
+      processedIndicators[indicator.indicator_name] = {
+        current_value: current,
+        target_value: target,
+        previous_value: previous,
+        change_value: change,
+        comparison_type: indicator.comparison_type,
+        hit_status: indicator.hit_status,
+        progress_percentage: Math.round(progressPercentage * 100) / 100,
+        distance_to_target: distance,
+        percentage_change: Math.round(percentageChange * 100) / 100,
+        progress_bar_width: Math.min(progressPercentage, 100), // Cap at 100% for display
+        remaining_bar_width: Math.max(100 - progressPercentage, 0)
+      };
+    }
+  });
+  
+  console.log(`DEBUG: Processed ${Object.keys(processedIndicators).length} indicators`);
+  
+  return res.json({ 
+    success: true,
+    data: processedIndicators,
+    lastUpdated: new Date().toISOString(),
+    totalIndicators: Object.keys(processedIndicators).length
+  });
+}
         
         
       default:
