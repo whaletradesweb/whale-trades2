@@ -1225,32 +1225,50 @@ case "bull-market-peak-indicators": {
 
 case "volume-total": {
   try {
-    const url = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
-    const response = await axios.get(url, { headers });
+    const url = "https://open-api-v4.coinglass.com/api/futures/exchange-list";
+    const response = await axios.get(url, {
+      headers,
+      timeout: 12000,
+      validateStatus: s => s < 500 // let 4xx bubble to us with body
+    });
 
-    const pairs = response.data?.data || [];
-    if (!Array.isArray(pairs) || pairs.length === 0) {
-      throw new Error("No pair data received from CoinGlass");
+    // If the API responded with a non-200, forward details
+    if (response.status !== 200) {
+      return res.status(response.status).json({
+        error: "CoinGlass API error",
+        message: response.data?.msg || response.data?.message || `HTTP ${response.status}`,
+        status: response.status
+      });
     }
 
-    // Sum 24h futures volume across ALL futures pairs (perps + deliveries, all exchanges)
-    let totalVolume = 0;
-    let prevTotal = 0;
-
-    for (const p of pairs) {
-      const vol = Number(p.volume_usd) || 0;                           // v4 field
-      const pct = Number(p.volume_usd_change_percent_24h) || 0;        // v4 field
-
-      totalVolume += vol;
-
-      // Back out yesterday's volume for this pair using the 24h change %
-      // prev = vol / (1 + pct/100)
-      if (pct > -100) {
-        prevTotal += vol / (1 + (pct / 100));
-      }
+    // v4 pattern: { code: "0", data: [...] }
+    if (!response.data || response.data.code !== "0") {
+      return res.status(502).json({
+        error: "Unexpected API payload",
+        message: response.data?.msg || response.data?.message || "Missing code=0 or data[]"
+      });
     }
 
-    const changePct = prevTotal > 0 ? ((totalVolume - prevTotal) / prevTotal) * 100 : 0;
+    const rows = Array.isArray(response.data.data) ? response.data.data : [];
+    if (rows.length === 0) {
+      throw new Error("No exchange rows in response");
+    }
+
+    // Sum per-exchange 24h futures volume
+    const totalVolume = rows.reduce((sum, r) => sum + (Number(r.volume_usd) || 0), 0);
+
+    // 24h % change: use KV baseline (previous total within 24h window)
+    const now = Date.now();
+    const prev = await kv.get("futures_volume:previous_total");
+    const prevTs = await kv.get("futures_volume:timestamp");
+    let pct = 0;
+
+    if (prev && prevTs && (now - Number(prevTs)) < 24 * 60 * 60 * 1000) {
+      pct = ((totalVolume - Number(prev)) / Number(prev)) * 100;
+    } else {
+      await kv.set("futures_volume:previous_total", totalVolume);
+      await kv.set("futures_volume:timestamp", now);
+    }
 
     const fmtUSD = (v) =>
       v >= 1e12 ? `$${(v / 1e12).toFixed(2)}T` :
@@ -1261,8 +1279,9 @@ case "volume-total": {
     return res.json({
       total_volume_24h: totalVolume,
       total_volume_formatted: fmtUSD(totalVolume),
-      percent_change_24h: Number.isFinite(changePct) ? changePct.toFixed(2) : "0.00",
-      last_updated: new Date().toISOString()
+      percent_change_24h: Number.isFinite(pct) ? pct.toFixed(2) : "0.00",
+      last_updated: new Date().toISOString(),
+      source: "exchange-list"
     });
 
   } catch (err) {
@@ -1273,6 +1292,7 @@ case "volume-total": {
     });
   }
 }
+
 
 
 
