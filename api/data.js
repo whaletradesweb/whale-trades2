@@ -1147,7 +1147,7 @@ case "hyperliquid-whale-alert": {
   });
 }
 
-// Add this new case to your switch statement in data.js
+// 
 
 case "bull-market-peak-indicators": {
   console.log("DEBUG: Requesting Bull Market Peak Indicators from Coinglass...");
@@ -1202,15 +1202,15 @@ case "bull-market-peak-indicators": {
   
   const indicators = bullResponse.data.data || [];
   
-  // Target indicators we want to display
+  // Target indicators we want to display (using exact API names)
   const targetIndicators = [
     "Pi Cycle Top Indicator",
     "Puell Multiple", 
     "Bitcoin Rainbow Chart",
-    "MV-RV Z-Score",
+    "MVRV Z-Score", // Fixed name
     "Altcoin Season Index",
     "Bitcoin Dominance", 
-    "Bitcoin Net Unrealized Profit/Loss (NUPL)",
+    "Bitcoin Net Unrealized P&L (NUPL)", // Fixed name
     "Bitcoin 4-Year Moving Average"
   ];
   
@@ -1219,9 +1219,10 @@ case "bull-market-peak-indicators": {
   
   indicators.forEach(indicator => {
     if (targetIndicators.includes(indicator.indicator_name)) {
-      const current = parseFloat(indicator.current_value) || 0;
-      const target = parseFloat(indicator.target_value) || 0;
-      const previous = parseFloat(indicator.previous_value) || 0;
+      // Parse current and target values (handle percentage strings)
+      let current = parseFloat(indicator.current_value.toString().replace('%', '')) || 0;
+      let target = parseFloat(indicator.target_value.toString().replace('%', '')) || 0;
+      const previous = parseFloat(indicator.previous_value.toString().replace('%', '')) || 0;
       const change = parseFloat(indicator.change_value) || 0;
       
       // Calculate progress percentage
@@ -1250,8 +1251,10 @@ case "bull-market-peak-indicators": {
         progress_percentage: Math.round(progressPercentage * 100) / 100,
         distance_to_target: distance,
         percentage_change: Math.round(percentageChange * 100) / 100,
-        progress_bar_width: Math.min(progressPercentage, 100), // Cap at 100% for display
-        remaining_bar_width: Math.max(100 - progressPercentage, 0)
+        progress_bar_width: Math.min(progressPercentage, 100), // This is the green progress bar
+        remaining_bar_width: Math.max(100 - progressPercentage, 0), // This is the remaining gray bar
+        original_current_value: indicator.current_value, // Keep original format for display
+        original_target_value: indicator.target_value // Keep original format for display
       };
     }
   });
