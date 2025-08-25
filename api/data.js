@@ -472,6 +472,17 @@ case "volume-total": {
 
     const coins = coinsResponse.data.data || [];
     console.log(`DEBUG: Retrieved data for ${coins.length} coins`);
+    
+    // Debug: Log the structure of the first coin to see available fields
+    if (coins.length > 0) {
+      console.log("DEBUG: Sample coin data fields:", Object.keys(coins[0]));
+      console.log("DEBUG: Sample coin:", {
+        symbol: coins[0].symbol,
+        long_volume_usd_24h: coins[0].long_volume_usd_24h,
+        short_volume_usd_24h: coins[0].short_volume_usd_24h,
+        volume_change_percent_24h: coins[0].volume_change_percent_24h
+      });
+    }
 
     // Step 3: Calculate total volume correctly
     // The key insight is that coins-markets already provides aggregated volume across all exchanges
@@ -484,8 +495,10 @@ case "volume-total": {
     const coinVolumeData = [];
     
     coins.forEach(coin => {
-      // Use the total volume field from coins-markets (this is already aggregated across exchanges)
-      const coinVolume24h = coin.volume_usd_24h || 0;
+      // Based on the API response structure, we need to calculate volume from long + short volume
+      const longVolume24h = coin.long_volume_usd_24h || 0;
+      const shortVolume24h = coin.short_volume_usd_24h || 0;
+      const coinVolume24h = longVolume24h + shortVolume24h;
       const volumeChangePercent = coin.volume_change_percent_24h;
       
       if (coinVolume24h > 0) {
@@ -495,6 +508,8 @@ case "volume-total": {
         coinVolumeData.push({
           symbol: coin.symbol,
           volume_24h: coinVolume24h,
+          long_volume_24h: longVolume24h,
+          short_volume_24h: shortVolume24h,
           volume_change_percent: volumeChangePercent,
           market_cap: coin.market_cap_usd || 0
         });
