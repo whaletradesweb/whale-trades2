@@ -429,6 +429,8 @@ case "etf-eth-flows": {
         });
       }
 
+
+// Replace your existing "volume-total" case with this corrected version
 case "volume-total": {
   try {
     console.log("DEBUG: Calculating total futures volume using supported-exchange-pairs method...");
@@ -618,7 +620,7 @@ case "volume-total": {
           alternativeCalculation ? "futures/pairs-markets" : null
         ].filter(Boolean),
         calculation_method: "Volume aggregated from coins-markets endpoint which provides cross-exchange totals",
-        last_updated: new Date().toUSOString()
+        last_updated: new Date().toISOString()
       }
     });
 
@@ -631,7 +633,6 @@ case "volume-total": {
     });
   }
 }
-
 
 case "rsi-heatmap": {
   const { interval = "1h" } = req.query;
