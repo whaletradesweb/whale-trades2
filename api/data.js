@@ -1222,7 +1222,54 @@ case "bull-market-peak-indicators": {
     totalIndicators: Object.keys(processedIndicators).length
   });
 }
-        
+
+case "volume-total": {
+  try {
+    const url = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
+    const response = await axios.get(url, { headers });
+    const pairs = response.data?.data || [];
+
+    if (!Array.isArray(pairs) || pairs.length === 0) {
+      throw new Error("No pair data received from CoinGlass");
+    }
+
+    let totalVolume = 0;
+    let prevTotal = 0;
+
+    for (const p of pairs) {
+      const vol = p.volUsd ?? 0;
+      const pct = p.volUsdChangePercent24h ?? 0;
+
+      totalVolume += vol;
+      const prev = vol / (1 + (pct / 100));
+      prevTotal += prev;
+    }
+
+    const changePct = prevTotal > 0 ? ((totalVolume - prevTotal) / prevTotal) * 100 : 0;
+
+    // Format helper
+    const fmtUSD = v =>
+      v >= 1e12 ? `$${(v/1e12).toFixed(2)}T` :
+      v >= 1e9  ? `$${(v/1e9 ).toFixed(2)}B` :
+      v >= 1e6  ? `$${(v/1e6 ).toFixed(2)}M` :
+                  `$${v.toFixed(0)}`;
+
+    return res.json({
+      total_volume_24h: totalVolume,
+      total_volume_formatted: fmtUSD(totalVolume),
+      percent_change_24h: changePct.toFixed(2),
+      last_updated: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error("[volume-total] API Error:", err.message);
+    return res.status(500).json({ 
+      error: "Volume API failed", 
+      message: err.message 
+    });
+  }
+}
+
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
