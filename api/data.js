@@ -431,6 +431,60 @@ case "etf-eth-flows": {
 
 case "volume-total": {
   try {
+    // Try to get pairs data first (more comprehensive)
+    console.log("DEBUG: Attempting to fetch pairs markets data...");
+    
+    const pairsResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/pairs-markets", { 
+      headers,
+      timeout: 15000,
+      validateStatus: function (status) {
+        return status < 500; // Don't throw on 4xx errors
+      }
+    });
+
+    // If pairs endpoint works, use it for most accurate calculation
+    if (pairsResponse.status === 200 && pairsResponse.data?.code === "0") {
+      const pairs = pairsResponse.data.data || [];
+      console.log(`DEBUG: Processing ${pairs.length} trading pairs for volume calculation`);
+
+      let totalVolume = 0;
+      let totalWeightedChange = 0;
+      let validPairs = 0;
+
+      pairs.forEach(pair => {
+        const volume = pair.volume_usd || 0;
+        const volumeChange = pair.volume_usd_change_percent_24h;
+        
+        if (volume > 0) {
+          totalVolume += volume;
+          
+          if (typeof volumeChange === "number") {
+            totalWeightedChange += volume * volumeChange;
+            validPairs++;
+          }
+        }
+      });
+
+      const weightedPercentChange = totalVolume > 0 
+        ? totalWeightedChange / totalVolume 
+        : 0;
+
+      console.log(`DEBUG: Pairs method - Total Volume: ${(totalVolume / 1e9).toFixed(2)}B`);
+      console.log(`DEBUG: Pairs method - Weighted Change: ${weightedPercentChange.toFixed(2)}%`);
+
+      return res.json({
+        total_volume_24h: totalVolume,
+        percent_change_24h: weightedPercentChange,
+        total_pairs_processed: pairs.length,
+        pairs_with_volume_data: validPairs,
+        last_updated: new Date().toUTCString(),
+        calculation_method: "sum_of_all_trading_pairs"
+      });
+    }
+
+    // Fallback to coins markets endpoint if pairs fails
+    console.log("DEBUG: Pairs endpoint failed, falling back to coins markets...");
+    
     const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
     const coins = response.data?.data || [];
 
@@ -440,13 +494,11 @@ case "volume-total": {
 
     console.log(`DEBUG: Processing ${coins.length} coins for volume calculation`);
 
-    // Calculate total 24h volume by summing long and short volumes
     let total24hVolume = 0;
     let totalWeightedChange = 0;
     let validCoins = 0;
 
     coins.forEach(coin => {
-      // Sum long and short volume for 24h to get total volume for this coin
       const longVolume24h = coin.long_volume_usd_24h || 0;
       const shortVolume24h = coin.short_volume_usd_24h || 0;
       const coinTotal24hVolume = longVolume24h + shortVolume24h;
@@ -454,7 +506,6 @@ case "volume-total": {
       if (coinTotal24hVolume > 0) {
         total24hVolume += coinTotal24hVolume;
         
-        // For weighted percentage change, use the volume change if available
         if (typeof coin.volume_change_percent_24h === "number") {
           totalWeightedChange += coinTotal24hVolume * coin.volume_change_percent_24h;
           validCoins++;
@@ -462,14 +513,12 @@ case "volume-total": {
       }
     });
 
-    // Calculate volume-weighted percentage change
     const cumulativePercentageChange = total24hVolume > 0 
       ? totalWeightedChange / total24hVolume 
       : 0;
 
-    console.log(`DEBUG: Total 24h Volume: $${(total24hVolume / 1e9).toFixed(2)}B`);
-    console.log(`DEBUG: Weighted Change: ${cumulativePercentageChange.toFixed(2)}%`);
-    console.log(`DEBUG: Valid coins for calculation: ${validCoins}`);
+    console.log(`DEBUG: Coins method - Total Volume: ${(total24hVolume / 1e9).toFixed(2)}B`);
+    console.log(`DEBUG: Coins method - Weighted Change: ${cumulativePercentageChange.toFixed(2)}%`);
 
     return res.json({
       total_volume_24h: total24hVolume,
@@ -477,7 +526,7 @@ case "volume-total": {
       total_coins_processed: coins.length,
       coins_with_volume_data: validCoins,
       last_updated: new Date().toUTCString(),
-      calculation_method: "sum_of_long_and_short_volumes"
+      calculation_method: "sum_of_long_and_short_volumes_fallback"
     });
 
   } catch (err) {
