@@ -438,37 +438,46 @@ case "volume-total": {
       throw new Error("No market data received from Coinglass");
     }
 
-    let cumulativeVolume = 0;
+    console.log(`DEBUG: Processing ${coins.length} coins for volume calculation`);
+
+    // Calculate total 24h volume by summing long and short volumes
+    let total24hVolume = 0;
     let totalWeightedChange = 0;
+    let validCoins = 0;
 
-    // Loop through all coins to calculate 24h volume and weighted change
     coins.forEach(coin => {
-      if (
-        typeof coin.volume_change_usd_24h === "number" &&
-        typeof coin.volume_change_percent_24h === "number" &&
-        coin.volume_change_percent_24h !== 0
-      ) {
-        // Step 1: Calculate absolute 24h volume for this coin
-        const volume_24h = Math.abs(coin.volume_change_usd_24h / (coin.volume_change_percent_24h / 100));
-
-        // Step 2: Add to cumulative total
-        cumulativeVolume += volume_24h;
-
-        // Step 3: Calculate weighted change contribution
-        const weightedChange = volume_24h * coin.volume_change_percent_24h;
-        totalWeightedChange += weightedChange;
+      // Sum long and short volume for 24h to get total volume for this coin
+      const longVolume24h = coin.long_volume_usd_24h || 0;
+      const shortVolume24h = coin.short_volume_usd_24h || 0;
+      const coinTotal24hVolume = longVolume24h + shortVolume24h;
+      
+      if (coinTotal24hVolume > 0) {
+        total24hVolume += coinTotal24hVolume;
+        
+        // For weighted percentage change, use the volume change if available
+        if (typeof coin.volume_change_percent_24h === "number") {
+          totalWeightedChange += coinTotal24hVolume * coin.volume_change_percent_24h;
+          validCoins++;
+        }
       }
     });
 
-    // Step 4: Calculate cumulative % change (volume-weighted)
-    const cumulativePercentageChange = cumulativeVolume > 0
-      ? totalWeightedChange / cumulativeVolume
+    // Calculate volume-weighted percentage change
+    const cumulativePercentageChange = total24hVolume > 0 
+      ? totalWeightedChange / total24hVolume 
       : 0;
 
+    console.log(`DEBUG: Total 24h Volume: $${(total24hVolume / 1e9).toFixed(2)}B`);
+    console.log(`DEBUG: Weighted Change: ${cumulativePercentageChange.toFixed(2)}%`);
+    console.log(`DEBUG: Valid coins for calculation: ${validCoins}`);
+
     return res.json({
-      total_volume_24h: cumulativeVolume,
+      total_volume_24h: total24hVolume,
       percent_change_24h: cumulativePercentageChange,
-      last_updated: new Date().toUTCString()
+      total_coins_processed: coins.length,
+      coins_with_volume_data: validCoins,
+      last_updated: new Date().toUTCString(),
+      calculation_method: "sum_of_long_and_short_volumes"
     });
 
   } catch (err) {
