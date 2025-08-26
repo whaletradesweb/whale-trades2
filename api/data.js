@@ -1223,6 +1223,100 @@ case "bull-market-peak-indicators": {
   });
 }
 
+case "volume-total": {
+  try {
+    // Sum 24h futures volume_usd for BTC, ETH, ADA, BNB, XRP, DOGE via pairs-markets
+    const COINS = (req.query.coins
+      ? String(req.query.coins).split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
+      : ["BTC", "ETH", "ADA", "BNB", "XRP", "DOGE"]
+    );
+
+    const fmtUSD = (v) =>
+      v >= 1e12 ? `$${(v / 1e12).toFixed(2)}T` :
+      v >= 1e9  ? `$${(v / 1e9 ).toFixed(2)}B` :
+      v >= 1e6  ? `$${(v / 1e6 ).toFixed(2)}M` :
+                  `$${Math.round(v).toLocaleString()}`;
+
+    const BASE_URL = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
+    const PER_PAGE = 200;
+
+    async function fetchCoin(symbol) {
+      let page = 1;
+      let total = 0;
+      let rowsCount = 0;
+
+      for (;;) {
+        const r = await axios.get(BASE_URL, {
+          headers,
+          timeout: 15000,
+          validateStatus: s => s < 500,
+          params: { symbol, per_page: PER_PAGE, page }
+        });
+
+        if (r.status !== 200) {
+          return {
+            symbol,
+            error: `HTTP ${r.status}: ${r.data?.msg || r.data?.message || "pairs-markets error"}`,
+            volume_usd_24h: 0,
+            pairs_count: 0,
+            volume_formatted: "$0"
+          };
+        }
+        if (!r.data || r.data.code !== "0" || !Array.isArray(r.data.data)) {
+          return {
+            symbol,
+            error: r.data?.msg || "Unexpected payload",
+            volume_usd_24h: 0,
+            pairs_count: 0,
+            volume_formatted: "$0"
+          };
+        }
+
+        const rows = r.data.data;
+        if (!rows.length) break;
+
+        for (const row of rows) {
+          total += Number(row.volume_usd || 0);
+        }
+        rowsCount += rows.length;
+
+        if (rows.length < PER_PAGE) break; // last page
+        page++;
+      }
+
+      return {
+        symbol,
+        volume_usd_24h: total,
+        volume_formatted: fmtUSD(total),
+        pairs_count: rowsCount
+      };
+    }
+
+    // 6 coins -> typically 6 calls (pagination rare)
+    const results = await Promise.all(COINS.map(fetchCoin));
+
+    // sort per-coin by volume desc
+    results.sort((a, b) => (b.volume_usd_24h || 0) - (a.volume_usd_24h || 0));
+
+    const overallTotal = results.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
+
+    return res.json({
+      total_volume_24h: overallTotal,
+      total_formatted: fmtUSD(overallTotal),
+      coins: results,
+      coins_count: results.length,
+      last_updated: new Date().toISOString(),
+      source: "futures/pairs-markets (sum of volume_usd across all exchanges & pairs for top-6)"
+    });
+  } catch (err) {
+    console.error("[volume-total] Error:", err?.response?.data || err.message);
+    return res.status(500).json({
+      error: "Volume API failed",
+      message: err.message || "Unknown error"
+    });
+  }
+}
+
     
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
