@@ -239,67 +239,65 @@ case "etf-eth-flows": {
         });
       }
 
+
 case "liquidations-table": {
   const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const EXCHANGES = (process.env.COINGLASS_EXCHANGES || "Binance,OKX,Bybit"); // capitalized
 
-  // Follow your existing pattern: headers & key come from env (already defined in your file)
-  // Example in your codebase:
-  // const headers = { accept: "application/json", "CG-API-KEY": process.env.COINGLASS_API_KEY };
-
-  // Exchanges to include (env wins, sensible default covers most of CoinGlass UI)
-  const EXCHANGES = (process.env.COINGLASS_EXCHANGES || "binance,okx,bybit").toLowerCase();
-
-  const PER_PAGE = 200; // request a big page to minimize loops
-  const tfs = ["1h", "4h", "12h", "24h"];
+  const PER_PAGE = 200;
+  const tfs = ["1h","4h","12h","24h"];
 
   const axiosOpts = {
     headers,
     timeout: 10000,
-    validateStatus: (s) => s < 500
+    validateStatus: s => s < 500
   };
 
-  // helper to fetch one page
-  const fetchPage = (page) =>
-    axios.get(COINS_URL, {
-      ...axiosOpts,
-      params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
-    });
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+  const agg = Object.fromEntries(tfs.map(tf => [tf, { total:0, long:0, short:0 }]));
 
-  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  async function pullAll({ withExchanges }) {
+    let page = 1, totalRows = 0;
+    for (;;) {
+      const params = withExchanges
+        ? { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
+        : { per_page: PER_PAGE, page };
 
-  const agg = Object.fromEntries(tfs.map(tf => [tf, { total: 0, long: 0, short: 0 }]));
+      const resp = await axios.get(COINS_URL, { ...axiosOpts, params });
 
-  let page = 1;
-  for (;;) {
-    const resp = await fetchPage(page);
-
-    if (resp.status === 401) return res.status(401).json({ error: "API Authentication Failed", message: "Invalid CG key." });
-    if (resp.status === 403) return res.status(403).json({ error: "API Access Forbidden", message: "Plan may not include endpoint." });
-    if (resp.status !== 200) return res.status(resp.status).json({ error: "API Request Failed", message: `Status ${resp.status}`, details: resp.data });
-
-    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
-    if (!rows.length) break;
-
-    // sum this page
-    for (const r of rows) {
-      for (const tf of tfs) {
-        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
-        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
-        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
+      if (resp.status !== 200 || resp.data?.code !== "0") {
+        throw new Error(`CoinGlass ${resp.status}: ${resp.data?.message || "bad response"}`);
       }
-    }
 
-    // last page guard
-    if (rows.length < PER_PAGE) break;
-    page++;
+      const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
+      if (!rows.length) return { page, totalRows };
+
+      for (const r of rows) {
+        for (const tf of tfs) {
+          agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
+          agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
+          agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
+        }
+      }
+
+      totalRows += rows.length;
+      if (rows.length < PER_PAGE) return { page, totalRows };
+      page++;
+    }
+  }
+
+  // 1) Try WITH exchange_list (capitalized). 2) If empty, retry WITHOUT it.
+  let meta = await pullAll({ withExchanges: true });
+  if (meta.totalRows === 0) {
+    meta = await pullAll({ withExchanges: false });
   }
 
   const fmtUSD = (v) => {
     const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v / 1e9 ).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v / 1e6 ).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v / 1e3 ).toFixed(2)}K`;
+    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
     return `$${v.toFixed(2)}`;
   };
 
@@ -313,11 +311,13 @@ case "liquidations-table": {
 
   return res.json({
     success: true,
-    totals: agg,          // raw numbers for analytics tab
-    formatted,            // strings for your UI cards/IDs
-    exchanges: EXCHANGES, // so you can see what was included
+    totals: agg,
+    formatted,
+    exchanges_attempted: EXCHANGES,
+    used_exchange_filter: meta.totalRows > 0,  // true if the first attempt returned data
     per_page: PER_PAGE,
-    pages_processed: page,
+    pages_processed: meta.page,
+    rows_processed: meta.totalRows,
     lastUpdated: new Date().toISOString()
   });
 }
