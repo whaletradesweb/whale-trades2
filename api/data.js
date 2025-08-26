@@ -241,58 +241,13 @@ case "etf-eth-flows": {
 
 
 case "liquidations-table": {
-  const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const COINS_URL   = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const EXRANK_URL  = "https://open-api-v4.coinglass.com/new-endpoint"; // Exchange Rank endpoint you provided
+  const PER_PAGE    = 200;
+  const TF          = ["1h","4h","12h","24h"];
 
-  // allow override via env; default to your list above
-  const EXCHANGES = (process.env.COINGLASS_EXCHANGES ||
-    "Bybit,Binance,OKX,Gate,HTX,Hyperliquid,CoinEx,Bitmex,Bitfinex");
-
-  const PER_PAGE = 200;
-  const TF = ["1h","4h","12h","24h"];
-
+  // helpers
   const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
-  const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
-
-  const axiosOpts = {
-    headers,
-    timeout: 10000,
-    validateStatus: s => s < 500
-  };
-
-  async function fetchPage(page) {
-    return axios.get(COINS_URL, {
-      ...axiosOpts,
-      params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
-    });
-  }
-
-  let page = 1, rowsProcessed = 0;
-  for (;;) {
-    const resp = await fetchPage(page);
-    if (resp.status !== 200 || resp.data?.code !== "0") {
-      return res.status(resp.status || 500).json({
-        error: "API Request Failed",
-        message: resp.data?.message || "Bad response",
-        status: resp.status
-      });
-    }
-
-    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
-    if (!rows.length) break;
-
-    for (const r of rows) {
-      for (const tf of TF) {
-        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
-        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
-        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
-      }
-    }
-
-    rowsProcessed += rows.length;
-    if (rows.length < PER_PAGE) break;
-    page++;
-  }
-
   const fmtUSD = (v) => {
     const n = Math.abs(v);
     if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
@@ -302,26 +257,103 @@ case "liquidations-table": {
     return `$${v.toFixed(2)}`;
   };
 
-  const formatted = Object.fromEntries(
-    TF.map(tf => [tf, {
-      total: fmtUSD(agg[tf].total),
-      long:  fmtUSD(agg[tf].long),
-      short: fmtUSD(agg[tf].short)
-    }])
-  );
+  // 1) Get the live exchange list (cache for 10 minutes)
+  async function getExchanges() {
+    // try cache first
+    const cached = await kv.get("liquidations:exchanges");
+    if (Array.isArray(cached) && cached.length) return cached;
 
-  // Return both, so your footer can use either `data[tf]` or `data.formatted[tf]`
-  return res.json({
-    success: true,
-    totals: agg,
-    formatted,
-    exchanges: EXCHANGES,
-    per_page: PER_PAGE,
-    pages_processed: page,
-    rows_processed: rowsProcessed,
-    lastUpdated: new Date().toISOString()
-  });
+    const xr = await axios.get(EXRANK_URL, {
+      headers, timeout: 10000, validateStatus: s => s < 500
+    });
+    if (xr.status !== 200 || xr.data?.code !== "0") {
+      throw new Error(`Exchange list fetch failed (${xr.status})`);
+    }
+
+    const list = (xr.data?.data || [])
+      .map(d => (d.exchange || "").toString().trim())
+      .filter(Boolean);
+
+    // de-dupe & keep nice casing
+    const deduped = Array.from(new Set(list));
+
+    // cache 10 minutes
+    await kv.set("liquidations:exchanges", deduped, { ex: 600 });
+    return deduped;
+  }
+
+  // 2) Pull coins-markets across all pages for those exchanges
+  async function sumCoins(exchanges) {
+    const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
+    let page = 1, rowsProcessed = 0;
+
+    // Helper to fetch one page
+    const fetchPage = (p, withExList = true) => axios.get(COINS_URL, {
+      headers, timeout: 10000, validateStatus: s => s < 500,
+      params: withExList ? { exchange_list: exchanges.join(","), per_page: PER_PAGE, page: p }
+                         : { per_page: PER_PAGE, page: p }
+    });
+
+    // Try WITH exchange_list first; if page 1 is empty, retry WITHOUT it (some tenants behave this way)
+    let useExchangeFilter = true;
+    for (;;) {
+      const resp = await fetchPage(page, useExchangeFilter);
+      if (resp.status !== 200 || resp.data?.code !== "0") {
+        throw new Error(`coins-markets ${resp.status}`);
+      }
+
+      const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
+      if (page === 1 && useExchangeFilter && rows.length === 0) {
+        // retry without filter
+        useExchangeFilter = false;
+        continue; // re-run page 1 without exchange_list
+      }
+
+      if (!rows.length) break;
+
+      for (const r of rows) {
+        for (const tf of TF) {
+          agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
+          agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
+          agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
+        }
+      }
+
+      rowsProcessed += rows.length;
+      if (rows.length < PER_PAGE) break;
+      page++;
+    }
+
+    return { agg, pages: page, rowsProcessed };
+  }
+
+  try {
+    const exchanges = await getExchanges();            // live list (cached)
+    const { agg, pages, rowsProcessed } = await sumCoins(exchanges);
+
+    const formatted = Object.fromEntries(
+      TF.map(tf => [tf, {
+        total: fmtUSD(agg[tf].total),
+        long:  fmtUSD(agg[tf].long),
+        short: fmtUSD(agg[tf].short)
+      }])
+    );
+
+    return res.json({
+      success: true,
+      totals: agg,
+      formatted,
+      exchanges,                 // what we actually used
+      per_page: PER_PAGE,
+      pages_processed: pages,
+      rows_processed: rowsProcessed,
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (e) {
+    return res.status(502).json({ error: "Aggregation failed", message: e.message });
+  }
 }
+
 
 
 
