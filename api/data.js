@@ -239,112 +239,170 @@ case "etf-eth-flows": {
         });
       }
 
-
 case "liquidations-table": {
-  const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-
-  // Exact exchange spellings you provided
-  const EXCHANGES = (process.env.COINGLASS_EXCHANGES ||
-    [
-      "Binance",
-      "Gate",
-      "Bybit",
-      "HTX",
-      "Bitget",
-      "MEXC",
-      "Hyperliquid",
-      "WhiteBIT",
-      "BingX",
-      "Deribit",
-      "Crypto.com",
-      "KuCoin",
-      "Kraken",
-      "Bitmex",
-      "Coinbase",
-      "Bitunix",
-      "CoinEx",
-      "dYdX",
-      "Bitfinex"
-    ].join(",")
-  );
-
-  const PER_PAGE = 200;
-  const TF = ["1h", "4h", "12h", "24h"];
-  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
-  const agg = Object.fromEntries(TF.map(tf => [tf, { total: 0, long: 0, short: 0 }]));
-
-  const axiosOpts = {
+  console.log("DEBUG: Requesting aggregated liquidations from Coinglass coins-markets...");
+  
+  // Define the exchanges to include
+  const exchanges = [
+    "Binance", "Gate", "Bybit", "HTX", "Bitget", "MEXC", "Hyperliquid", 
+    "WhiteBIT", "BingX", "Deribit", "Crypto.com", "KuCoin", "Kraken", 
+    "Bitmex", "Coinbase", "Bitunix", "CoinEx", "dYdX", "Bitfinex"
+  ];
+  
+  const exchangeList = exchanges.join(",");
+  console.log(`DEBUG: Including exchanges: ${exchangeList}`);
+  
+  const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const response = await axios.get(url, { 
     headers,
-    timeout: 10000,
-    validateStatus: s => s < 500
-  };
-
-  async function fetchPage(page) {
-    return axios.get(COINS_URL, {
-      ...axiosOpts,
-      params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
+    timeout: 15000,
+    validateStatus: function (status) {
+      return status < 500;
+    },
+    params: {
+      exchange_list: exchangeList
+    }
+  });
+  
+  console.log("DEBUG: Coins Markets Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
     });
   }
-
-  let page = 1, rowsProcessed = 0;
-  for (;;) {
-    const resp = await fetchPage(page);
-    if (resp.status !== 200 || resp.data?.code !== "0") {
-      return res.status(resp.status || 500).json({
-        error: "API Request Failed",
-        message: resp.data?.message || "Bad response",
-        status: resp.status
-      });
-    }
-
-    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
-    if (!rows.length) break;
-
-    for (const r of rows) {
-      for (const tf of TF) {
-        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
-        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
-        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
-      }
-    }
-
-    rowsProcessed += rows.length;
-    if (rows.length < PER_PAGE) break;
-    page++;
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden', 
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
   }
-
-  const fmtUSD = (v) => {
-    const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v / 1e9).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v / 1e3).toFixed(2)}K`;
-    return `$${v.toFixed(2)}`;
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  const coins = response.data.data || [];
+  console.log(`DEBUG: Processing ${coins.length} coins for liquidations aggregation`);
+  
+  if (!Array.isArray(coins) || coins.length === 0) {
+    return res.status(404).json({
+      error: 'No Data',
+      message: 'No coin market data available'
+    });
+  }
+  
+  // Initialize aggregation objects for each timeframe
+  const timeframes = ['1h', '4h', '12h', '24h'];
+  const aggregatedData = {};
+  
+  // Initialize all timeframes with zero values
+  timeframes.forEach(timeframe => {
+    aggregatedData[timeframe] = {
+      total_liquidations: 0,
+      long_liquidations: 0, 
+      short_liquidations: 0
+    };
+  });
+  
+  // Aggregate liquidations across all coins
+  coins.forEach(coin => {
+    if (!coin || typeof coin !== 'object') return;
+    
+    timeframes.forEach(timeframe => {
+      // Extract liquidation data for this timeframe
+      const totalKey = `liquidation_usd_${timeframe}`;
+      const longKey = `long_liquidation_usd_${timeframe}`;
+      const shortKey = `short_liquidation_usd_${timeframe}`;
+      
+      const totalLiq = Number(coin[totalKey]) || 0;
+      const longLiq = Number(coin[longKey]) || 0;
+      const shortLiq = Number(coin[shortKey]) || 0;
+      
+      // Add to aggregated totals
+      aggregatedData[timeframe].total_liquidations += totalLiq;
+      aggregatedData[timeframe].long_liquidations += longLiq;
+      aggregatedData[timeframe].short_liquidations += shortLiq;
+      
+      // Debug logging for first few coins
+      if (coins.indexOf(coin) < 3) {
+        console.log(`DEBUG: ${coin.symbol} ${timeframe} - Total: ${totalLiq}, Long: ${longLiq}, Short: ${shortLiq}`);
+      }
+    });
+  });
+  
+  // Format the aggregated data to match your website's expected structure
+  const formattedData = {
+    "1H-Total-Liquidated": aggregatedData['1h'].total_liquidations,
+    "1H-Total-Long": aggregatedData['1h'].long_liquidations,
+    "1H-Total-Short": aggregatedData['1h'].short_liquidations,
+    "4H-Total-Liquidated": aggregatedData['4h'].total_liquidations,
+    "4H-Total-Long": aggregatedData['4h'].long_liquidations,
+    "4H-Total-Short": aggregatedData['4h'].short_liquidations,
+    "12H-Total-Liquidated": aggregatedData['12h'].total_liquidations,
+    "12H-Total-Long": aggregatedData['12h'].long_liquidations,
+    "12H-Total-Short": aggregatedData['12h'].short_liquidations,
+    "24H-Total-Liquidated": aggregatedData['24h'].total_liquidations,
+    "24H-Total-Long": aggregatedData['24h'].long_liquidations,
+    "24H-Total-Short": aggregatedData['24h'].short_liquidations
   };
-
-  const formatted = Object.fromEntries(
-    TF.map(tf => [tf, {
-      total: fmtUSD(agg[tf].total),
-      long:  fmtUSD(agg[tf].long),
-      short: fmtUSD(agg[tf].short)
-    }])
-  );
-
+  
+  // Format values for display (optional - you can remove this if you want raw numbers)
+  const formatUSD = (value) => {
+    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;  
+    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+    return `$${value.toFixed(2)}`;
+  };
+  
+  // Create formatted version for display
+  const formattedForDisplay = {
+    "1H-Total-Liquidated-Formatted": formatUSD(aggregatedData['1h'].total_liquidations),
+    "1H-Total-Long-Formatted": formatUSD(aggregatedData['1h'].long_liquidations),
+    "1H-Total-Short-Formatted": formatUSD(aggregatedData['1h'].short_liquidations),
+    "4H-Total-Liquidated-Formatted": formatUSD(aggregatedData['4h'].total_liquidations),
+    "4H-Total-Long-Formatted": formatUSD(aggregatedData['4h'].long_liquidations),
+    "4H-Total-Short-Formatted": formatUSD(aggregatedData['4h'].short_liquidations),
+    "12H-Total-Liquidated-Formatted": formatUSD(aggregatedData['12h'].total_liquidations),
+    "12H-Total-Long-Formatted": formatUSD(aggregatedData['12h'].long_liquidations),
+    "12H-Total-Short-Formatted": formatUSD(aggregatedData['12h'].short_liquidations),
+    "24H-Total-Liquidated-Formatted": formatUSD(aggregatedData['24h'].total_liquidations),
+    "24H-Total-Long-Formatted": formatUSD(aggregatedData['24h'].long_liquidations),
+    "24H-Total-Short-Formatted": formatUSD(aggregatedData['24h'].short_liquidations)
+  };
+  
+  console.log("DEBUG: Aggregated liquidations summary:");
+  console.log(`1H Total: ${formatUSD(aggregatedData['1h'].total_liquidations)}`);
+  console.log(`4H Total: ${formatUSD(aggregatedData['4h'].total_liquidations)}`);
+  console.log(`12H Total: ${formatUSD(aggregatedData['12h'].total_liquidations)}`);
+  console.log(`24H Total: ${formatUSD(aggregatedData['24h'].total_liquidations)}`);
+  
   return res.json({
     success: true,
-    totals: agg,
-    formatted,
-    exchanges: EXCHANGES,
-    per_page: PER_PAGE,
-    pages_processed: page,
-    rows_processed: rowsProcessed,
-    lastUpdated: new Date().toISOString()
+    data: formattedData, // Raw numbers for your ID updates
+    formatted: formattedForDisplay, // Formatted strings for display
+    metadata: {
+      coins_processed: coins.length,
+      last_updated: new Date().toISOString(),
+      timeframes: timeframes,
+      api_endpoint: 'coins-markets'
+    }
   });
 }
-
-
-
-
 
 
   case "long-short": {
