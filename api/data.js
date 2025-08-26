@@ -240,92 +240,88 @@ case "etf-eth-flows": {
       }
 
 case "liquidations-table": {
-  const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-  const key = process.env.CG_API_KEY; // ← set this in Vercel Project → Settings → Environment Variables
+  const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
 
-  if (!key) {
-    return json({ ok: false, error: "CG_API_KEY not configured" }, 500);
-  }
+  // Follow your existing pattern: headers & key come from env (already defined in your file)
+  // Example in your codebase:
+  // const headers = { accept: "application/json", "CG-API-KEY": process.env.COINGLASS_API_KEY };
 
-  let resp;
-  try {
-    resp = await fetch(url, {
-      method: "GET",
-      headers: { accept: "application/json", "CG-API-KEY": key },
-      cache: "no-store",
-    });
-  } catch (e) {
-    return json({ ok: false, error: `Network error: ${e.message}` }, 502);
-  }
+  // Exchanges to include (env wins, sensible default covers most of CoinGlass UI)
+  const EXCHANGES = (process.env.COINGLASS_EXCHANGES || "binance,okx,bybit").toLowerCase();
 
-  if (!resp.ok) {
-    return json({ ok: false, error: `CoinGlass responded ${resp.status}` }, 502);
-  }
+  const PER_PAGE = 200; // request a big page to minimize loops
+  const tfs = ["1h", "4h", "12h", "24h"];
 
-  const payload = await resp.json();
-  const rows = Array.isArray(payload?.data) ? payload.data : [];
-
-  const toNum = (v) => (typeof v === "number" ? v : parseFloat(v) || 0);
-
-  const acc = {
-    "1h": { total: 0, long: 0, short: 0 },
-    "4h": { total: 0, long: 0, short: 0 },
-    "12h": { total: 0, long: 0, short: 0 },
-    "24h": { total: 0, long: 0, short: 0 },
+  const axiosOpts = {
+    headers,
+    timeout: 10000,
+    validateStatus: (s) => s < 500
   };
 
-  for (const r of rows) {
-    acc["1h"].total  += toNum(r.liquidation_usd_1h);
-    acc["1h"].long   += toNum(r.long_liquidation_usd_1h);
-    acc["1h"].short  += toNum(r.short_liquidation_usd_1h);
+  // helper to fetch one page
+  const fetchPage = (page) =>
+    axios.get(COINS_URL, {
+      ...axiosOpts,
+      params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
+    });
 
-    acc["4h"].total  += toNum(r.liquidation_usd_4h);
-    acc["4h"].long   += toNum(r.long_liquidation_usd_4h);
-    acc["4h"].short  += toNum(r.short_liquidation_usd_4h);
+  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
 
-    acc["12h"].total += toNum(r.liquidation_usd_12h);
-    acc["12h"].long  += toNum(r.long_liquidation_usd_12h);
-    acc["12h"].short += toNum(r.short_liquidation_usd_12h);
+  const agg = Object.fromEntries(tfs.map(tf => [tf, { total: 0, long: 0, short: 0 }]));
 
-    acc["24h"].total += toNum(r.liquidation_usd_24h);
-    acc["24h"].long  += toNum(r.long_liquidation_usd_24h);
-    acc["24h"].short += toNum(r.short_liquidation_usd_24h);
+  let page = 1;
+  for (;;) {
+    const resp = await fetchPage(page);
+
+    if (resp.status === 401) return res.status(401).json({ error: "API Authentication Failed", message: "Invalid CG key." });
+    if (resp.status === 403) return res.status(403).json({ error: "API Access Forbidden", message: "Plan may not include endpoint." });
+    if (resp.status !== 200) return res.status(resp.status).json({ error: "API Request Failed", message: `Status ${resp.status}`, details: resp.data });
+
+    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
+    if (!rows.length) break;
+
+    // sum this page
+    for (const r of rows) {
+      for (const tf of tfs) {
+        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
+        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
+        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
+      }
+    }
+
+    // last page guard
+    if (rows.length < PER_PAGE) break;
+    page++;
   }
 
   const fmtUSD = (v) => {
     const n = Math.abs(v);
     if (n >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v / 1e9).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v / 1e3).toFixed(2)}K`;
+    if (n >= 1e9)  return `$${(v / 1e9 ).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v / 1e6 ).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v / 1e3 ).toFixed(2)}K`;
     return `$${v.toFixed(2)}`;
   };
 
-  const formatted = {
-    "1h": {
-      total: fmtUSD(acc["1h"].total),
-      long:  fmtUSD(acc["1h"].long),
-      short: fmtUSD(acc["1h"].short),
-    },
-    "4h": {
-      total: fmtUSD(acc["4h"].total),
-      long:  fmtUSD(acc["4h"].long),
-      short: fmtUSD(acc["4h"].short),
-    },
-    "12h": {
-      total: fmtUSD(acc["12h"].total),
-      long:  fmtUSD(acc["12h"].long),
-      short: fmtUSD(acc["12h"].short),
-    },
-    "24h": {
-      total: fmtUSD(acc["24h"].total),
-      long:  fmtUSD(acc["24h"].long),
-      short: fmtUSD(acc["24h"].short),
-    },
-  };
+  const formatted = Object.fromEntries(
+    tfs.map(tf => [tf, {
+      total: fmtUSD(agg[tf].total),
+      long:  fmtUSD(agg[tf].long),
+      short: fmtUSD(agg[tf].short)
+    }])
+  );
 
-  return json({ ok: true, totals: acc, formatted });
+  return res.json({
+    success: true,
+    totals: agg,          // raw numbers for analytics tab
+    formatted,            // strings for your UI cards/IDs
+    exchanges: EXCHANGES, // so you can see what was included
+    per_page: PER_PAGE,
+    pages_processed: page,
+    lastUpdated: new Date().toISOString()
+  });
 }
+
 
   case "long-short": {
   const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
