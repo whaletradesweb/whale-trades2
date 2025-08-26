@@ -239,35 +239,93 @@ case "etf-eth-flows": {
         });
       }
 
-      case "liquidations-table": {
-        const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-        const coins = response.data?.data || [];
-        
-        const timeframes = ['1h', '4h', '12h', '24h'];
-        const aggregates = Object.fromEntries(timeframes.map(tf => [tf, { total: 0, long: 0, short: 0 }]));
+case "liquidations-table": {
+  const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const key = process.env.CG_API_KEY; // ← set this in Vercel Project → Settings → Environment Variables
 
-        coins.forEach(coin => timeframes.forEach(tf => {
-          aggregates[tf].total += coin[`liquidation_usd_${tf}`] || 0;
-          aggregates[tf].long += coin[`long_liquidation_usd_${tf}`] || 0;
-          aggregates[tf].short += coin[`short_liquidation_usd_${tf}`] || 0;
-        }));
+  if (!key) {
+    return json({ ok: false, error: "CG_API_KEY not configured" }, 500);
+  }
 
-        const formatUSD = (v) =>
-          v >= 1e9 ? `$${(v / 1e9).toFixed(2)}B` :
-          v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` :
-          v >= 1e3 ? `$${(v / 1e3).toFixed(2)}K` :
-          `$${v.toFixed(2)}`;
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "GET",
+      headers: { accept: "application/json", "CG-API-KEY": key },
+      cache: "no-store",
+    });
+  } catch (e) {
+    return json({ ok: false, error: `Network error: ${e.message}` }, 502);
+  }
 
-        const formatted = Object.fromEntries(
-          timeframes.map(tf => [tf, {
-            total: formatUSD(aggregates[tf].total),
-            long: formatUSD(aggregates[tf].long),
-            short: formatUSD(aggregates[tf].short)
-          }])
-        );
+  if (!resp.ok) {
+    return json({ ok: false, error: `CoinGlass responded ${resp.status}` }, 502);
+  }
 
-        return res.json(formatted);
-      }
+  const payload = await resp.json();
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+
+  const toNum = (v) => (typeof v === "number" ? v : parseFloat(v) || 0);
+
+  const acc = {
+    "1h": { total: 0, long: 0, short: 0 },
+    "4h": { total: 0, long: 0, short: 0 },
+    "12h": { total: 0, long: 0, short: 0 },
+    "24h": { total: 0, long: 0, short: 0 },
+  };
+
+  for (const r of rows) {
+    acc["1h"].total  += toNum(r.liquidation_usd_1h);
+    acc["1h"].long   += toNum(r.long_liquidation_usd_1h);
+    acc["1h"].short  += toNum(r.short_liquidation_usd_1h);
+
+    acc["4h"].total  += toNum(r.liquidation_usd_4h);
+    acc["4h"].long   += toNum(r.long_liquidation_usd_4h);
+    acc["4h"].short  += toNum(r.short_liquidation_usd_4h);
+
+    acc["12h"].total += toNum(r.liquidation_usd_12h);
+    acc["12h"].long  += toNum(r.long_liquidation_usd_12h);
+    acc["12h"].short += toNum(r.short_liquidation_usd_12h);
+
+    acc["24h"].total += toNum(r.liquidation_usd_24h);
+    acc["24h"].long  += toNum(r.long_liquidation_usd_24h);
+    acc["24h"].short += toNum(r.short_liquidation_usd_24h);
+  }
+
+  const fmtUSD = (v) => {
+    const n = Math.abs(v);
+    if (n >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v / 1e9).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v / 1e3).toFixed(2)}K`;
+    return `$${v.toFixed(2)}`;
+  };
+
+  const formatted = {
+    "1h": {
+      total: fmtUSD(acc["1h"].total),
+      long:  fmtUSD(acc["1h"].long),
+      short: fmtUSD(acc["1h"].short),
+    },
+    "4h": {
+      total: fmtUSD(acc["4h"].total),
+      long:  fmtUSD(acc["4h"].long),
+      short: fmtUSD(acc["4h"].short),
+    },
+    "12h": {
+      total: fmtUSD(acc["12h"].total),
+      long:  fmtUSD(acc["12h"].long),
+      short: fmtUSD(acc["12h"].short),
+    },
+    "24h": {
+      total: fmtUSD(acc["24h"].total),
+      long:  fmtUSD(acc["24h"].long),
+      short: fmtUSD(acc["24h"].short),
+    },
+  };
+
+  return json({ ok: true, totals: acc, formatted });
+}
 
   case "long-short": {
   const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
