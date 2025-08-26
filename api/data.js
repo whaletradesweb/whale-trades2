@@ -1294,16 +1294,85 @@ case "volume-total": {
     const coinsData = coinsResponse.data.data || [];
     console.log(`DEBUG: Retrieved ${coinsData.length} coin records from coins-markets`);
     
-    // Debug: Show sample of what we got
+    // Debug: Show sample of what we got and analyze data structure
     if (coinsData.length > 0) {
-      const sample = coinsData[0];
-      console.log("DEBUG: Sample coin data structure:", {
-        symbol: sample.symbol,
-        exchange: sample.exchange,
-        long_volume_usd_24h: sample.long_volume_usd_24h,
-        short_volume_usd_24h: sample.short_volume_usd_24h,
-        volume_change_percent_24h: sample.volume_change_percent_24h
+      console.log("DEBUG: Analyzing API response structure and exchange field...");
+      
+      let coinsWithLongShort = 0;
+      let coinsWithDirectVolume = 0;
+      let coinsWithAnyVolume = 0;
+      let totalCoinsAnalyzed = 0;
+      
+      const volumeFieldAnalysis = {};
+      const exchangeFieldAnalysis = {};
+      const sampleCoinsWithData = [];
+      const sampleCoinsWithoutData = [];
+      
+      coinsData.slice(0, 50).forEach(coin => { // Analyze first 50 for detailed debugging
+        totalCoinsAnalyzed++;
+        
+        // Analyze exchange field
+        const exchange = coin.exchange;
+        if (exchange && exchange !== 'Unknown') {
+          exchangeFieldAnalysis[exchange] = (exchangeFieldAnalysis[exchange] || 0) + 1;
+        } else {
+          exchangeFieldAnalysis['missing_or_unknown'] = (exchangeFieldAnalysis['missing_or_unknown'] || 0) + 1;
+        }
+        
+        const availableFields = Object.keys(coin).filter(key => 
+          key.toLowerCase().includes('volume') && coin[key] !== null && coin[key] !== undefined && coin[key] !== 0
+        );
+        const availableFields = Object.keys(coin).filter(key => 
+          key.toLowerCase().includes('volume') && coin[key] !== null && coin[key] !== undefined && coin[key] !== 0
+        );
+        
+        const hasLongShort = (coin.long_volume_usd_24h || 0) > 0 || (coin.short_volume_usd_24h || 0) > 0;
+        const hasDirectVolume = (coin.volume_usd_24h || 0) > 0;
+        const hasAnyVolume = availableFields.length > 0;
+        
+        if (hasLongShort) coinsWithLongShort++;
+        if (hasDirectVolume) coinsWithDirectVolume++;
+        if (hasAnyVolume) coinsWithAnyVolume++;
+        
+        // Track which fields are available
+        availableFields.forEach(field => {
+          volumeFieldAnalysis[field] = (volumeFieldAnalysis[field] || 0) + 1;
+        });
+        
+        // Collect samples
+                
+        if (hasAnyVolume && sampleCoinsWithData.length < 5) {
+          sampleCoinsWithData.push({
+            symbol: coin.symbol,
+            exchange: coin.exchange || 'MISSING_EXCHANGE_FIELD',
+            fields: availableFields,
+            long_volume: coin.long_volume_usd_24h,
+            short_volume: coin.short_volume_usd_24h,
+            direct_volume: coin.volume_usd_24h,
+            all_keys: Object.keys(coin) // Show ALL fields for debugging
+          });
+        } else if (!hasAnyVolume && sampleCoinsWithoutData.length < 3) {
+          sampleCoinsWithoutData.push({
+            symbol: coin.symbol,
+            exchange: coin.exchange || 'MISSING_EXCHANGE_FIELD',
+            all_fields: Object.keys(coin)
+          });
+        }
       });
+      
+      console.log("DEBUG: Volume field analysis results:");
+      console.log(`  Coins with long/short volume: ${coinsWithLongShort}/${totalCoinsAnalyzed}`);
+      console.log(`  Coins with direct volume: ${coinsWithDirectVolume}/${totalCoinsAnalyzed}`);
+      console.log(`  Coins with any volume data: ${coinsWithAnyVolume}/${totalCoinsAnalyzed}`);
+      console.log("DEBUG: Exchange field analysis:", exchangeFieldAnalysis);
+      console.log("DEBUG: Available volume fields:", volumeFieldAnalysis);
+      console.log("DEBUG: Sample coins WITH volume data:", sampleCoinsWithData);
+      console.log("DEBUG: Sample coins WITHOUT volume data:", sampleCoinsWithoutData);
+      
+      // Specific debugging for the exchange_list parameter
+      console.log("DEBUG: Exchange list parameter being sent:", exchangeList);
+      console.log("DEBUG: Number of exchanges in list:", exchangeNames.length);
+      console.log("DEBUG: Expected behavior: API should return one record per coin per exchange");
     }
     
     // Step 3: Calculate total volume by summing long + short volume for each coin across all exchanges
@@ -1319,8 +1388,35 @@ case "volume-total": {
       const exchange = coinRecord.exchange || 'Unknown';
       const longVolume = coinRecord.long_volume_usd_24h || 0;
       const shortVolume = coinRecord.short_volume_usd_24h || 0;
-      const totalCoinExchangeVolume = longVolume + shortVolume;
+      let totalCoinExchangeVolume = longVolume + shortVolume;
       const volumeChangePercent = coinRecord.volume_change_percent_24h;
+      let volumeSource = 'long_short';
+      
+      // If long+short volumes are zero or missing, try alternative volume fields
+      if (totalCoinExchangeVolume === 0) {
+        // Try direct volume field
+        if (coinRecord.volume_usd_24h && coinRecord.volume_usd_24h > 0) {
+          totalCoinExchangeVolume = coinRecord.volume_usd_24h;
+          volumeSource = 'direct_volume_usd_24h';
+        }
+        // Try other possible volume fields
+        else if (coinRecord.total_volume_usd_24h && coinRecord.total_volume_usd_24h > 0) {
+          totalCoinExchangeVolume = coinRecord.total_volume_usd_24h;
+          volumeSource = 'total_volume_usd_24h';
+        }
+        else if (coinRecord.futures_volume_usd_24h && coinRecord.futures_volume_usd_24h > 0) {
+          totalCoinExchangeVolume = coinRecord.futures_volume_usd_24h;
+          volumeSource = 'futures_volume_usd_24h';
+        }
+        // Try calculating from open interest if available
+        else if (coinRecord.open_interest_usd && coinRecord.open_interest_volume_ratio && coinRecord.open_interest_volume_ratio > 0) {
+          const calculatedVolume = coinRecord.open_interest_usd / coinRecord.open_interest_volume_ratio;
+          if (calculatedVolume > 0 && isFinite(calculatedVolume)) {
+            totalCoinExchangeVolume = calculatedVolume;
+            volumeSource = 'calculated_from_oi';
+          }
+        }
+      }
       
       // Initialize coin entry if doesn't exist
       if (!coinVolumeMap[symbol]) {
@@ -1328,7 +1424,8 @@ case "volume-total": {
           symbol: symbol,
           totalVolume: 0,
           exchanges: {},
-          volumeChangeData: []
+          volumeChangeData: [],
+          volumeSources: [] // Track which volume sources were used
         };
       }
       
@@ -1339,8 +1436,10 @@ case "volume-total": {
           longVolume: longVolume,
           shortVolume: shortVolume,
           totalVolume: totalCoinExchangeVolume,
-          volumeChange: volumeChangePercent
+          volumeChange: volumeChangePercent,
+          volumeSource: volumeSource
         };
+        coinVolumeMap[symbol].volumeSources.push(volumeSource);
         
         // Track volume change data for weighted average
         if (typeof volumeChangePercent === "number" && !isNaN(volumeChangePercent)) {
@@ -1430,7 +1529,16 @@ case "volume-total": {
         step2_coin_records_retrieved: coinsData.length,
         step2_unique_coins_processed: Object.keys(coinVolumeMap).length,
         exchanges_queried: exchangeNames,
-        methodology: "Sum of (long_volume_usd_24h + short_volume_usd_24h) per coin per exchange, then sum all coins"
+        methodology: "Sum of (long_volume_usd_24h + short_volume_usd_24h) per coin per exchange, with fallbacks to other volume fields",
+        volume_source_breakdown: (() => {
+          const sourceCounts = {};
+          Object.values(coinVolumeMap).forEach(coin => {
+            coin.volumeSources.forEach(source => {
+              sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+            });
+          });
+          return sourceCounts;
+        })()
       },
       top_coins_by_volume: topCoinsForDisplay.map(coin => ({
         symbol: coin.symbol,
