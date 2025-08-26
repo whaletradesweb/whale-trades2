@@ -240,7 +240,7 @@ case "etf-eth-flows": {
       }
 
 
- case "liquidations-table": {
+case "liquidations-table": {
   console.log("DEBUG: Requesting aggregated liquidations from Coinglass coins-markets...");
   
   // Define the exchanges to include
