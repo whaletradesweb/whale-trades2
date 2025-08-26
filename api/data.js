@@ -242,17 +242,62 @@ case "etf-eth-flows": {
 
 case "liquidations-table": {
   const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-  const PER_PAGE  = 200;
+
+  // allow override via env; otherwise use your fixed 20-exchange universe
+  const EXCHANGES = (process.env.COINGLASS_EXCHANGES ||
+    [
+      "Binance","OKX","Bybit","KuCoin","Gate","WhiteBIT","Bitget","BingX","MEXC",
+      "Bitunix","Hyperliquid","Crypto.com","dYdX","Bitfinex","BitMEX","Deribit",
+      "CoinEx","HTX","Kraken","Coinbase"
+    ].join(",")
+  );
+
+  const PER_PAGE = 200;
   const TF = ["1h","4h","12h","24h"];
 
-  // === Your fixed 20 exchanges ===
-  const EXCHANGES = [
-    "Binance","OKX","Bybit","KuCoin","Gate","WhiteBIT","Bitget","BingX","MEXC",
-    "Bitunix","Hyperliquid","Crypto.com","dYdX","Bitfinex","BitMEX","Deribit",
-    "CoinEx","HTX","Kraken","Coinbase"
-  ];
-
   const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
+
+  const axiosOpts = {
+    headers,
+    timeout: 10000,
+    validateStatus: s => s < 500
+  };
+
+  async function fetchPage(page) {
+    return axios.get(COINS_URL, {
+      ...axiosOpts,
+      params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
+    });
+  }
+
+  let page = 1, rowsProcessed = 0;
+  for (;;) {
+    const resp = await fetchPage(page);
+    if (resp.status !== 200 || resp.data?.code !== "0") {
+      return res.status(resp.status || 500).json({
+        error: "API Request Failed",
+        message: resp.data?.message || "Bad response",
+        status: resp.status
+      });
+    }
+
+    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
+    if (!rows.length) break;
+
+    for (const r of rows) {
+      for (const tf of TF) {
+        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
+        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
+        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
+      }
+    }
+
+    rowsProcessed += rows.length;
+    if (rows.length < PER_PAGE) break;
+    page++;
+  }
+
   const fmtUSD = (v) => {
     const n = Math.abs(v);
     if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
@@ -262,66 +307,27 @@ case "liquidations-table": {
     return `$${v.toFixed(2)}`;
   };
 
-  const axiosOpts = { headers, timeout: 10000, validateStatus: s => s < 500 };
+  const formatted = Object.fromEntries(
+    TF.map(tf => [tf, {
+      total: fmtUSD(agg[tf].total),
+      long:  fmtUSD(agg[tf].long),
+      short: fmtUSD(agg[tf].short)
+    }])
+  );
 
-  async function sumCoins() {
-    const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
-    let page = 1, rowsProcessed = 0;
-
-    for (;;) {
-      const resp = await axios.get(COINS_URL, {
-        ...axiosOpts,
-        params: { exchange_list: EXCHANGES.join(","), per_page: PER_PAGE, page }
-      });
-
-      if (resp.status !== 200 || resp.data?.code !== "0") {
-        throw new Error(`coins-markets ${resp.status}`);
-      }
-
-      const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
-      if (!rows.length) break;
-
-      for (const r of rows) {
-        for (const tf of TF) {
-          agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
-          agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
-          agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
-        }
-      }
-
-      rowsProcessed += rows.length;
-      if (rows.length < PER_PAGE) break;
-      page++;
-    }
-
-    return { agg, pages: page, rowsProcessed };
-  }
-
-  try {
-    const { agg, pages, rowsProcessed } = await sumCoins();
-
-    const formatted = Object.fromEntries(
-      TF.map(tf => [tf, {
-        total: fmtUSD(agg[tf].total),
-        long:  fmtUSD(agg[tf].long),
-        short: fmtUSD(agg[tf].short)
-      }])
-    );
-
-    return res.json({
-      success: true,
-      totals: agg,
-      formatted,
-      exchanges: EXCHANGES,
-      per_page: PER_PAGE,
-      pages_processed: pages,
-      rows_processed: rowsProcessed,
-      lastUpdated: new Date().toISOString()
-    });
-  } catch (e) {
-    return res.status(502).json({ error: "Aggregation failed", message: e.message });
-  }
+  // Return both, so your footer can use either `data[tf]` or `data.formatted[tf]`
+  return res.json({
+    success: true,
+    totals: agg,
+    formatted,
+    exchanges: EXCHANGES,
+    per_page: PER_PAGE,
+    pages_processed: page,
+    rows_processed: rowsProcessed,
+    lastUpdated: new Date().toISOString()
+  });
 }
+
 
 
 
