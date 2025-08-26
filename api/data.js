@@ -1224,146 +1224,249 @@ case "bull-market-peak-indicators": {
 }
 
 
-case "volume-coin-exchanges": {
+case "volume-total": {
   try {
-    // Exchanges to use per coin (exactly as you listed)
-    const coinExchangeMap = {
-      BTC: ['Binance','Bitget','Bybit','CME','OKX','Hyperliquid','MEXC','Gate','Coinbase','WhiteBIT','BingX','Crypto.com','Bitunix','Deribit','KuCoin','HTX','Bitmex','CoinEx','Bitfinex','Kraken','dYdX'],
-      ETH: ['Binance','OKX','Bitget','Bybit','Gate','CME','Hyperliquid','MEXC','BingX','Bitunix','WhiteBIT','HTX','KuCoin','Coinbase','Deribit','Kraken','CoinEx','Bitmex','dYdX','Bitfinex'],
-      ADA: ['Binance','MEXC','Bybit','Bitget','OKX','BingX','Bitunix','Gate','KuCoin','Coinbase','WhiteBIT','CoinEx','Kraken','HTX','Hyperliquid','Bitmex','Crypto.com','dYdX'],
-      BNB: ['Binance','OKX','Bybit','Bitget','BingX','Bitunix','MEXC','Hyperliquid','Gate','Kraken','KuCoin','HTX','CoinEx','Bitmex','dYdX'],
-      XRP: ['Binance','Bybit','Bitget','CME','OKX','MEXC','Gate','BingX','Hyperliquid','Bitunix','KuCoin','Coinbase','WhiteBIT','Kraken','Crypto.com','HTX','CoinEx','Bitmex','dYdX'],
-      DOGE:['Binance','OKX','Bybit','Bitget','Gate','MEXC','BingX','Bitunix','Hyperliquid','HTX','WhiteBIT','Coinbase','CoinEx','KuCoin','Kraken','Crypto.com','Bitmex','dYdX']
-    };
-
-    // Hit pairs-markets (perps + deliveries, all exchanges) and filter locally
-    const url = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
-    const response = await axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 });
-
-    if (response.status !== 200) {
-      return res.status(response.status).json({
-        error: "CoinGlass API error",
-        message: response.data?.msg || response.data?.message || `HTTP ${response.status}`,
-        status: response.status
-      });
-    }
-    if (!response.data || response.data.code !== "0" || !Array.isArray(response.data.data)) {
-      throw new Error("Unexpected payload from pairs-markets");
-    }
-
-    const rows = response.data.data;
-
-    // Helper: normalize exchange names from API (e.g., "Gate.io" vs "Gate")
-    const normalize = (name="") => {
-      const n = String(name).toLowerCase().replace(/\.io\b/g, ""); // "Gate.io" -> "Gate"
-      // map a few common aliases
-      const map = {
-        "crypto com": "crypto.com",
-        "whitebit": "whitebit",
-        "bingx": "bingx",
-        "bitmex": "bitmex",
-        "hyperliquid": "hyperliquid",
-        "bybit": "bybit",
-        "bitget": "bitget",
-        "okx": "okx",
-        "binance": "binance",
-        "mexc": "mexc",
-        "gate": "gate",
-        "kucoin": "kucoin",
-        "htx": "htx",
-        "coinex": "coinex",
-        "bitfinex": "bitfinex",
-        "kraken": "kraken",
-        "coinbase": "coinbase",
-        "deribit": "deribit",
-        "bitunix": "bitunix",
-        "dydx": "dydx",
-        "cme": "cme"
-      };
-      return map[n.replace(/\s+/g, "")] || n;
-    };
-
-    // Build a quick lookup for each coin's allowed exchanges (normalized)
-    const allowed = {};
-    for (const [coin, list] of Object.entries(coinExchangeMap)) {
-      allowed[coin] = new Set(list.map(normalize));
-    }
-
-    // Identify coin symbol on each row and the exchange field name
-    // Common keys: base/quote, symbol (like "BTCUSDT"), or coin field.
-    const getBase = (r) => {
-      // try typical possibilities without breaking if absent
-      if (r.base) return String(r.base).toUpperCase();
-      if (r.symbol && /^[A-Z]{3,10}[A-Z]{3,10}$/.test(r.symbol)) {
-        // extract base from something like "BTCUSDT", "ETHUSD"
-        const s = String(r.symbol).toUpperCase();
-        // heuristic: take leading letters until we hit "USD" or "USDT" or "PERP"
-        const m = s.match(/^(.*?)(USDT|USD|PERP)/);
-        if (m) return m[1];
-        // fallback: first 3-5 chars
-        return s.slice(0, 4).replace(/[^A-Z]/g, "");
+    console.log("DEBUG: Starting 2-step volume calculation process...");
+    
+    // Step 1: Get all supported exchanges and their trading pairs
+    console.log("DEBUG: Step 1 - Fetching supported exchange pairs...");
+    const supportedResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/supported-exchange-pairs", { 
+      headers,
+      timeout: 20000,
+      validateStatus: function (status) {
+        return status < 500;
       }
-      if (r.coin) return String(r.coin).toUpperCase();
-      return ""; // unknown
-    };
-    const getExchange = (r) => r.exchange_name || r.exchange || r.market || "";
+    });
 
-    // Sum volumes
-    const out = {};
-    for (const coin of Object.keys(coinExchangeMap)) {
-      out[coin] = { total_volume_usd_24h: 0, by_exchange: [] };
+    if (supportedResponse.status !== 200 || supportedResponse.data?.code !== "0") {
+      throw new Error(`Supported exchange pairs API failed: ${supportedResponse.data?.msg || 'Unknown error'}`);
     }
 
-    // Accept both snake_case and camelCase volume fields
-    const getVol = (r) => {
-      const v = r.volume_usd ?? r.volUsd ?? r.volumeUSD ?? 0;
-      return Number(v) || 0;
-    };
+    const exchangesData = supportedResponse.data.data || {};
+    const exchangeNames = Object.keys(exchangesData);
+    console.log(`DEBUG: Found ${exchangeNames.length} exchanges:`, exchangeNames);
+    
+    // Create exchange-to-coins mapping
+    const exchangeCoinMap = {};
+    const allUniqueCoins = new Set();
+    let totalPairs = 0;
+    
+    exchangeNames.forEach(exchangeName => {
+      const pairs = exchangesData[exchangeName] || [];
+      exchangeCoinMap[exchangeName] = new Set();
+      
+      pairs.forEach(pair => {
+        if (pair.base_asset) {
+          exchangeCoinMap[exchangeName].add(pair.base_asset);
+          allUniqueCoins.add(pair.base_asset);
+        }
+      });
+      
+      totalPairs += pairs.length;
+      console.log(`DEBUG: ${exchangeName}: ${pairs.length} pairs, ${exchangeCoinMap[exchangeName].size} unique coins`);
+    });
+    
+    console.log(`DEBUG: Total unique coins across all exchanges: ${allUniqueCoins.size}`);
+    console.log(`DEBUG: Total trading pairs: ${totalPairs}`);
+    
+    // Step 2: Get coins-markets data for ALL exchanges
+    console.log("DEBUG: Step 2 - Fetching coins markets for all exchanges...");
+    
+    // Create comma-separated exchange list for the API call
+    const exchangeList = exchangeNames.join(',');
+    console.log(`DEBUG: Exchange list for API: ${exchangeList}`);
+    
+    const coinsMarketsUrl = `https://open-api-v4.coinglass.com/api/futures/coins-markets?exchange_list=${encodeURIComponent(exchangeList)}`;
+    console.log(`DEBUG: Requesting: ${coinsMarketsUrl}`);
+    
+    const coinsResponse = await axios.get(coinsMarketsUrl, { 
+      headers,
+      timeout: 30000, // Longer timeout since we're getting data for all exchanges
+      validateStatus: function (status) {
+        return status < 500;
+      }
+    });
 
-    for (const r of rows) {
-      const base = getBase(r);
-      if (!out[base]) continue; // not in our requested coin list
+    if (coinsResponse.status !== 200 || coinsResponse.data?.code !== "0") {
+      throw new Error(`Coins markets API failed: ${coinsResponse.data?.msg || 'Unknown error'}`);
+    }
 
-      const exNorm = normalize(getExchange(r));
-      if (!allowed[base].has(exNorm)) continue; // not in allowed exchange list for that coin
-
-      const vol = getVol(r);
-      if (vol <= 0) continue;
-
-      out[base].total_volume_usd_24h += vol;
-      out[base].by_exchange.push({
-        exchange: getExchange(r),
-        volume_usd_24h: vol
+    const coinsData = coinsResponse.data.data || [];
+    console.log(`DEBUG: Retrieved ${coinsData.length} coin records from coins-markets`);
+    
+    // Debug: Show sample of what we got
+    if (coinsData.length > 0) {
+      const sample = coinsData[0];
+      console.log("DEBUG: Sample coin data structure:", {
+        symbol: sample.symbol,
+        exchange: sample.exchange,
+        long_volume_usd_24h: sample.long_volume_usd_24h,
+        short_volume_usd_24h: sample.short_volume_usd_24h,
+        volume_change_percent_24h: sample.volume_change_percent_24h
       });
     }
-
-    // Sort breakdowns and format
-    const fmtUSD = (v) =>
-      v >= 1e12 ? `$${(v/1e12).toFixed(2)}T` :
-      v >= 1e9  ? `$${(v/1e9 ).toFixed(2)}B` :
-      v >= 1e6  ? `$${(v/1e6 ).toFixed(2)}M` :
-                  `$${Math.round(v).toLocaleString()}`;
-
-    for (const coin of Object.keys(out)) {
-      out[coin].by_exchange.sort((a,b) => b.volume_usd_24h - a.volume_usd_24h);
-      out[coin].total_formatted = fmtUSD(out[coin].total_volume_usd_24h);
-    }
-
+    
+    // Step 3: Calculate total volume by summing long + short volume for each coin across all exchanges
+    console.log("DEBUG: Step 3 - Calculating total volume...");
+    
+    const coinVolumeMap = {}; // coin symbol -> { exchanges: {...}, totalVolume, volumeChangeData }
+    let totalVolume24h = 0;
+    let totalWeightedVolumeChange = 0;
+    const exchangeVolumeBreakdown = {};
+    
+    coinsData.forEach(coinRecord => {
+      const symbol = coinRecord.symbol;
+      const exchange = coinRecord.exchange || 'Unknown';
+      const longVolume = coinRecord.long_volume_usd_24h || 0;
+      const shortVolume = coinRecord.short_volume_usd_24h || 0;
+      const totalCoinExchangeVolume = longVolume + shortVolume;
+      const volumeChangePercent = coinRecord.volume_change_percent_24h;
+      
+      // Initialize coin entry if doesn't exist
+      if (!coinVolumeMap[symbol]) {
+        coinVolumeMap[symbol] = {
+          symbol: symbol,
+          totalVolume: 0,
+          exchanges: {},
+          volumeChangeData: []
+        };
+      }
+      
+      // Add this exchange's volume to the coin's total
+      if (totalCoinExchangeVolume > 0) {
+        coinVolumeMap[symbol].totalVolume += totalCoinExchangeVolume;
+        coinVolumeMap[symbol].exchanges[exchange] = {
+          longVolume: longVolume,
+          shortVolume: shortVolume,
+          totalVolume: totalCoinExchangeVolume,
+          volumeChange: volumeChangePercent
+        };
+        
+        // Track volume change data for weighted average
+        if (typeof volumeChangePercent === "number" && !isNaN(volumeChangePercent)) {
+          coinVolumeMap[symbol].volumeChangeData.push({
+            volume: totalCoinExchangeVolume,
+            change: volumeChangePercent,
+            exchange: exchange
+          });
+        }
+        
+        // Track volume by exchange for analysis
+        if (!exchangeVolumeBreakdown[exchange]) {
+          exchangeVolumeBreakdown[exchange] = 0;
+        }
+        exchangeVolumeBreakdown[exchange] += totalCoinExchangeVolume;
+      }
+    });
+    
+    // Calculate total volume and weighted average change
+    Object.values(coinVolumeMap).forEach(coinData => {
+      totalVolume24h += coinData.totalVolume;
+      
+      // Calculate weighted average change for this coin across its exchanges
+      if (coinData.volumeChangeData.length > 0) {
+        const coinTotalVolume = coinData.volumeChangeData.reduce((sum, d) => sum + d.volume, 0);
+        const coinWeightedChange = coinData.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0);
+        const coinAvgChange = coinTotalVolume > 0 ? coinWeightedChange / coinTotalVolume : 0;
+        
+        // Add to global weighted average
+        totalWeightedVolumeChange += coinData.totalVolume * coinAvgChange;
+      }
+    });
+    
+    const averageVolumeChange = totalVolume24h > 0 ? totalWeightedVolumeChange / totalVolume24h : 0;
+    
+    // Sort coins by total volume
+    const coinsSortedByVolume = Object.values(coinVolumeMap)
+      .sort((a, b) => b.totalVolume - a.totalVolume)
+      .slice(0, 20); // Top 20 for detailed analysis
+    
+    // Sort exchanges by volume
+    const exchangesSortedByVolume = Object.entries(exchangeVolumeBreakdown)
+      .sort(([,a], [,b]) => b - a)
+      .map(([exchange, volume]) => ({
+        exchange,
+        volume,
+        volume_formatted: `$${(volume / 1e9).toFixed(2)}B`,
+        percentage: `${((volume / totalVolume24h) * 100).toFixed(1)}%`
+      }));
+    
+    // Calculate accuracy metrics
+    const volumeDiff = totalVolume24h - 498038439118;
+    const changeDiff = averageVolumeChange - 107.68;
+    const volumeAccuracy = 100 - Math.abs(volumeDiff / 498038439118 * 100);
+    const changeAccuracy = 100 - Math.abs(changeDiff / 107.68 * 100);
+    
+    console.log(`DEBUG: Final calculation results:`);
+    console.log(`  Total Volume: $${(totalVolume24h / 1e9).toFixed(2)}B`);
+    console.log(`  Volume Change: ${averageVolumeChange.toFixed(2)}%`);
+    console.log(`  Target: $498.04B +107.68%`);
+    console.log(`  Accuracy: ${volumeAccuracy.toFixed(2)}% volume, ${changeAccuracy.toFixed(2)}% change`);
+    console.log(`  Unique coins processed: ${Object.keys(coinVolumeMap).length}`);
+    console.log(`  Coin records from API: ${coinsData.length}`);
+    
     return res.json({
-      coins: out,
-      last_updated: new Date().toISOString(),
-      source: "futures/pairs-markets (filtered by exchange list)"
+      total_volume_24h: totalVolume24h,
+      total_volume_formatted: `$${(totalVolume24h / 1e9).toFixed(2)}B`,
+      percent_change_24h: parseFloat(averageVolumeChange.toFixed(2)),
+      coinglass_target: {
+        volume: 498038439118,
+        volume_formatted: "$498.04B",
+        change: 107.68
+      },
+      accuracy_metrics: {
+        volume_difference: volumeDiff,
+        volume_difference_formatted: `$${(volumeDiff / 1e9).toFixed(2)}B`,
+        change_difference: parseFloat(changeDiff.toFixed(2)),
+        volume_accuracy: `${volumeAccuracy.toFixed(2)}%`,
+        change_accuracy: `${changeAccuracy.toFixed(2)}%`
+      },
+      calculation_summary: {
+        step1_exchanges_found: exchangeNames.length,
+        step1_unique_coins_available: allUniqueCoins.size,
+        step1_total_trading_pairs: totalPairs,
+        step2_coin_records_retrieved: coinsData.length,
+        step2_unique_coins_processed: Object.keys(coinVolumeMap).length,
+        exchanges_queried: exchangeNames,
+        methodology: "Sum of (long_volume_usd_24h + short_volume_usd_24h) per coin per exchange, then sum all coins"
+      },
+      top_coins_by_volume: coinsSortedByVolume.map(coin => ({
+        symbol: coin.symbol,
+        total_volume_formatted: `$${(coin.totalVolume / 1e9).toFixed(2)}B`,
+        exchanges_trading: Object.keys(coin.exchanges).length,
+        exchanges_breakdown: Object.entries(coin.exchanges).map(([exchange, data]) => ({
+          exchange,
+          volume_formatted: `$${(data.totalVolume / 1e9).toFixed(2)}B`,
+          long_volume: data.longVolume,
+          short_volume: data.shortVolume,
+          volume_change: data.volumeChange
+        })).sort((a, b) => b.long_volume + b.short_volume - a.long_volume - a.short_volume),
+        // Weighted average change across exchanges for this coin
+        avg_volume_change: coin.volumeChangeData.length > 0 ? 
+          parseFloat((coin.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0) / 
+          coin.volumeChangeData.reduce((sum, d) => sum + d.volume, 0)).toFixed(2)) : 0
+      })),
+      volume_by_exchange: exchangesSortedByVolume,
+      debug_info: {
+        api_calls_made: [
+          "futures/supported-exchange-pairs",
+          `futures/coins-markets?exchange_list=${exchangeList}`
+        ],
+        calculation_method: "2-step process: get all exchanges, then query coins-markets with all exchange names",
+        data_completeness: `${Object.keys(coinVolumeMap).length}/${allUniqueCoins.size} coins found with volume data`,
+        last_updated: new Date().toISOString()
+      }
     });
 
   } catch (err) {
-    console.error("[volume-coin-exchanges] Error:", err?.response?.data || err.message);
-    return res.status(500).json({
-      error: "Volume calculation failed",
-      message: err.message || "Unknown error"
+    console.error("[volume-total] API Error:", err.message);
+    return res.status(500).json({ 
+      error: "Volume calculation failed", 
+      message: err.message,
+      debug: "Error in 2-step volume calculation process"
     });
   }
 }
-
 
 
 
