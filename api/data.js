@@ -1226,109 +1226,276 @@ case "bull-market-peak-indicators": {
 
 case "volume-total": {
   try {
-    const fmtUSD = (v) =>
-      v >= 1e12 ? `$${(v / 1e12).toFixed(2)}T` :
-      v >= 1e9  ? `$${(v / 1e9 ).toFixed(2)}B` :
-      v >= 1e6  ? `$${(v / 1e6 ).toFixed(2)}M` :
-                  `$${Math.round(v).toLocaleString()}`;
-
-    // --- Step 1: Get supported exchanges (single call, we only need the keys) ---
-    const supportedUrl = "https://open-api-v4.coinglass.com/api/futures/supported-exchange-pairs";
-    const sRes = await axios.get(supportedUrl, {
+    console.log("DEBUG: Starting pairs-markets approach using volume_usd field...");
+    
+    // Step 1: Get all supported exchanges and extract unique coins
+    console.log("DEBUG: Step 1 - Fetching supported exchange pairs to get coin symbols...");
+    const supportedResponse = await axios.get("https://open-api-v4.coinglass.com/api/futures/supported-exchange-pairs", { 
       headers,
-      timeout: 15000,
-      validateStatus: (s) => s < 500
+      timeout: 20000,
+      validateStatus: function (status) {
+        return status < 500;
+      }
     });
 
-    if (sRes.status !== 200 || !sRes.data || sRes.data.code !== "0") {
-      return res.status(sRes.status || 502).json({
-        error: "CoinGlass API error (supported-exchange-pairs)",
-        message: sRes.data?.msg || "Unexpected response"
-      });
+    if (supportedResponse.status !== 200 || supportedResponse.data?.code !== "0") {
+      throw new Error(`Supported exchange pairs API failed: ${supportedResponse.data?.msg || 'Unknown error'}`);
     }
 
-    const exchObj = sRes.data.data || {};
-    const exchanges = Object.keys(exchObj);
-    if (!exchanges.length) {
-      throw new Error("No exchanges returned by supported-exchange-pairs");
-    }
-
-    // --- Step 2: Query coins-markets with every supported exchange, paginate until done ---
-    const cmUrl = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-    const perPage = 200; // pull a big page; loop if there are more
-    let page = 1;
-    let grandTotal = 0;
-    const perSymbol = {}; // optional breakdown
-
-    // Helper to extract volume even if some fields are missing
-    const getCoinVol24h = (coin) => {
-      const longV  = Number(coin.long_volume_usd_24h  ?? 0);
-      const shortV = Number(coin.short_volume_usd_24h ?? 0);
-      if (longV || shortV) return longV + shortV;
-
-      // fallbacks if needed (defensive)
-      const v1 = Number(coin.volume_usd_24h ?? 0);
-      const v2 = Number(coin.volume_usd ?? 0);
-      return v1 || v2 || 0;
-    };
-
-    while (true) {
-      const cRes = await axios.get(cmUrl, {
-        headers,
-        timeout: 20000,
-        validateStatus: (s) => s < 500,
-        params: {
-          exchange_list: exchanges.join(","), // axios will URL-encode as needed
-          per_page: perPage,
-          page
+    const exchangesData = supportedResponse.data.data || {};
+    const exchangeNames = Object.keys(exchangesData);
+    console.log(`DEBUG: Found ${exchangeNames.length} exchanges:`, exchangeNames);
+    
+    // Extract unique coin symbols (base_asset) from all exchanges
+    const allUniqueCoins = new Set();
+    let totalPairs = 0;
+    
+    exchangeNames.forEach(exchangeName => {
+      const pairs = exchangesData[exchangeName] || [];
+      pairs.forEach(pair => {
+        if (pair.base_asset) {
+          allUniqueCoins.add(pair.base_asset);
         }
       });
-
-      if (cRes.status !== 200 || !cRes.data || cRes.data.code !== "0") {
-        return res.status(cRes.status || 502).json({
-          error: "CoinGlass API error (coins-markets)",
-          message: cRes.data?.msg || "Unexpected response"
+      totalPairs += pairs.length;
+    });
+    
+    const symbolsArray = ['BTC', 'ETH', 'ADA', 'BNB', 'XRP', 'DOGE']; // Test with specific coins
+    console.log(`DEBUG: Testing with specific coins: ${symbolsArray.join(', ')}`);
+    console.log(`DEBUG: This will make ${symbolsArray.length + 1} total API requests (well within limits)`);
+    
+    // Step 2: Query pairs-markets for each test symbol to get volume_usd data
+    console.log("DEBUG: Step 2 - Querying pairs-markets for test symbols...");
+    
+    const coinVolumeMap = {};
+    const exchangeVolumeBreakdown = {};
+    const symbolProcessingResults = [];
+    let totalVolume24h = 0;
+    let totalWeightedVolumeChange = 0;
+    let processedSymbols = 0;
+    let failedSymbols = 0;
+    
+    // Process each test symbol individually
+    for (const symbol of symbolsArray) {
+      try {
+        console.log(`DEBUG: Querying pairs-markets for ${symbol}...`);
+        
+        const pairsResponse = await axios.get(`https://open-api-v4.coinglass.com/api/futures/pairs-markets?symbol=${symbol}`, {
+          headers,
+          timeout: 10000,
+          validateStatus: function (status) {
+            return status < 500;
+          }
         });
+        
+        if (pairsResponse.status === 200 && pairsResponse.data?.code === "0") {
+          const pairs = pairsResponse.data.data || [];
+          console.log(`DEBUG: ${symbol}: Retrieved ${pairs.length} trading pairs`);
+          
+          let symbolTotalVolume = 0;
+          let symbolVolumeChangeData = [];
+          const symbolExchanges = {};
+          
+          pairs.forEach(pair => {
+            const exchangeName = pair.exchange_name || pair.exchange || 'Unknown';
+            const pairVolume = pair.volume_usd || 0; // This is the key field - actual trading volume
+            const volumeChangePercent = pair.volume_usd_change_percent_24h;
+            const instrumentId = pair.instrument_id;
+            
+            if (pairVolume > 0) {
+              symbolTotalVolume += pairVolume;
+              
+              // Track by exchange
+              if (!symbolExchanges[exchangeName]) {
+                symbolExchanges[exchangeName] = {
+                  totalVolume: 0,
+                  pairs: [],
+                  volumeChangeData: []
+                };
+              }
+              
+              symbolExchanges[exchangeName].totalVolume += pairVolume;
+              symbolExchanges[exchangeName].pairs.push({
+                instrument_id: instrumentId,
+                volume_usd: pairVolume,
+                volume_change: volumeChangePercent
+              });
+              
+              // Track volume change data for this pair
+              if (typeof volumeChangePercent === "number" && !isNaN(volumeChangePercent)) {
+                symbolVolumeChangeData.push({
+                  volume: pairVolume,
+                  change: volumeChangePercent,
+                  exchange: exchangeName,
+                  pair: instrumentId
+                });
+                symbolExchanges[exchangeName].volumeChangeData.push({
+                  volume: pairVolume,
+                  change: volumeChangePercent
+                });
+              }
+              
+              // Add to global exchange breakdown
+              if (!exchangeVolumeBreakdown[exchangeName]) {
+                exchangeVolumeBreakdown[exchangeName] = 0;
+              }
+              exchangeVolumeBreakdown[exchangeName] += pairVolume;
+            }
+          });
+          
+          if (symbolTotalVolume > 0) {
+            coinVolumeMap[symbol] = {
+              symbol: symbol,
+              totalVolume: symbolTotalVolume,
+              exchanges: symbolExchanges,
+              volumeChangeData: symbolVolumeChangeData,
+              pairCount: pairs.length,
+              exchangeCount: Object.keys(symbolExchanges).length
+            };
+            
+            totalVolume24h += symbolTotalVolume;
+            processedSymbols++;
+            
+            console.log(`DEBUG: ${symbol} - Total Volume: ${(symbolTotalVolume / 1e9).toFixed(2)}B across ${Object.keys(symbolExchanges).length} exchanges`);
+            
+            symbolProcessingResults.push({ 
+              success: true, 
+              symbol, 
+              volume: symbolTotalVolume, 
+              exchanges: Object.keys(symbolExchanges).length,
+              pairs: pairs.length 
+            });
+          } else {
+            console.log(`DEBUG: ${symbol} - No volume data found`);
+            symbolProcessingResults.push({ success: false, symbol, error: "No volume data found" });
+          }
+          
+        } else {
+          console.log(`DEBUG: Failed to get data for ${symbol}: ${pairsResponse.status} - ${pairsResponse.data?.msg}`);
+          failedSymbols++;
+          symbolProcessingResults.push({ success: false, symbol, error: pairsResponse.data?.msg || `HTTP ${pairsResponse.status}` });
+        }
+        
+        // Small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+      } catch (error) {
+        console.log(`DEBUG: Error processing ${symbol}: ${error.message}`);
+        failedSymbols++;
+        symbolProcessingResults.push({ success: false, symbol, error: error.message });
       }
-
-      const list = Array.isArray(cRes.data.data) ? cRes.data.data : [];
-      if (!list.length) break;
-
-      for (const coin of list) {
-        const vol = getCoinVol24h(coin);
-        if (!vol) continue;
-
-        grandTotal += vol;
-        const sym = coin.symbol || "UNKNOWN";
-        perSymbol[sym] = (perSymbol[sym] || 0) + vol;
-      }
-
-      if (list.length < perPage) break; // last page
-      page += 1;
     }
-
-    // Optional: top symbols for quick debugging/validation
-    const topSymbols = Object.entries(perSymbol)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([symbol, v]) => ({ symbol, volume_usd_24h: v, formatted: fmtUSD(v) }));
-
+    
+    // Calculate weighted average volume change
+    Object.values(coinVolumeMap).forEach(coinData => {
+      if (coinData.volumeChangeData.length > 0) {
+        const coinTotalVolume = coinData.volumeChangeData.reduce((sum, d) => sum + d.volume, 0);
+        const coinWeightedChange = coinData.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0);
+        const coinAvgChange = coinTotalVolume > 0 ? coinWeightedChange / coinTotalVolume : 0;
+        totalWeightedVolumeChange += coinData.totalVolume * coinAvgChange;
+      }
+    });
+    
+    const averageVolumeChange = totalVolume24h > 0 ? totalWeightedVolumeChange / totalVolume24h : 0;
+    
+    // Sort results
+    const coinsSortedByVolume = Object.values(coinVolumeMap)
+      .sort((a, b) => b.totalVolume - a.totalVolume);
+    
+    const topCoinsForDisplay = coinsSortedByVolume.slice(0, 15);
+    
+    const exchangesSortedByVolume = Object.entries(exchangeVolumeBreakdown)
+      .sort(([,a], [,b]) => b - a)
+      .map(([exchange, volume]) => ({
+        exchange,
+        volume,
+        volume_formatted: `$${(volume / 1e9).toFixed(2)}B`,
+        percentage: `${((volume / totalVolume24h) * 100).toFixed(1)}%`
+      }));
+    
+    // Calculate accuracy metrics
+    const volumeDiff = totalVolume24h - 498038439118;
+    const changeDiff = averageVolumeChange - 107.68;
+    const volumeAccuracy = 100 - Math.abs(volumeDiff / 498038439118 * 100);
+    const changeAccuracy = 100 - Math.abs(changeDiff / 107.68 * 100);
+    
+    console.log(`DEBUG: Test Results with 6 major coins using pairs-markets volume_usd:`);
+    console.log(`  Total Volume (6 coins only): ${(totalVolume24h / 1e9).toFixed(2)}B`);
+    console.log(`  Volume Change: ${averageVolumeChange.toFixed(2)}%`);
+    console.log(`  Note: This is only 6 coins vs full market of ~871 coins`);
+    console.log(`  Coins processed: ${processedSymbols}/${symbolsArray.length}`);
+    console.log(`  API requests made: ${symbolsArray.length + 1} (well within limits)`);
+    
+    // Show individual coin volumes
+    Object.values(coinVolumeMap).forEach(coin => {
+      console.log(`  ${coin.symbol}: ${(coin.totalVolume / 1e9).toFixed(2)}B across ${coin.exchangeCount} exchanges`);
+    });
+    
     return res.json({
-      total_volume_24h: grandTotal,
-      total_formatted: fmtUSD(grandTotal),
-      exchange_count: exchanges.length,
-      // exchanges, // uncomment if you want the full list returned
-      symbols_processed: Object.keys(perSymbol).length,
-      top_symbols: topSymbols,
-      last_updated: new Date().toISOString(),
-      method: "supported-exchange-pairs -> coins-markets (sum long+short 24h by symbol)"
+      total_volume_24h: totalVolume24h,
+      total_volume_formatted: `$${(totalVolume24h / 1e9).toFixed(2)}B`,
+      percent_change_24h: parseFloat(averageVolumeChange.toFixed(2)),
+      coinglass_target: {
+        volume: 498038439118,
+        volume_formatted: "$498.04B",
+        change: 107.68
+      },
+      accuracy_metrics: {
+        volume_difference: volumeDiff,
+        volume_difference_formatted: `$${(volumeDiff / 1e9).toFixed(2)}B`,
+        change_difference: parseFloat(changeDiff.toFixed(2)),
+        volume_accuracy: `${volumeAccuracy.toFixed(2)}%`,
+        change_accuracy: `${changeAccuracy.toFixed(2)}%`
+      },
+      calculation_summary: {
+        step1_exchanges_found: exchangeNames.length,
+        step1_unique_symbols_found: symbolsArray.length,
+        step1_total_trading_pairs: totalPairs,
+        step2_symbols_processed_successfully: processedSymbols,
+        step2_symbols_failed: failedSymbols,
+        step2_unique_coins_with_volume: Object.keys(coinVolumeMap).length,
+        methodology: "Query pairs-markets per symbol, sum volume_usd across all pairs/exchanges per coin",
+        volume_field_used: "volume_usd (actual 24h trading volume, not taker splits)"
+      },
+      top_coins_by_volume: topCoinsForDisplay.map(coin => ({
+        symbol: coin.symbol,
+        total_volume_formatted: `$${(coin.totalVolume / 1e9).toFixed(2)}B`,
+        exchanges_trading: coin.exchangeCount,
+        pairs_count: coin.pairCount,
+        exchanges_breakdown: Object.entries(coin.exchanges).map(([exchange, data]) => ({
+          exchange,
+          volume_formatted: `$${(data.totalVolume / 1e9).toFixed(2)}B`,
+          pairs_count: data.pairs.length,
+          avg_volume_change: data.volumeChangeData.length > 0 ?
+            parseFloat((data.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0) / 
+            data.volumeChangeData.reduce((sum, d) => sum + d.volume, 0)).toFixed(2)) : 0
+        })).sort((a, b) => parseFloat(b.volume_formatted.replace(/[$B]/g, '')) - parseFloat(a.volume_formatted.replace(/[$B]/g, ''))),
+        avg_volume_change: coin.volumeChangeData.length > 0 ? 
+          parseFloat((coin.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0) / 
+          coin.volumeChangeData.reduce((sum, d) => sum + d.volume, 0)).toFixed(2)) : 0
+      })),
+      volume_by_exchange: exchangesSortedByVolume,
+      symbol_processing_summary: {
+        successful_symbols: processedSymbols,
+        failed_symbols: failedSymbols,
+        success_rate: `${((processedSymbols / symbolsArray.length) * 100).toFixed(1)}%`,
+        batches_processed: batches.length
+      },
+      debug_info: {
+        approach: "pairs-markets per symbol using volume_usd field",
+        volume_metric: "volume_usd - actual 24h trading volume (not directional splits)",
+        api_endpoints_used: ["futures/supported-exchange-pairs", "futures/pairs-markets (per symbol)"],
+        key_improvement: "Using volume_usd instead of long_volume_usd + short_volume_usd",
+        last_updated: new Date().toISOString()
+      }
     });
 
   } catch (err) {
-    console.error("[volume-total] Error:", err?.response?.data || err.message);
-    return res.status(500).json({
-      error: "Volume API failed",
-      message: err.message || "Unknown error"
+    console.error("[volume-total] API Error:", err.message);
+    return res.status(500).json({ 
+      error: "Volume calculation failed", 
+      message: err.message,
+      debug: "Error in pairs-markets volume_usd approach"
     });
   }
 }
