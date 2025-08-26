@@ -1225,10 +1225,11 @@ case "bull-market-peak-indicators": {
 
 case "volume-total": {
   try {
-    // Default top 10 from your screenshot; override with ?coins=BTC,ETH,...
+    // Default TOP 20 (from your screenshots). Override with ?coins=BTC,ETH,...
     const COINS = (req.query.coins
       ? String(req.query.coins).split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
-      : ["BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "SUI", "ADA", "LINK", "BNB"]
+      : ["BTC","ETH","SOL","XRP","DOGE","HYPE","SUI","ADA","LINK","BNB",
+         "ENA","LTC","AVAX","AAVE","UNI","FARTCOIN","PEPE","TRX","BCH","DOT"]
     );
 
     const fmtUSD = (v) =>
@@ -1254,24 +1255,15 @@ case "volume-total": {
           params: { symbol, per_page: PER_PAGE, page }
         });
 
-        if (r.status !== 200) {
+        if (r.status !== 200 || !r.data || r.data.code !== "0" || !Array.isArray(r.data.data)) {
           return {
             symbol,
-            error: `HTTP ${r.status}: ${r.data?.msg || r.data?.message || "pairs-markets error"}`,
+            error: r.data?.msg || `HTTP ${r.status} pairs-markets`,
             volume_usd_24h: 0,
+            volume_formatted: "$0",
             percent_change_24h: "0.00",
             pairs_count: 0,
-            volume_formatted: "$0"
-          };
-        }
-        if (!r.data || r.data.code !== "0" || !Array.isArray(r.data.data)) {
-          return {
-            symbol,
-            error: r.data?.msg || "Unexpected payload",
-            volume_usd_24h: 0,
-            percent_change_24h: "0.00",
-            pairs_count: 0,
-            volume_formatted: "$0"
+            _prev: 0
           };
         }
 
@@ -1284,14 +1276,14 @@ case "volume-total": {
           if (vol) {
             total += vol;
             if (Number.isFinite(pct) && pct > -100) {
-              // reconstruct yesterday to compute a weighted change per coin
+              // reconstruct yesterday's volume for weighted change
               prevTotal += vol / (1 + pct / 100);
             }
           }
         }
         rowsCount += rows.length;
 
-        if (rows.length < PER_PAGE) break; // last page
+        if (rows.length < PER_PAGE) break;
         page++;
       }
 
@@ -1302,34 +1294,33 @@ case "volume-total": {
         volume_usd_24h: total,
         volume_formatted: fmtUSD(total),
         percent_change_24h: Number.isFinite(changePct) ? changePct.toFixed(2) : "0.00",
-        pairs_count: rowsCount
+        pairs_count: rowsCount,
+        _prev: prevTotal
       };
     }
 
-    // 10 coins -> typically ~10 calls
+    // 20 coins → usually ~20 calls
     const results = await Promise.all(COINS.map(fetchCoin));
 
-    // sort per-coin by volume desc
+    // sort by per-coin volume desc
     results.sort((a, b) => (b.volume_usd_24h || 0) - (a.volume_usd_24h || 0));
 
-    // aggregate totals and overall change (from the per-coin reconstructed prev totals)
-    const totalVol = results.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
-    const totalPrev = results.reduce((s, r) => {
-      const pct = Number(r.percent_change_24h);
-      return (!Number.isFinite(pct) || pct <= -100)
-        ? s
-        : s + (r.volume_usd_24h / (1 + pct / 100));
-    }, 0);
+    // aggregate totals & overall weighted change
+    const totalVol  = results.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
+    const totalPrev = results.reduce((s, r) => s + (r._prev || 0), 0);
     const aggChangePct = totalPrev > 0 ? ((totalVol - totalPrev) / totalPrev) * 100 : 0;
+
+    // remove internal field
+    const clean = results.map(({ _prev, ...rest }) => rest);
 
     return res.json({
       total_volume_24h: totalVol,
       total_formatted: fmtUSD(totalVol),
       percent_change_24h: Number.isFinite(aggChangePct) ? aggChangePct.toFixed(2) : "0.00",
-      coins: results,
-      coins_count: results.length,
+      coins: clean,
+      coins_count: clean.length,
       last_updated: new Date().toISOString(),
-      source: "futures/pairs-markets (sum volume_usd across all exchanges & pairs for top-10)"
+      source: "futures/pairs-markets (sum volume_usd across all exchanges & pairs for top-20)"
     });
 
   } catch (err) {
@@ -1340,6 +1331,7 @@ case "volume-total": {
     });
   }
 }
+
 
 
     
