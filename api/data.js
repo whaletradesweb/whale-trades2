@@ -1225,10 +1225,10 @@ case "bull-market-peak-indicators": {
 
 case "volume-total": {
   try {
-    // Sum 24h futures volume_usd for BTC, ETH, ADA, BNB, XRP, DOGE via pairs-markets
+    // Default top 10 from your screenshot; override with ?coins=BTC,ETH,...
     const COINS = (req.query.coins
       ? String(req.query.coins).split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
-      : ["BTC", "ETH", "ADA", "BNB", "XRP", "DOGE"]
+      : ["BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "SUI", "ADA", "LINK", "BNB"]
     );
 
     const fmtUSD = (v) =>
@@ -1243,6 +1243,7 @@ case "volume-total": {
     async function fetchCoin(symbol) {
       let page = 1;
       let total = 0;
+      let prevTotal = 0;
       let rowsCount = 0;
 
       for (;;) {
@@ -1258,6 +1259,7 @@ case "volume-total": {
             symbol,
             error: `HTTP ${r.status}: ${r.data?.msg || r.data?.message || "pairs-markets error"}`,
             volume_usd_24h: 0,
+            percent_change_24h: "0.00",
             pairs_count: 0,
             volume_formatted: "$0"
           };
@@ -1267,6 +1269,7 @@ case "volume-total": {
             symbol,
             error: r.data?.msg || "Unexpected payload",
             volume_usd_24h: 0,
+            percent_change_24h: "0.00",
             pairs_count: 0,
             volume_formatted: "$0"
           };
@@ -1276,7 +1279,15 @@ case "volume-total": {
         if (!rows.length) break;
 
         for (const row of rows) {
-          total += Number(row.volume_usd || 0);
+          const vol = Number(row.volume_usd ?? 0);
+          const pct = Number(row.volume_usd_change_percent_24h ?? 0);
+          if (vol) {
+            total += vol;
+            if (Number.isFinite(pct) && pct > -100) {
+              // reconstruct yesterday to compute a weighted change per coin
+              prevTotal += vol / (1 + pct / 100);
+            }
+          }
         }
         rowsCount += rows.length;
 
@@ -1284,30 +1295,43 @@ case "volume-total": {
         page++;
       }
 
+      const changePct = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0;
+
       return {
         symbol,
         volume_usd_24h: total,
         volume_formatted: fmtUSD(total),
+        percent_change_24h: Number.isFinite(changePct) ? changePct.toFixed(2) : "0.00",
         pairs_count: rowsCount
       };
     }
 
-    // 6 coins -> typically 6 calls (pagination rare)
+    // 10 coins -> typically ~10 calls
     const results = await Promise.all(COINS.map(fetchCoin));
 
     // sort per-coin by volume desc
     results.sort((a, b) => (b.volume_usd_24h || 0) - (a.volume_usd_24h || 0));
 
-    const overallTotal = results.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
+    // aggregate totals and overall change (from the per-coin reconstructed prev totals)
+    const totalVol = results.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
+    const totalPrev = results.reduce((s, r) => {
+      const pct = Number(r.percent_change_24h);
+      return (!Number.isFinite(pct) || pct <= -100)
+        ? s
+        : s + (r.volume_usd_24h / (1 + pct / 100));
+    }, 0);
+    const aggChangePct = totalPrev > 0 ? ((totalVol - totalPrev) / totalPrev) * 100 : 0;
 
     return res.json({
-      total_volume_24h: overallTotal,
-      total_formatted: fmtUSD(overallTotal),
+      total_volume_24h: totalVol,
+      total_formatted: fmtUSD(totalVol),
+      percent_change_24h: Number.isFinite(aggChangePct) ? aggChangePct.toFixed(2) : "0.00",
       coins: results,
       coins_count: results.length,
       last_updated: new Date().toISOString(),
-      source: "futures/pairs-markets (sum of volume_usd across all exchanges & pairs for top-6)"
+      source: "futures/pairs-markets (sum volume_usd across all exchanges & pairs for top-10)"
     });
+
   } catch (err) {
     console.error("[volume-total] Error:", err?.response?.data || err.message);
     return res.status(500).json({
@@ -1316,6 +1340,7 @@ case "volume-total": {
     });
   }
 }
+
 
     
       default:
