@@ -1376,10 +1376,12 @@ case "volume-total": {
     
     const averageVolumeChange = totalVolume24h > 0 ? totalWeightedVolumeChange / totalVolume24h : 0;
     
-    // Sort coins by total volume
+    // Sort coins by total volume (keep ALL coins, not just top 20)
     const coinsSortedByVolume = Object.values(coinVolumeMap)
-      .sort((a, b) => b.totalVolume - a.totalVolume)
-      .slice(0, 20); // Top 20 for detailed analysis
+      .sort((a, b) => b.totalVolume - a.totalVolume);
+    
+    // Create separate array for display purposes (top 20)
+    const topCoinsForDisplay = coinsSortedByVolume.slice(0, 20);
     
     // Sort exchanges by volume
     const exchangesSortedByVolume = Object.entries(exchangeVolumeBreakdown)
@@ -1430,7 +1432,7 @@ case "volume-total": {
         exchanges_queried: exchangeNames,
         methodology: "Sum of (long_volume_usd_24h + short_volume_usd_24h) per coin per exchange, then sum all coins"
       },
-      top_coins_by_volume: coinsSortedByVolume.map(coin => ({
+      top_coins_by_volume: topCoinsForDisplay.map(coin => ({
         symbol: coin.symbol,
         total_volume_formatted: `$${(coin.totalVolume / 1e9).toFixed(2)}B`,
         exchanges_trading: Object.keys(coin.exchanges).length,
@@ -1447,6 +1449,23 @@ case "volume-total": {
           coin.volumeChangeData.reduce((sum, d) => sum + d.volume, 0)).toFixed(2)) : 0
       })),
       volume_by_exchange: exchangesSortedByVolume,
+      all_coins_processed: {
+        total_coins: coinsSortedByVolume.length,
+        total_volume_all_coins: totalVolume24h,
+        coins_with_volume: coinsSortedByVolume.filter(coin => coin.totalVolume > 0).length,
+        coins_over_1b_volume: coinsSortedByVolume.filter(coin => coin.totalVolume > 1e9).length,
+        coins_over_100m_volume: coinsSortedByVolume.filter(coin => coin.totalVolume > 100e6).length,
+        // List ALL coins with their volumes (not just top 20)
+        complete_coin_list: coinsSortedByVolume.map(coin => ({
+          symbol: coin.symbol,
+          total_volume: coin.totalVolume,
+          total_volume_formatted: `${(coin.totalVolume / 1e9).toFixed(2)}B`,
+          exchanges_count: Object.keys(coin.exchanges).length,
+          avg_volume_change: coin.volumeChangeData.length > 0 ? 
+            parseFloat((coin.volumeChangeData.reduce((sum, d) => sum + (d.volume * d.change), 0) / 
+            coin.volumeChangeData.reduce((sum, d) => sum + d.volume, 0)).toFixed(2)) : 0
+        }))
+      },
       debug_info: {
         api_calls_made: [
           "futures/supported-exchange-pairs",
