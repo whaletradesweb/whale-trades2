@@ -242,10 +242,16 @@ case "etf-eth-flows": {
 
 case "liquidations-table": {
   const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-  const EXCHANGES = (process.env.COINGLASS_EXCHANGES || "Binance,OKX,Bybit"); // capitalized
+
+  // allow override via env; default to your list above
+  const EXCHANGES = (process.env.COINGLASS_EXCHANGES ||
+    "Bybit,Binance,OKX,Gate,HTX,Hyperliquid,CoinEx,Bitmex,Bitfinex");
 
   const PER_PAGE = 200;
-  const tfs = ["1h","4h","12h","24h"];
+  const TF = ["1h","4h","12h","24h"];
+
+  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
 
   const axiosOpts = {
     headers,
@@ -253,43 +259,38 @@ case "liquidations-table": {
     validateStatus: s => s < 500
   };
 
-  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
-  const agg = Object.fromEntries(tfs.map(tf => [tf, { total:0, long:0, short:0 }]));
-
-  async function pullAll({ withExchanges }) {
-    let page = 1, totalRows = 0;
-    for (;;) {
-      const params = withExchanges
-        ? { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
-        : { per_page: PER_PAGE, page };
-
-      const resp = await axios.get(COINS_URL, { ...axiosOpts, params });
-
-      if (resp.status !== 200 || resp.data?.code !== "0") {
-        throw new Error(`CoinGlass ${resp.status}: ${resp.data?.message || "bad response"}`);
-      }
-
-      const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
-      if (!rows.length) return { page, totalRows };
-
-      for (const r of rows) {
-        for (const tf of tfs) {
-          agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
-          agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
-          agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
-        }
-      }
-
-      totalRows += rows.length;
-      if (rows.length < PER_PAGE) return { page, totalRows };
-      page++;
-    }
+  async function fetchPage(page) {
+    return axios.get(COINS_URL, {
+      ...axiosOpts,
+      params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
+    });
   }
 
-  // 1) Try WITH exchange_list (capitalized). 2) If empty, retry WITHOUT it.
-  let meta = await pullAll({ withExchanges: true });
-  if (meta.totalRows === 0) {
-    meta = await pullAll({ withExchanges: false });
+  let page = 1, rowsProcessed = 0;
+  for (;;) {
+    const resp = await fetchPage(page);
+    if (resp.status !== 200 || resp.data?.code !== "0") {
+      return res.status(resp.status || 500).json({
+        error: "API Request Failed",
+        message: resp.data?.message || "Bad response",
+        status: resp.status
+      });
+    }
+
+    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
+    if (!rows.length) break;
+
+    for (const r of rows) {
+      for (const tf of TF) {
+        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
+        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
+        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
+      }
+    }
+
+    rowsProcessed += rows.length;
+    if (rows.length < PER_PAGE) break;
+    page++;
   }
 
   const fmtUSD = (v) => {
@@ -302,25 +303,26 @@ case "liquidations-table": {
   };
 
   const formatted = Object.fromEntries(
-    tfs.map(tf => [tf, {
+    TF.map(tf => [tf, {
       total: fmtUSD(agg[tf].total),
       long:  fmtUSD(agg[tf].long),
       short: fmtUSD(agg[tf].short)
     }])
   );
 
+  // Return both, so your footer can use either `data[tf]` or `data.formatted[tf]`
   return res.json({
     success: true,
     totals: agg,
     formatted,
-    exchanges_attempted: EXCHANGES,
-    used_exchange_filter: meta.totalRows > 0,  // true if the first attempt returned data
+    exchanges: EXCHANGES,
     per_page: PER_PAGE,
-    pages_processed: meta.page,
-    rows_processed: meta.totalRows,
+    pages_processed: page,
+    rows_processed: rowsProcessed,
     lastUpdated: new Date().toISOString()
   });
 }
+
 
 
   case "long-short": {
