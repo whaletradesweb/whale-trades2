@@ -240,79 +240,42 @@ case "etf-eth-flows": {
       }
 
 
+
 case "liquidations-table": {
   const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-
-  // --- 1) Start from your 20 targets, normalize tricky spellings ---
-  const TARGET20 = [
-    "Binance","OKX","Bybit","KuCoin","Gate","WhiteBIT","Bitget","BingX","MEXC",
-    "Bitunix","Hyperliquid","Crypto.com","dYdX","Bitfinex","BitMEX","Deribit",
-    "CoinEx","HTX","Kraken","Coinbase"
-  ];
-  const NAME_FIX = {
-    "BitMEX":"Bitmex",
-    "Crypto.com":"CryptoCom",
-    "KuCoin":"Kucoin",
-    // others usually OK as-is:
-    "Binance":"Binance","OKX":"OKX","Bybit":"Bybit","Gate":"Gate","WhiteBIT":"WhiteBIT",
-    "Bitget":"Bitget","BingX":"BingX","MEXC":"MEXC","Bitunix":"Bitunix","Hyperliquid":"Hyperliquid",
-    "dYdX":"dYdX","Bitfinex":"Bitfinex","Deribit":"Deribit","CoinEx":"CoinEx","HTX":"HTX",
-    "Kraken":"Kraken","Coinbase":"Coinbase"
-  };
-  const START_LIST = (process.env.COINGLASS_EXCHANGES
-    ? process.env.COINGLASS_EXCHANGES.split(",").map(s=>s.trim()).filter(Boolean)
-    : TARGET20.map(n => NAME_FIX[n] || n)
-  );
-
   const PER_PAGE = 200;
   const TF = ["1h","4h","12h","24h"];
+
   const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  const fmtUSD = (v) => {
+    const n = Math.abs(v);
+    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+    return `$${v.toFixed(2)}`;
+  };
+
   const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
 
-  const axiosOpts = { headers, timeout: 10000, validateStatus: s => s < 500 };
+  const axiosOpts = {
+    headers,                 // your existing headers with CG-API-KEY
+    timeout: 10000,
+    validateStatus: s => s < 500
+  };
 
-  // --- 2) Tiny probe to validate an exchange name (per_page=1) ---
-  async function probe(exchange) {
-    const r = await axios.get(COINS_URL, {
+  async function fetchPage(page) {
+    // IMPORTANT: no exchange_list param → All Exchanges
+    return axios.get(COINS_URL, {
       ...axiosOpts,
-      params: { exchange_list: exchange, per_page: 1, page: 1 }
+      params: { per_page: PER_PAGE, page }
     });
-    return r.status === 200 && r.data?.code === "0";
-  }
-
-  // Build a validated list quickly
-  const VALID = [];
-  for (const ex of START_LIST) {
-    try {
-      if (await probe(ex)) VALID.push(ex);
-    } catch (_) {}
-  }
-  // If validation somehow wiped it out, keep your last known good subset
-  if (VALID.length === 0) VALID.push("Bybit","Binance","OKX","Gate","HTX","Hyperliquid","CoinEx","Bitmex","Bitfinex");
-
-  // Compose the final exchange_list string
-  const EXCHANGES = VALID.join(",");
-
-  async function fetchPage(page, useFilter = true) {
-    const params = useFilter
-      ? { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
-      : { per_page: PER_PAGE, page };
-    return axios.get(COINS_URL, { ...axiosOpts, params });
   }
 
   let page = 1, rowsProcessed = 0;
 
-  // --- 3) Aggregate with the validated list; if API still balks, drop filter ---
-  let useFilter = true;
   for (;;) {
-    const resp = await fetchPage(page, useFilter);
-
-    // Retry once without exchange_list if server returns code != "0"
-    if (page === 1 && useFilter && (resp.status !== 200 || resp.data?.code !== "0")) {
-      useFilter = false;
-      continue; // restart page 1 without the filter
-    }
-
+    const resp = await fetchPage(page);
     if (resp.status !== 200 || resp.data?.code !== "0") {
       return res.status(resp.status || 500).json({
         error: "API Request Failed",
@@ -333,18 +296,9 @@ case "liquidations-table": {
     }
 
     rowsProcessed += rows.length;
-    if (rows.length < PER_PAGE) break;
+    if (rows.length < PER_PAGE) break; // last page
     page++;
   }
-
-  const fmtUSD = (v) => {
-    const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
-    return `$${v.toFixed(2)}`;
-  };
 
   const formatted = Object.fromEntries(
     TF.map(tf => [tf, {
@@ -358,9 +312,7 @@ case "liquidations-table": {
     success: true,
     totals: agg,
     formatted,
-    exchanges_attempted: START_LIST,
-    exchanges_validated: VALID,
-    used_exchange_filter: useFilter,
+    mode: "all-exchanges",          // for clarity/debug
     per_page: PER_PAGE,
     pages_processed: page,
     rows_processed: rowsProcessed,
