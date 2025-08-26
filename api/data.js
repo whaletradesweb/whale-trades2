@@ -243,20 +243,35 @@ case "etf-eth-flows": {
 case "liquidations-table": {
   const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
 
-  // allow override via env; otherwise use your fixed 20-exchange universe
+  // Exact exchange spellings you provided
   const EXCHANGES = (process.env.COINGLASS_EXCHANGES ||
     [
-      "Binance","OKX","Bybit","KuCoin","Gate","WhiteBIT","Bitget","BingX","MEXC",
-      "Bitunix","Hyperliquid","Crypto.com","dYdX","Bitfinex","BitMEX","Deribit",
-      "CoinEx","HTX","Kraken","Coinbase"
+      "Binance",
+      "Gate",
+      "Bybit",
+      "HTX",
+      "Bitget",
+      "MEXC",
+      "Hyperliquid",
+      "WhiteBIT",
+      "BingX",
+      "Deribit",
+      "Crypto.com",
+      "KuCoin",
+      "Kraken",
+      "Bitmex",
+      "Coinbase",
+      "Bitunix",
+      "CoinEx",
+      "dYdX",
+      "Bitfinex"
     ].join(",")
   );
 
   const PER_PAGE = 200;
-  const TF = ["1h","4h","12h","24h"];
-
+  const TF = ["1h", "4h", "12h", "24h"];
   const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
-  const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
+  const agg = Object.fromEntries(TF.map(tf => [tf, { total: 0, long: 0, short: 0 }]));
 
   const axiosOpts = {
     headers,
@@ -300,10 +315,10 @@ case "liquidations-table": {
 
   const fmtUSD = (v) => {
     const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+    if (n >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v / 1e9).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v / 1e3).toFixed(2)}K`;
     return `$${v.toFixed(2)}`;
   };
 
@@ -315,7 +330,6 @@ case "liquidations-table": {
     }])
   );
 
-  // Return both, so your footer can use either `data[tf]` or `data.formatted[tf]`
   return res.json({
     success: true,
     totals: agg,
@@ -327,6 +341,7 @@ case "liquidations-table": {
     lastUpdated: new Date().toISOString()
   });
 }
+
 
 
 
