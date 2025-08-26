@@ -1491,21 +1491,26 @@ case "fomo-finder": {
    * Bitcoin FOMO Finder (EMASAR companion)
    *
    * Query params:
-   *   symbol=BTCUSDT          (default; affects funding source only)
-   *   exchange=Binance        (default; affects funding source only)
+   *   symbol=BTCUSDT          (default; affects all Coinglass calls)
+   *   exchange=Binance        (default; affects all Coinglass calls)
    *   interval=1d             (supports: 1m,3m,5m,15m,30m,1h,4h,6h,8h,12h,1d,1w)
    *   limit=1000              (default)
    *   premiumSource=coinbase  ('coinbase' | 'none')
    *
    * Endpoints used:
-   *   1) Funding (OHLC):  /api/futures/funding-rate/history
-   *   2) Premium (spot):  /api/coinbase-premium-index   (premium_rate decimal; 0.012 = 1.2%)
+   *   1) Funding (OHLC):        /api/futures/funding-rate/history
+   *   2) Premium (spot):        /api/coinbase-premium-index
+   *   3) Price (OHLC close):    /api/futures/price/history   <-- NEW
    *
    * Output:
    *   {
-   *     success, meta, series: [{t,funding,premium,level}], current: {...}, lastUpdated
+   *     success,
+   *     meta,
+   *     series: [{ t, price, funding, premium, level }],
+   *     current: { time, label, level, color, price, funding_pct, premium_pct },
+   *     lastUpdated
    *   }
-   *   level mapping: -2=Capitulation, -1=Panic, 0=Balanced, 1=Canary, 2=Greed, 3=FOMO
+   *   level mapping (unchanged): -2=Capitulation, -1=Panic, 0=Balanced, 1=Canary Call, 2=Greed, 3=FOMO
    */
 
   const {
@@ -1518,83 +1523,105 @@ case "fomo-finder": {
 
   const num = v => (typeof v === "number" ? v : Number(v) || 0);
 
-  // -------- 1) Funding history (required) --------
-  const frURL = "https://open-api-v4.coinglass.com/api/futures/funding-rate/history";
-  const frResp = await axios.get(frURL, {
-    headers,
-    params: { exchange, symbol, interval, limit },
-    timeout: 15000,
-    validateStatus: s => s < 500
-  });
+  // -------- parallel fetches --------
+  const fundingURL = "https://open-api-v4.coinglass.com/api/futures/funding-rate/history";
+  const priceURL   = "https://open-api-v4.coinglass.com/api/futures/price/history";
+  const cpiURL     = "https://open-api-v4.coinglass.com/api/coinbase-premium-index";
 
+  // funding + price are required; premium optional
+  const [frResp, prResp, cpiResp] = await Promise.all([
+    axios.get(fundingURL, {
+      headers,
+      params: { exchange, symbol, interval, limit },
+      timeout: 15000,
+      validateStatus: s => s < 500
+    }),
+    axios.get(priceURL, {
+      headers,
+      params: { exchange, symbol, interval, limit },
+      timeout: 15000,
+      validateStatus: s => s < 500
+    }),
+    premiumSource === "none"
+      ? Promise.resolve(null)
+      : axios.get(cpiURL, {
+          headers,
+          params: { interval, limit },
+          timeout: 15000,
+          validateStatus: s => s < 500
+        })
+  ]);
+
+  // --- funding required ---
   if (frResp.status !== 200 || frResp.data?.code !== "0" || !Array.isArray(frResp.data?.data)) {
     return res.status(frResp.status || 500).json({
       error: "Funding history failed",
       message: frResp.data?.message || `Bad response (code: ${frResp.data?.code ?? "unknown"})`
     });
   }
-
   const funding = frResp.data.data.map(row => ({
-    t: row.time,                 // ms (already ms in this endpoint)
-    o: num(row.open),
-    h: num(row.high),
-    l: num(row.low),
-    c: num(row.close)            // funding close for bar (decimal; 0.0001 = 0.01%)
+    t: row.time,                 // ms
+    c: num(row.close)            // funding close (decimal; 0.0001 = 0.01%)
   }));
 
-  // -------- 2) Coinbase Premium Index (optional but default) --------
-  let premiumSeries = null;
-  if (premiumSource !== "none") {
-    try {
-      const cpiURL = "https://open-api-v4.coinglass.com/api/coinbase-premium-index";
-      const cpiResp = await axios.get(cpiURL, {
-        headers,
-        params: { interval, limit },
-        timeout: 15000,
-        validateStatus: s => s < 500
-      });
-      if (cpiResp.status === 200 && cpiResp.data?.code === "0" && Array.isArray(cpiResp.data?.data)) {
-        // CPI times are in seconds → convert to ms
-        premiumSeries = cpiResp.data.data.map(r => ({
-          t: (Number(r.time) * 1000),
-          premium_rate: num(r.premium_rate) // decimal; e.g. 0.0122 = 1.22%
-        }));
-      }
-    } catch (_err) {
-      // funding-only fallback
-    }
-  }
-
-  // -------- 3) Merge by timestamp (left-join on funding) --------
-  const rows = new Map();
-  funding.forEach(f => rows.set(f.t, { t: f.t, funding: f.c, premium: null }));
-  if (Array.isArray(premiumSeries)) {
-    premiumSeries.forEach(p => {
-      const prev = rows.get(p.t) || { t: p.t, funding: null, premium: null };
-      prev.premium = p.premium_rate; // decimal
-      rows.set(p.t, prev);
+  // --- price required ---
+  if (prResp.status !== 200 || prResp.data?.code !== "0" || !Array.isArray(prResp.data?.data)) {
+    return res.status(prResp.status || 500).json({
+      error: "Price history failed",
+      message: prResp.data?.message || `Bad response (code: ${prResp.data?.code ?? "unknown"})`
     });
   }
-  const merged = Array.from(rows.values()).sort((a,b) => a.t - b.t);
+  // price endpoint already returns time in ms; we take close as the plotting price
+  const prices = prResp.data.data.map(row => ({
+    t: row.time,                 // ms
+    close: num(row.close)
+  }));
 
-  // -------- 4) Sentiment classification --------
-  // Tunable thresholds (decimals)
+  // --- premium optional ---
+  let premiumSeries = null;
+  if (cpiResp && cpiResp.status === 200 && cpiResp.data?.code === "0" && Array.isArray(cpiResp.data?.data)) {
+    // CPI times are seconds → ms
+    premiumSeries = cpiResp.data.data.map(r => ({
+      t: Number(r.time) * 1000,
+      premium_rate: num(r.premium_rate) // decimal; e.g., 0.0122 = 1.22%
+    }));
+  }
+
+  // -------- merge by timestamp (left-join on PRICE, so every plotted point has a price) --------
+  const byTime = new Map();
+  prices.forEach(p => byTime.set(p.t, { t: p.t, price: p.close, funding: null, premium: null }));
+
+  // attach nearest-same-time funding/premium if present
+  funding.forEach(f => {
+    const row = byTime.get(f.t);
+    if (row) row.funding = f.c;
+  });
+  if (Array.isArray(premiumSeries)) {
+    premiumSeries.forEach(p => {
+      const row = byTime.get(p.t);
+      if (row) row.premium = p.premium_rate;
+    });
+  }
+
+  const merged = Array.from(byTime.values()).sort((a, b) => a.t - b.t);
+
+  // -------- sentiment classification (unchanged thresholds) --------
   const TH = {
     // Funding (decimal; 0.0001 = 0.01%)
-    F_CAPIT: -0.0005,  // -0.05%
-    F_PANIC: -0.0002,  // -0.02%
-    F_BAL_LO: -0.0001, // -0.01%
-    F_BAL_HI:  0.0001, // +0.01%
-    F_GREED:   0.0003, // +0.03%
-    F_FOMO:    0.0006, // +0.06%
+    F_CAPIT: -0.0005,
+    F_PANIC: -0.0002,
+    F_BAL_LO: -0.0001,
+    F_BAL_HI:  0.0001,
+    F_GREED:   0.0003,
+    F_FOMO:    0.0006,
 
     // Coinbase premium_rate (decimal; 0.01 = 1%)
-    P_CAPIT: -0.010,   // -1.0%
-    P_PANIC: -0.005,   // -0.5%
-    P_BAL_LO:-0.002,   // -0.2%
-    P_BAL_HI: 0.003,   // +0.3%
-    P_GREED:  0.010,   // +1.0%
-    P_FOMO:   0.025    // +2.5%
+    P_CAPIT: -0.010,
+    P_PANIC: -0.005,
+    P_BAL_LO:-0.002,
+    P_BAL_HI: 0.003,
+    P_GREED:  0.010,
+    P_FOMO:   0.025
   };
 
   function levelFromFunding(f) {
@@ -1616,20 +1643,25 @@ case "fomo-finder": {
     return 3;
   }
   function combineLevels(lf, lp) {
-    if (lp == null) return lf;           // funding-only
-    // pick the more extreme (by absolute value). If tie, prefer the positive one (greed > fear bias)
-    if (Math.abs(lp) > Math.abs(lf)) return lp;
+    if (lp == null) return lf;                     // funding-only
+    if (Math.abs(lp) > Math.abs(lf)) return lp;    // pick more extreme
     if (Math.abs(lp) < Math.abs(lf)) return lf;
-    return Math.max(lf, lp);
+    return Math.max(lf, lp);                       // tie → bias positive
   }
 
   const series = merged.map(r => {
     const lf = r.funding == null ? 0 : levelFromFunding(r.funding);
     const lp = r.premium == null ? null : levelFromPremium(r.premium);
-    return { t: r.t, funding: r.funding, premium: r.premium, level: combineLevels(lf, lp) };
+    return {
+      t: r.t,
+      price: r.price,
+      funding: r.funding,
+      premium: r.premium,
+      level: combineLevels(lf, lp)
+    };
   });
 
-  // -------- 5) Current dial & cosmetics --------
+  // -------- current dial & cosmetics (labels/colors unchanged) --------
   const last = series[series.length - 1] || null;
   const labelFor = lvl =>
     lvl <= -2 ? "Capitulation" :
@@ -1648,19 +1680,21 @@ case "fomo-finder": {
 
   return res.json({
     success: true,
-    meta: { symbol, exchange, interval, premiumSource },
-    series, // [{ t, funding, premium, level }]
+    meta: { symbol, exchange, interval, premiumSource, priceSource: "coinglass" },
+    series, // [{ t, price, funding, premium, level }]
     current: last ? {
       time: last.t,
       label: labelFor(last.level),
       level: last.level,
       color: colorFor(last.level),
+      price: last.price,
       funding_pct: last.funding != null ? (num(last.funding) * 100).toFixed(4) : null,
       premium_pct: last.premium != null ? (num(last.premium) * 100).toFixed(3) : null
     } : null,
     lastUpdated: new Date().toISOString()
   });
 }
+
 
 
 
