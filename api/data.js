@@ -239,7 +239,8 @@ case "etf-eth-flows": {
         });
       }
 
-case "liquidations-table": {
+
+  case "liquidations-table": {
   console.log("DEBUG: Requesting aggregated liquidations from Coinglass coins-markets...");
   
   // Define the exchanges to include
@@ -260,9 +261,45 @@ case "liquidations-table": {
       return status < 500;
     },
     params: {
-      exchange_list: exchangeList
+      exchange_list: exchangeList,
+      per_page: 1000  // Request maximum possible coins in one call
     }
   });
+  
+  console.log("DEBUG: Coins Markets Response Status:", response.status);
+  
+  if (response.status === 401) {
+    return res.status(401).json({
+      error: 'API Authentication Failed',
+      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    });
+  }
+  
+  if (response.status === 403) {
+    return res.status(403).json({
+      error: 'API Access Forbidden', 
+      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+    });
+  }
+  
+  if (response.status !== 200) {
+    return res.status(response.status).json({
+      error: 'API Request Failed',
+      message: `CoinGlass API returned status ${response.status}`,
+      details: response.data
+    });
+  }
+  
+  if (!response.data || response.data.code !== "0") {
+    return res.status(400).json({
+      error: 'API Error',
+      message: response.data?.message || 'CoinGlass API returned error code',
+      code: response.data?.code
+    });
+  }
+  
+  const coins = response.data.data || [];
+  console.log(`DEBUG: Processing ${coins.length} coins for liquidations aggregation`);
   
   console.log("DEBUG: Coins Markets Response Status:", response.status);
   
