@@ -240,7 +240,7 @@ case "etf-eth-flows": {
       }
 
 
-  case "liquidations-table": {
+ case "liquidations-table": {
   console.log("DEBUG: Requesting aggregated liquidations from Coinglass coins-markets...");
   
   // Define the exchanges to include
@@ -253,53 +253,82 @@ case "etf-eth-flows": {
   const exchangeList = exchanges.join(",");
   console.log(`DEBUG: Including exchanges: ${exchangeList}`);
   
+  // Fetch all coins using proper pagination
   const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-  const response = await axios.get(url, { 
-    headers,
-    timeout: 15000,
-    validateStatus: function (status) {
-      return status < 500;
-    },
-    params: {
-      exchange_list: exchangeList,
-      per_page: 1000  // Request maximum possible coins in one call
+  let allCoins = [];
+  let page = 1;
+  const maxPages = 10; // Safety limit
+  const perPage = 200; // Reasonable page size
+  
+  console.log(`DEBUG: Starting pagination with ${perPage} coins per page...`);
+  
+  while (page <= maxPages) {
+    try {
+      const response = await axios.get(url, { 
+        headers,
+        timeout: 10000, // Reduced timeout
+        validateStatus: function (status) {
+          return status < 500;
+        },
+        params: {
+          exchange_list: exchangeList,
+          per_page: perPage,
+          page: page
+        }
+      });
+      
+      console.log(`DEBUG: Page ${page} Response Status:`, response.status);
+      
+      if (response.status === 401) {
+        return res.status(401).json({
+          error: 'API Authentication Failed',
+          message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+        });
+      }
+      
+      if (response.status === 403) {
+        return res.status(403).json({
+          error: 'API Access Forbidden', 
+          message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
+        });
+      }
+      
+      if (response.status !== 200) {
+        console.log(`DEBUG: Non-200 status on page ${page}, stopping pagination`);
+        break;
+      }
+      
+      if (!response.data || response.data.code !== "0") {
+        console.log(`DEBUG: API error on page ${page}:`, response.data?.msg || 'Unknown error');
+        break;
+      }
+      
+      const pageCoins = response.data.data || [];
+      console.log(`DEBUG: Page ${page} returned ${pageCoins.length} coins`);
+      
+      if (pageCoins.length === 0) {
+        console.log(`DEBUG: No coins on page ${page}, stopping`);
+        break;
+      }
+      
+      allCoins = allCoins.concat(pageCoins);
+      
+      // If we got fewer coins than requested, we've reached the end
+      if (pageCoins.length < perPage) {
+        console.log(`DEBUG: Reached end of data on page ${page} (got ${pageCoins.length} coins)`);
+        break;
+      }
+      
+      page++;
+      
+    } catch (error) {
+      console.log(`DEBUG: Error on page ${page}:`, error.message);
+      break;
     }
-  });
-  
-  console.log("DEBUG: Coins Markets Response Status:", response.status);
-  
-  if (response.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-    });
   }
   
-  if (response.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden', 
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (response.status !== 200) {
-    return res.status(response.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${response.status}`,
-      details: response.data
-    });
-  }
-  
-  if (!response.data || response.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: response.data?.message || 'CoinGlass API returned error code',
-      code: response.data?.code
-    });
-  }
-  
-  const coins = response.data.data || [];
-  console.log(`DEBUG: Processing ${coins.length} coins for liquidations aggregation`);
+  const coins = allCoins;
+  console.log(`DEBUG: Total coins collected: ${coins.length}`);
   
   console.log("DEBUG: Coins Markets Response Status:", response.status);
   
