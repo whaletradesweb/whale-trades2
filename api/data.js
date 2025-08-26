@@ -1225,12 +1225,13 @@ case "bull-market-peak-indicators": {
 
 case "volume-total": {
   try {
-    // Dynamic TOP N by Open Interest (from coins-markets on binance, okx, bybit),
-    // then sum 24h futures volume_usd from pairs-markets across ALL exchanges
+    // ---- config ----
     const EXCHANGES = (req.query.exchanges || "binance,okx,bybit")
       .split(",").map(s => s.trim()).filter(Boolean).join(",");
     const TOP_N = Math.max(1, Math.min(200, Number(req.query.limit) || 50)); // default 50
-    const PER_PAGE = 200;
+    const PER_PAGE_CM = 100;  // coins-markets page size (be conservative)
+    const PER_PAGE_PM = 200;  // pairs-markets page size
+    const CONCURRENCY = 10;   // how many coins to fetch in parallel
 
     const fmtUSD = (v) =>
       v >= 1e12 ? `$${(v/1e12).toFixed(2)}T` :
@@ -1238,109 +1239,139 @@ case "volume-total": {
       v >= 1e6  ? `$${(v/1e6 ).toFixed(2)}M` :
                   `$${Math.round(v).toLocaleString()}`;
 
-    // ---- Step 1: coins-markets -> get Top N by open_interest_usd (for selected exchanges) ----
-    const CM_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-    async function getTopCoinsByOI() {
-      let page = 1;
-      const all = [];
-      for (;;) {
-        const r = await axios.get(CM_URL, {
-          headers,
-          timeout: 20000,
-          validateStatus: s => s < 500,
-          params: { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
-        });
-        if (r.status !== 200 || r.data?.code !== "0") {
-          throw new Error(r.data?.msg || `coins-markets HTTP ${r.status}`);
-        }
-        const list = Array.isArray(r.data?.data) ? r.data.data : [];
-        if (!list.length) break;
-        for (const row of list) {
-          const sym = String(row.symbol || "").toUpperCase();
-          const oi  = Number(row.open_interest_usd ?? 0);
-          if (sym && Number.isFinite(oi)) all.push({ symbol: sym, open_interest_usd: oi });
-        }
-        if (list.length < PER_PAGE) break;
-        page++;
-      }
-      // sort by OI desc, take TOP_N, dedupe symbols just in case
-      const seen = new Set();
-      const top = [];
-      all.sort((a,b) => (b.open_interest_usd || 0) - (a.open_interest_usd || 0));
-      for (const r of all) {
-        if (!seen.has(r.symbol)) {
-          top.push(r);
-          seen.add(r.symbol);
-          if (top.length >= TOP_N) break;
+    // Lightweight retry wrapper so intermittent 5xx don't nuke the run
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    async function getWithRetry(url, params, label, tries = 3) {
+      let lastErr;
+      for (let i = 1; i <= tries; i++) {
+        try {
+          const res = await axios.get(url, {
+            headers,
+            timeout: 15000,
+            validateStatus: () => true,
+            params
+          });
+          if (res.status === 200 && res.data?.code === "0") return res;
+          // If server-side error, retry; for 4xx surface immediately
+          if (res.status >= 500) throw new Error(`[${label}] HTTP ${res.status} ${res.data?.msg || ""}`);
+          return res; // non-200 non-5xx -> return so caller can surface detail
+        } catch (e) {
+          lastErr = e;
+          if (i === tries) break;
+          await sleep(250 * i * i + Math.floor(Math.random() * 150));
         }
       }
-      return top;
+      throw lastErr || new Error(`[${label}] unknown error`);
     }
 
-    // ---- Step 2: pairs-markets -> sum volume_usd for each selected coin across ALL exchanges ----
-    const PM_URL = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
-    async function sumPairsVolumeUsd(symbol) {
-      let page = 1, total = 0, pairs = 0;
-      for (;;) {
-        const r = await axios.get(PM_URL, {
-          headers,
-          timeout: 20000,
-          validateStatus: s => s < 500,
-          params: { symbol, per_page: PER_PAGE, page }
+    // ---- Step 1: Top N by open_interest_usd from coins-markets (filtered to the 3 exchanges) ----
+    const CM_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+    const topSymbols = [];
+    let page = 1;
+
+    while (topSymbols.length < TOP_N) {
+      const r = await getWithRetry(
+        CM_URL,
+        { exchange_list: EXCHANGES, per_page: PER_PAGE_CM, page },
+        "coins-markets"
+      );
+
+      if (r.status !== 200 || r.data?.code !== "0" || !Array.isArray(r.data?.data)) {
+        return res.status(r.status || 502).json({
+          error: "coins-markets failed",
+          message: r.data?.msg || `HTTP ${r.status}`
         });
-        if (r.status !== 200 || r.data?.code !== "0") {
-          // treat as zero but report error string
-          return { symbol, volume_usd_24h: 0, pairs_count: 0, error: r.data?.msg || `pairs-markets HTTP ${r.status}` };
+      }
+
+      const rows = r.data.data;
+      if (!rows.length) break;
+
+      for (const row of rows) {
+        const sym = String(row.symbol || "").toUpperCase();
+        const oi  = Number(row.open_interest_usd ?? 0);
+        if (sym && Number.isFinite(oi)) topSymbols.push({ symbol: sym, open_interest_usd: oi });
+      }
+
+      if (rows.length < PER_PAGE_CM) break;
+      page++;
+    }
+
+    // sort by OI desc, take unique symbols up to TOP_N
+    topSymbols.sort((a,b) => (b.open_interest_usd || 0) - (a.open_interest_usd || 0));
+    const seen = new Set();
+    const top = [];
+    for (const r of topSymbols) {
+      if (!seen.has(r.symbol)) {
+        top.push(r);
+        seen.add(r.symbol);
+        if (top.length >= TOP_N) break;
+      }
+    }
+    if (!top.length) {
+      return res.status(502).json({ error: "No symbols ranked", message: "coins-markets returned no data" });
+    }
+
+    // ---- Step 2: For each symbol, sum volume_usd across all exchanges/pairs from pairs-markets ----
+    const PM_URL = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
+    async function sumPairsVolume(symbol) {
+      let total = 0, pairs = 0, page = 1;
+
+      for (;;) {
+        const rr = await getWithRetry(
+          PM_URL,
+          { symbol, per_page: PER_PAGE_PM, page },
+          `pairs-markets:${symbol}`
+        );
+
+        if (rr.status !== 200 || rr.data?.code !== "0" || !Array.isArray(rr.data?.data)) {
+          return { symbol, volume_usd_24h: 0, pairs_count: 0, error: rr.data?.msg || `HTTP ${rr.status}` };
         }
-        const rows = Array.isArray(r.data?.data) ? r.data.data : [];
+
+        const rows = rr.data.data;
         if (!rows.length) break;
-        for (const row of rows) {
-          total += Number(row.volume_usd || 0);
-        }
+        for (const row of rows) total += Number(row.volume_usd || 0);
         pairs += rows.length;
-        if (rows.length < PER_PAGE) break;
+
+        if (rows.length < PER_PAGE_PM) break;
         page++;
       }
+
       return { symbol, volume_usd_24h: total, pairs_count: pairs };
     }
 
-    const topCoins = await getTopCoinsByOI(); // [{symbol, open_interest_usd}, ...]
-    // small worker pool to stay under rate limits
-    const CONCURRENCY = Math.min(12, topCoins.length);
-    const out = new Array(topCoins.length);
-    let i = 0;
-    async function worker() {
-      while (i < topCoins.length) {
-        const idx = i++;
-        const { symbol, open_interest_usd } = topCoins[idx];
-        const v = await sumPairsVolumeUsd(symbol);
-        out[idx] = { ...v, open_interest_usd };
+    // modest concurrency to avoid spikes
+    const results = [];
+    for (let i = 0; i < top.length; i += CONCURRENCY) {
+      const chunk = top.slice(i, i + CONCURRENCY);
+      const chunkRes = await Promise.all(chunk.map(c => sumPairsVolume(c.symbol)));
+      // attach OI for sorting/visibility
+      for (let j = 0; j < chunkRes.length; j++) {
+        results.push({ ...chunkRes[j], open_interest_usd: chunk[j].open_interest_usd });
       }
     }
-    await Promise.all(Array(CONCURRENCY).fill(0).map(worker));
 
-    // sort by OI (desc) to mirror selection order; include formatted fields
-    out.sort((a,b) => (b.open_interest_usd || 0) - (a.open_interest_usd || 0));
-    const detailed = out.map(r => ({
-      symbol: r.symbol,
-      open_interest_usd: r.open_interest_usd,
-      volume_usd_24h: r.volume_usd_24h,
-      volume_formatted: fmtUSD(r.volume_usd_24h),
-      pairs_count: r.pairs_count,
-      ...(r.error ? { error: r.error } : {})
-    }));
+    // order by OI desc (to mirror the selection) and build response
+    results.sort((a,b) => (b.open_interest_usd || 0) - (a.open_interest_usd || 0));
+    const total = results.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
 
-    const total = detailed.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
-
-    return res.json({
+    const payload = {
       total_volume_24h: total,
       total_formatted: fmtUSD(total),
-      coins_count: detailed.length,
-      exchanges_filter_for_ranking: EXCHANGES, // used only for ranking (step 1)
-      coins: detailed,
+      coins_count: results.length,
+      exchanges_filter_for_ranking: EXCHANGES,
+      coins: results.map(r => ({
+        symbol: r.symbol,
+        open_interest_usd: r.open_interest_usd,
+        volume_usd_24h: r.volume_usd_24h,
+        volume_formatted: fmtUSD(r.volume_usd_24h),
+        pairs_count: r.pairs_count,
+        ...(r.error ? { error: r.error } : {})
+      })),
       last_updated: new Date().toISOString(),
       method: "Top 50 by open_interest_usd from coins-markets (binance,okx,bybit) → pairs-markets sum(volume_usd)"
-    });
+    };
+
+    return res.json(payload);
 
   } catch (err) {
     console.error("[volume-total] Error:", err?.response?.data || err.message);
@@ -1350,6 +1381,7 @@ case "volume-total": {
     });
   }
 }
+
 
 
 
