@@ -241,234 +241,133 @@ case "etf-eth-flows": {
 
 
 case "liquidations-table": {
-  console.log("DEBUG: Requesting aggregated liquidations from Coinglass coins-markets...");
-  
-  // Define the exchanges to include
-  const exchanges = [
-    "Binance", "Gate", "Bybit", "HTX", "Bitget", "MEXC", "Hyperliquid", 
-    "WhiteBIT", "BingX", "Deribit", "Crypto.com", "KuCoin", "Kraken", 
-    "Bitmex", "Coinbase", "Bitunix", "CoinEx", "dYdX", "Bitfinex"
+  const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+
+  // --- 1) Start from your 20 targets, normalize tricky spellings ---
+  const TARGET20 = [
+    "Binance","OKX","Bybit","KuCoin","Gate","WhiteBIT","Bitget","BingX","MEXC",
+    "Bitunix","Hyperliquid","Crypto.com","dYdX","Bitfinex","BitMEX","Deribit",
+    "CoinEx","HTX","Kraken","Coinbase"
   ];
-  
-  const exchangeList = exchanges.join(",");
-  console.log(`DEBUG: Including exchanges: ${exchangeList}`);
-  
-  // Fetch all coins using proper pagination
-  const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-  let allCoins = [];
-  let page = 1;
-  const maxPages = 10; // Safety limit
-  const perPage = 200; // Reasonable page size
-  
-  console.log(`DEBUG: Starting pagination with ${perPage} coins per page...`);
-  
-  while (page <= maxPages) {
+  const NAME_FIX = {
+    "BitMEX":"Bitmex",
+    "Crypto.com":"CryptoCom",
+    "KuCoin":"Kucoin",
+    // others usually OK as-is:
+    "Binance":"Binance","OKX":"OKX","Bybit":"Bybit","Gate":"Gate","WhiteBIT":"WhiteBIT",
+    "Bitget":"Bitget","BingX":"BingX","MEXC":"MEXC","Bitunix":"Bitunix","Hyperliquid":"Hyperliquid",
+    "dYdX":"dYdX","Bitfinex":"Bitfinex","Deribit":"Deribit","CoinEx":"CoinEx","HTX":"HTX",
+    "Kraken":"Kraken","Coinbase":"Coinbase"
+  };
+  const START_LIST = (process.env.COINGLASS_EXCHANGES
+    ? process.env.COINGLASS_EXCHANGES.split(",").map(s=>s.trim()).filter(Boolean)
+    : TARGET20.map(n => NAME_FIX[n] || n)
+  );
+
+  const PER_PAGE = 200;
+  const TF = ["1h","4h","12h","24h"];
+  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
+
+  const axiosOpts = { headers, timeout: 10000, validateStatus: s => s < 500 };
+
+  // --- 2) Tiny probe to validate an exchange name (per_page=1) ---
+  async function probe(exchange) {
+    const r = await axios.get(COINS_URL, {
+      ...axiosOpts,
+      params: { exchange_list: exchange, per_page: 1, page: 1 }
+    });
+    return r.status === 200 && r.data?.code === "0";
+  }
+
+  // Build a validated list quickly
+  const VALID = [];
+  for (const ex of START_LIST) {
     try {
-      const response = await axios.get(url, { 
-        headers,
-        timeout: 10000, // Reduced timeout
-        validateStatus: function (status) {
-          return status < 500;
-        },
-        params: {
-          exchange_list: exchangeList,
-          per_page: perPage,
-          page: page
-        }
-      });
-      
-      console.log(`DEBUG: Page ${page} Response Status:`, response.status);
-      
-      if (response.status === 401) {
-        return res.status(401).json({
-          error: 'API Authentication Failed',
-          message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-        });
-      }
-      
-      if (response.status === 403) {
-        return res.status(403).json({
-          error: 'API Access Forbidden', 
-          message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-        });
-      }
-      
-      if (response.status !== 200) {
-        console.log(`DEBUG: Non-200 status on page ${page}, stopping pagination`);
-        break;
-      }
-      
-      if (!response.data || response.data.code !== "0") {
-        console.log(`DEBUG: API error on page ${page}:`, response.data?.msg || 'Unknown error');
-        break;
-      }
-      
-      const pageCoins = response.data.data || [];
-      console.log(`DEBUG: Page ${page} returned ${pageCoins.length} coins`);
-      
-      if (pageCoins.length === 0) {
-        console.log(`DEBUG: No coins on page ${page}, stopping`);
-        break;
-      }
-      
-      allCoins = allCoins.concat(pageCoins);
-      
-      // If we got fewer coins than requested, we've reached the end
-      if (pageCoins.length < perPage) {
-        console.log(`DEBUG: Reached end of data on page ${page} (got ${pageCoins.length} coins)`);
-        break;
-      }
-      
-      page++;
-      
-    } catch (error) {
-      console.log(`DEBUG: Error on page ${page}:`, error.message);
-      break;
+      if (await probe(ex)) VALID.push(ex);
+    } catch (_) {}
+  }
+  // If validation somehow wiped it out, keep your last known good subset
+  if (VALID.length === 0) VALID.push("Bybit","Binance","OKX","Gate","HTX","Hyperliquid","CoinEx","Bitmex","Bitfinex");
+
+  // Compose the final exchange_list string
+  const EXCHANGES = VALID.join(",");
+
+  async function fetchPage(page, useFilter = true) {
+    const params = useFilter
+      ? { exchange_list: EXCHANGES, per_page: PER_PAGE, page }
+      : { per_page: PER_PAGE, page };
+    return axios.get(COINS_URL, { ...axiosOpts, params });
+  }
+
+  let page = 1, rowsProcessed = 0;
+
+  // --- 3) Aggregate with the validated list; if API still balks, drop filter ---
+  let useFilter = true;
+  for (;;) {
+    const resp = await fetchPage(page, useFilter);
+
+    // Retry once without exchange_list if server returns code != "0"
+    if (page === 1 && useFilter && (resp.status !== 200 || resp.data?.code !== "0")) {
+      useFilter = false;
+      continue; // restart page 1 without the filter
     }
-  }
-  
-  const coins = allCoins;
-  console.log(`DEBUG: Total coins collected: ${coins.length}`);
-  
-  console.log("DEBUG: Coins Markets Response Status:", response.status);
-  
-  if (response.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-    });
-  }
-  
-  if (response.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden', 
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (response.status !== 200) {
-    return res.status(response.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${response.status}`,
-      details: response.data
-    });
-  }
-  
-  if (!response.data || response.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: response.data?.message || 'CoinGlass API returned error code',
-      code: response.data?.code
-    });
-  }
-  
-  const coins = response.data.data || [];
-  console.log(`DEBUG: Processing ${coins.length} coins for liquidations aggregation`);
-  
-  if (!Array.isArray(coins) || coins.length === 0) {
-    return res.status(404).json({
-      error: 'No Data',
-      message: 'No coin market data available'
-    });
-  }
-  
-  // Initialize aggregation objects for each timeframe
-  const timeframes = ['1h', '4h', '12h', '24h'];
-  const aggregatedData = {};
-  
-  // Initialize all timeframes with zero values
-  timeframes.forEach(timeframe => {
-    aggregatedData[timeframe] = {
-      total_liquidations: 0,
-      long_liquidations: 0, 
-      short_liquidations: 0
-    };
-  });
-  
-  // Aggregate liquidations across all coins
-  coins.forEach(coin => {
-    if (!coin || typeof coin !== 'object') return;
-    
-    timeframes.forEach(timeframe => {
-      // Extract liquidation data for this timeframe
-      const totalKey = `liquidation_usd_${timeframe}`;
-      const longKey = `long_liquidation_usd_${timeframe}`;
-      const shortKey = `short_liquidation_usd_${timeframe}`;
-      
-      const totalLiq = Number(coin[totalKey]) || 0;
-      const longLiq = Number(coin[longKey]) || 0;
-      const shortLiq = Number(coin[shortKey]) || 0;
-      
-      // Add to aggregated totals
-      aggregatedData[timeframe].total_liquidations += totalLiq;
-      aggregatedData[timeframe].long_liquidations += longLiq;
-      aggregatedData[timeframe].short_liquidations += shortLiq;
-      
-      // Debug logging for first few coins
-      if (coins.indexOf(coin) < 3) {
-        console.log(`DEBUG: ${coin.symbol} ${timeframe} - Total: ${totalLiq}, Long: ${longLiq}, Short: ${shortLiq}`);
+
+    if (resp.status !== 200 || resp.data?.code !== "0") {
+      return res.status(resp.status || 500).json({
+        error: "API Request Failed",
+        message: resp.data?.message || `Bad response (code: ${resp.data?.code ?? "unknown"})`,
+        status: resp.status || 500
+      });
+    }
+
+    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
+    if (!rows.length) break;
+
+    for (const r of rows) {
+      for (const tf of TF) {
+        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
+        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
+        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
       }
-    });
-  });
-  
-  // Format the aggregated data to match your website's expected structure
-  const formattedData = {
-    "1H-Total-Liquidated": aggregatedData['1h'].total_liquidations,
-    "1H-Total-Long": aggregatedData['1h'].long_liquidations,
-    "1H-Total-Short": aggregatedData['1h'].short_liquidations,
-    "4H-Total-Liquidated": aggregatedData['4h'].total_liquidations,
-    "4H-Total-Long": aggregatedData['4h'].long_liquidations,
-    "4H-Total-Short": aggregatedData['4h'].short_liquidations,
-    "12H-Total-Liquidated": aggregatedData['12h'].total_liquidations,
-    "12H-Total-Long": aggregatedData['12h'].long_liquidations,
-    "12H-Total-Short": aggregatedData['12h'].short_liquidations,
-    "24H-Total-Liquidated": aggregatedData['24h'].total_liquidations,
-    "24H-Total-Long": aggregatedData['24h'].long_liquidations,
-    "24H-Total-Short": aggregatedData['24h'].short_liquidations
+    }
+
+    rowsProcessed += rows.length;
+    if (rows.length < PER_PAGE) break;
+    page++;
+  }
+
+  const fmtUSD = (v) => {
+    const n = Math.abs(v);
+    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+    return `$${v.toFixed(2)}`;
   };
-  
-  // Format values for display (optional - you can remove this if you want raw numbers)
-  const formatUSD = (value) => {
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;  
-    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
-    return `$${value.toFixed(2)}`;
-  };
-  
-  // Create formatted version for display
-  const formattedForDisplay = {
-    "1H-Total-Liquidated-Formatted": formatUSD(aggregatedData['1h'].total_liquidations),
-    "1H-Total-Long-Formatted": formatUSD(aggregatedData['1h'].long_liquidations),
-    "1H-Total-Short-Formatted": formatUSD(aggregatedData['1h'].short_liquidations),
-    "4H-Total-Liquidated-Formatted": formatUSD(aggregatedData['4h'].total_liquidations),
-    "4H-Total-Long-Formatted": formatUSD(aggregatedData['4h'].long_liquidations),
-    "4H-Total-Short-Formatted": formatUSD(aggregatedData['4h'].short_liquidations),
-    "12H-Total-Liquidated-Formatted": formatUSD(aggregatedData['12h'].total_liquidations),
-    "12H-Total-Long-Formatted": formatUSD(aggregatedData['12h'].long_liquidations),
-    "12H-Total-Short-Formatted": formatUSD(aggregatedData['12h'].short_liquidations),
-    "24H-Total-Liquidated-Formatted": formatUSD(aggregatedData['24h'].total_liquidations),
-    "24H-Total-Long-Formatted": formatUSD(aggregatedData['24h'].long_liquidations),
-    "24H-Total-Short-Formatted": formatUSD(aggregatedData['24h'].short_liquidations)
-  };
-  
-  console.log("DEBUG: Aggregated liquidations summary:");
-  console.log(`1H Total: ${formatUSD(aggregatedData['1h'].total_liquidations)}`);
-  console.log(`4H Total: ${formatUSD(aggregatedData['4h'].total_liquidations)}`);
-  console.log(`12H Total: ${formatUSD(aggregatedData['12h'].total_liquidations)}`);
-  console.log(`24H Total: ${formatUSD(aggregatedData['24h'].total_liquidations)}`);
-  
+
+  const formatted = Object.fromEntries(
+    TF.map(tf => [tf, {
+      total: fmtUSD(agg[tf].total),
+      long:  fmtUSD(agg[tf].long),
+      short: fmtUSD(agg[tf].short)
+    }])
+  );
+
   return res.json({
     success: true,
-    data: formattedData, // Raw numbers for your ID updates
-    formatted: formattedForDisplay, // Formatted strings for display
-    metadata: {
-      coins_processed: coins.length,
-      last_updated: new Date().toISOString(),
-      timeframes: timeframes,
-      api_endpoint: 'coins-markets'
-    }
+    totals: agg,
+    formatted,
+    exchanges_attempted: START_LIST,
+    exchanges_validated: VALID,
+    used_exchange_filter: useFilter,
+    per_page: PER_PAGE,
+    pages_processed: page,
+    rows_processed: rowsProcessed,
+    lastUpdated: new Date().toISOString()
   });
 }
+
 
 
   case "long-short": {
