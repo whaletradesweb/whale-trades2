@@ -1490,48 +1490,74 @@ case "fomo-finder": {
   console.log("DEBUG: Processing FOMO Finder request...");
   
   try {
-    const { interval = "1h", limit = "1000" } = req.query;
+    const { interval = "1d", limit = "1000" } = req.query;
     const EXCHANGE = "Binance";
     const FUTURES_SYMBOL = "BTCUSDT";
     const SPOT_SYMBOL = "BTC";
     
-    // Level classification thresholds (reverse-engineered from your screenshots)
-    const FOMO_LEVELS = [
-      { level: -3, name: "Capitulation", color: "#ff3bbd", fundingMax: -0.0001, premiumMax: -0.005 },
-      { level: -2, name: "Panic", color: "#6a5cff", fundingMax: 0.0, premiumMax: 0.0 },
-      { level: -1, name: "Uncertainty", color: "#ffe45e", fundingMax: 0.0001, premiumMax: 0.0025 },
-      { level: 0, name: "Balanced", color: "#ffe34d", fundingMax: 0.0001, premiumMax: 0.0075 },
-      { level: 1, name: "Canary Call", color: "#f7c341", fundingMax: 0.0003, premiumMax: 0.015 },
-      { level: 2, name: "Greed", color: "#ff7a3e", fundingMax: 0.0005, premiumMax: 0.03 },
-      { level: 3, name: "FOMO", color: "#ff3e33", fundingMax: 1, premiumMax: 1 }
-    ];
-    
-    // Function to classify FOMO level based on funding and premium
+    // Fixed FOMO Level Classification Function
     function classifyFOMOLevel(fundingRate, premium) {
-      let level = 0;
+      // Sequential checking - first condition that matches determines the level
       
-      // Check upward bias (positive levels)
+      // Level 3 (FOMO) - Highest priority
       if (fundingRate >= 0.0005 || premium >= 0.03) {
-        level = 3; // FOMO
-      } else if (fundingRate >= 0.0003 || premium >= 0.015) {
-        level = 2; // Greed
-      } else if (fundingRate >= 0.0001 || premium >= 0.0075) {
-        level = 1; // Canary Call
-      } else if (fundingRate >= 0.0001 || premium >= 0.0025) {
-        level = 0; // Balanced
-      } else if (fundingRate >= 0.0 || premium >= 0.0) {
-        level = -1; // Uncertainty
-      } else if (fundingRate >= -0.0001 || premium >= -0.005) {
-        level = -2; // Panic
-      } else {
-        level = -3; // Capitulation
+        return {
+          level: 3,
+          name: "FOMO",
+          color: "#ff3e33"
+        };
       }
       
-      const levelData = FOMO_LEVELS.find(l => l.level === level);
+      // Level 2 (Greed)
+      if (fundingRate >= 0.0003 || premium >= 0.015) {
+        return {
+          level: 2,
+          name: "Greed",
+          color: "#ff7a3e"
+        };
+      }
+      
+      // Level 1 (Canary Call)
+      if (fundingRate >= 0.0001 || premium >= 0.0075) {
+        return {
+          level: 1,
+          name: "Canary Call",
+          color: "#f7c341"
+        };
+      }
+      
+      // Level 0 (Balanced)
+      if (fundingRate >= 0.0001 || premium >= 0.0025) {
+        return {
+          level: 0,
+          name: "Balanced",
+          color: "#ffe34d"
+        };
+      }
+      
+      // Level -1 (Uncertainty)
+      if (fundingRate >= 0.0 || premium >= 0.0) {
+        return {
+          level: -1,
+          name: "Uncertainty",
+          color: "#ffe45e"
+        };
+      }
+      
+      // Level -2 (Panic)
+      if (fundingRate >= -0.0001 || premium >= -0.005) {
+        return {
+          level: -2,
+          name: "Panic",
+          color: "#6a5cff"
+        };
+      }
+      
+      // Level -3 (Capitulation) - Default fallback
       return {
-        level: level,
-        name: levelData?.name || "Balanced",
-        color: levelData?.color || "#ffe34d"
+        level: -3,
+        name: "Capitulation",
+        color: "#ff3bbd"
       };
     }
     
@@ -1600,7 +1626,7 @@ case "fomo-finder": {
       const approximateSpot = price * 0.999; // Rough approximation
       const premium = spotPrice > 0 ? (price - approximateSpot) / approximateSpot : 0;
       
-      // Classify FOMO level
+      // Classify FOMO level using corrected function
       const fomoLevel = classifyFOMOLevel(fundingRate, premium);
       
       combinedData.push({
@@ -1684,7 +1710,15 @@ case "fomo-finder": {
         symbol: FUTURES_SYMBOL,
         interval: interval,
         dataPoints: combinedData.length,
-        levels: FOMO_LEVELS
+        levels: {
+          "-3": "Capitulation",
+          "-2": "Panic", 
+          "-1": "Uncertainty",
+          "0": "Balanced",
+          "1": "Canary Call",
+          "2": "Greed",
+          "3": "FOMO"
+        }
       },
       lastUpdated: new Date().toISOString()
     });
@@ -1698,9 +1732,6 @@ case "fomo-finder": {
     });
   }
 }
-
-
-// Add this new case to your data.js file
 
 case "fomo-finder-hybrid": {
   console.log("DEBUG: Processing Hybrid FOMO Finder request...");
@@ -1726,6 +1757,72 @@ case "fomo-finder-hybrid": {
       "2": "#ff7a3e",
       "3": "#ff3e33"
     };
+
+    // Fixed FOMO Level Classification Function
+    function classifyFOMOLevel(fundingRate, premium) {
+      // Sequential checking - first condition that matches determines the level
+      
+      // Level 3 (FOMO) - Highest priority
+      if (fundingRate >= 0.0005 || premium >= 0.03) {
+        return {
+          level: 3,
+          name: "FOMO",
+          color: "#ff3e33"
+        };
+      }
+      
+      // Level 2 (Greed)
+      if (fundingRate >= 0.0003 || premium >= 0.015) {
+        return {
+          level: 2,
+          name: "Greed",
+          color: "#ff7a3e"
+        };
+      }
+      
+      // Level 1 (Canary Call)
+      if (fundingRate >= 0.0001 || premium >= 0.0075) {
+        return {
+          level: 1,
+          name: "Canary Call",
+          color: "#f7c341"
+        };
+      }
+      
+      // Level 0 (Balanced)
+      if (fundingRate >= 0.0001 || premium >= 0.0025) {
+        return {
+          level: 0,
+          name: "Balanced",
+          color: "#ffe34d"
+        };
+      }
+      
+      // Level -1 (Uncertainty)
+      if (fundingRate >= 0.0 || premium >= 0.0) {
+        return {
+          level: -1,
+          name: "Uncertainty",
+          color: "#ffe45e"
+        };
+      }
+      
+      // Level -2 (Panic)
+      if (fundingRate >= -0.0001 || premium >= -0.005) {
+        return {
+          level: -2,
+          name: "Panic",
+          color: "#6a5cff"
+        };
+      }
+      
+      // Level -3 (Capitulation) - Default fallback
+      return {
+        level: -3,
+        name: "Capitulation",
+        color: "#ff3bbd"
+      };
+    }
 
     // Step 1: Load historical data from GitHub
     let historicalData = [];
@@ -1804,38 +1901,6 @@ case "fomo-finder-hybrid": {
       fundingMap.set(f.time, parseFloat(f.close) || 0);
     });
     
-    // Function to classify FOMO level (same logic as your existing implementation)
-    function classifyFOMOLevel(fundingRate, premium) {
-      // Convert to percentages for easier comparison
-      const fundingPct = fundingRate * 100;
-      const premiumPct = premium * 100;
-      
-      let level = 0;
-      
-      // Thresholds derived from actual historical data analysis
-      if (fundingPct <= -0.21 || premiumPct <= -0.63) {
-        level = -3; // Capitulation
-      } else if (fundingPct <= -0.011 || premiumPct <= -0.033) {
-        level = -2; // Panic  
-      } else if (fundingPct < 0.011 && premiumPct < 0.034) {
-        level = -1; // Uncertainty
-      } else if (fundingPct < 0.030 && premiumPct < 0.089) {
-        level = 1; // Canary Call
-      } else if (fundingPct < 0.052 && premiumPct < 0.156) {
-        level = 2; // Greed
-      } else if (fundingPct >= 0.052 || premiumPct >= 0.156) {
-        level = 3; // FOMO
-      } else {
-        level = 0; // Balanced (fallback)
-      }
-      
-      return {
-        level: level,
-        name: LEVEL_NAMES[String(level)] || "Balanced",
-        color: LEVEL_COLORS[String(level)] || "#ffe34d"
-      };
-    }
-    
     // Process recent data points
     const recentData = [];
     recentPriceData.forEach(candle => {
@@ -1850,7 +1915,7 @@ case "fomo-finder-hybrid": {
       // Calculate premium (simplified - using current spot as approximation)
       const premium = currentSpotPrice > 0 ? (price - currentSpotPrice) / currentSpotPrice : 0;
       
-      // Classify FOMO level for recent data only
+      // Classify FOMO level for recent data only using corrected function
       const fomoLevel = classifyFOMOLevel(fundingRate, premium);
       
       recentData.push({
@@ -1958,6 +2023,8 @@ case "fomo-finder-hybrid": {
     });
   }
 }
+
+
 
     
       default:
