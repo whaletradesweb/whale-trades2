@@ -1810,22 +1810,30 @@ case "fomo-finder-hybrid": {
       const fundingPct = fundingRate * 100;
       const premiumPct = premium * 100;
       
+      let level = 0;
+      
       // Thresholds derived from actual historical data analysis
       if (fundingPct <= -0.21 || premiumPct <= -0.63) {
-        return { level: -3, name: "Capitulation", color: "#ff3bbd" }; // Level -3
+        level = -3; // Capitulation
       } else if (fundingPct <= -0.011 || premiumPct <= -0.033) {
-        return { level: -2, name: "Panic", color: "#6a5cff" }; // Level -2  
+        level = -2; // Panic  
       } else if (fundingPct < 0.011 && premiumPct < 0.034) {
-        return { level: -1, name: "Uncertainty", color: "#ffe45e" }; // Level -1
+        level = -1; // Uncertainty
       } else if (fundingPct < 0.030 && premiumPct < 0.089) {
-        return { level: 1, name: "Canary Call", color: "#f7c341" }; // Level 1
+        level = 1; // Canary Call
       } else if (fundingPct < 0.052 && premiumPct < 0.156) {
-        return { level: 2, name: "Greed", color: "#ff7a3e" }; // Level 2
+        level = 2; // Greed
       } else if (fundingPct >= 0.052 || premiumPct >= 0.156) {
-        return { level: 3, name: "FOMO", color: "#ff3e33" }; // Level 3
+        level = 3; // FOMO
       } else {
-        return { level: 0, name: "Balanced", color: "#ffe34d" }; // Level 0 (fallback)
+        level = 0; // Balanced (fallback)
       }
+      
+      return {
+        level: level,
+        name: LEVEL_NAMES[String(level)] || "Balanced",
+        color: LEVEL_COLORS[String(level)] || "#ffe34d"
+      };
     }
     
     // Process recent data points
