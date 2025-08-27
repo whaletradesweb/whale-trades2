@@ -1699,6 +1699,7 @@ case "fomo-finder": {
   }
 }
 
+
 // Add this new case to your data.js file
 
 case "fomo-finder-hybrid": {
@@ -1726,24 +1727,33 @@ case "fomo-finder-hybrid": {
       "3": "#ff3e33"
     };
 
-    // Step 1: Load and process historical data from Excel (stored as JSON in KV)
+    // Step 1: Load historical data from GitHub
     let historicalData = [];
-    const CUTOFF_DATE = new Date('2024-12-01').getTime(); // Cutoff between historical and live data
+    const CUTOFF_DATE = new Date('2024-12-01').getTime(); // Only filter RECENT data, not historical
     
     try {
-      // Try to get processed historical data from KV cache
-      const cachedHistorical = await kv.get("fomo_historical_data");
+      // Load historical data from your GitHub repository
+      const githubUrl = "https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/fomo_historical_data.json";
+      console.log("DEBUG: Loading historical data from GitHub...");
       
-      if (cachedHistorical && Array.isArray(cachedHistorical)) {
-        historicalData = cachedHistorical;
-        console.log(`DEBUG: Loaded ${historicalData.length} historical points from cache`);
+      const historicalResponse = await axios.get(githubUrl, {
+        timeout: 10000,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'whale-trades-api/1.0'
+        }
+      });
+      
+      if (historicalResponse.data && Array.isArray(historicalResponse.data)) {
+        // Use ALL historical data - don't filter by date since this IS the historical data
+        historicalData = historicalResponse.data.filter(point => point.t < CUTOFF_DATE);
+        console.log(`DEBUG: Loaded ${historicalData.length} historical points from GitHub (2017-2024)`);
       } else {
-        console.log("DEBUG: No cached historical data found - need to process Excel file");
-        // You'll need to upload the processed Excel data to KV store once
-        // This is a one-time setup step
+        console.log("DEBUG: Invalid historical data format from GitHub");
       }
     } catch (error) {
-      console.error("Error loading historical data:", error);
+      console.error("Error loading historical data from GitHub:", error.message);
+      // Continue without historical data if GitHub fetch fails
     }
 
     // Step 2: Get recent live data from CoinGlass API
@@ -1798,20 +1808,21 @@ case "fomo-finder-hybrid": {
     function classifyFOMOLevel(fundingRate, premium) {
       let level = 0;
       
-      if (fundingRate >= 0.0005 || premium >= 0.03) {
-        level = 3; // FOMO
-      } else if (fundingRate >= 0.0003 || premium >= 0.015) {
-        level = 2; // Greed
-      } else if (fundingRate >= 0.0001 || premium >= 0.0075) {
-        level = 1; // Canary Call
-      } else if (fundingRate >= 0.0001 || premium >= 0.0025) {
-        level = 0; // Balanced
-      } else if (fundingRate >= 0.0 || premium >= 0.0) {
-        level = -1; // Uncertainty
-      } else if (fundingRate >= -0.0001 || premium >= -0.005) {
-        level = -2; // Panic
+      // More realistic thresholds based on actual market conditions
+      if (fundingRate >= 0.002 || premium >= 0.05) {
+        level = 3; // FOMO - very high funding/premium
+      } else if (fundingRate >= 0.001 || premium >= 0.03) {
+        level = 2; // Greed - high funding/premium
+      } else if (fundingRate >= 0.0005 || premium >= 0.015) {
+        level = 1; // Canary Call - elevated funding/premium
+      } else if (fundingRate >= -0.0002 && premium >= -0.01) {
+        level = 0; // Balanced - neutral range
+      } else if (fundingRate >= -0.0005 || premium >= -0.02) {
+        level = -1; // Uncertainty - slightly negative
+      } else if (fundingRate >= -0.001 || premium >= -0.03) {
+        level = -2; // Panic - negative funding/premium
       } else {
-        level = -3; // Capitulation
+        level = -3; // Capitulation - very negative
       }
       
       return {
@@ -1826,7 +1837,7 @@ case "fomo-finder-hybrid": {
     recentPriceData.forEach(candle => {
       const timestamp = candle.time;
       
-      // Only include data after cutoff date
+      // Only include data after cutoff date (for live data only)
       if (timestamp <= CUTOFF_DATE) return;
       
       const price = parseFloat(candle.close) || 0;
@@ -1835,7 +1846,7 @@ case "fomo-finder-hybrid": {
       // Calculate premium (simplified - using current spot as approximation)
       const premium = currentSpotPrice > 0 ? (price - currentSpotPrice) / currentSpotPrice : 0;
       
-      // Classify FOMO level
+      // Classify FOMO level for recent data only
       const fomoLevel = classifyFOMOLevel(fundingRate, premium);
       
       recentData.push({
@@ -1943,6 +1954,8 @@ case "fomo-finder-hybrid": {
     });
   }
 }
+
+
 
 
 
