@@ -1806,30 +1806,26 @@ case "fomo-finder-hybrid": {
     
     // Function to classify FOMO level (same logic as your existing implementation)
     function classifyFOMOLevel(fundingRate, premium) {
-      let level = 0;
+      // Convert to percentages for easier comparison
+      const fundingPct = fundingRate * 100;
+      const premiumPct = premium * 100;
       
-      // More realistic thresholds based on actual market conditions
-      if (fundingRate >= 0.002 || premium >= 0.05) {
-        level = 3; // FOMO - very high funding/premium
-      } else if (fundingRate >= 0.001 || premium >= 0.03) {
-        level = 2; // Greed - high funding/premium
-      } else if (fundingRate >= 0.0005 || premium >= 0.015) {
-        level = 1; // Canary Call - elevated funding/premium
-      } else if (fundingRate >= -0.0002 && premium >= -0.01) {
-        level = 0; // Balanced - neutral range
-      } else if (fundingRate >= -0.0005 || premium >= -0.02) {
-        level = -1; // Uncertainty - slightly negative
-      } else if (fundingRate >= -0.001 || premium >= -0.03) {
-        level = -2; // Panic - negative funding/premium
+      // Thresholds derived from actual historical data analysis
+      if (fundingPct <= -0.21 || premiumPct <= -0.63) {
+        return { level: -3, name: "Capitulation", color: "#ff3bbd" }; // Level -3
+      } else if (fundingPct <= -0.011 || premiumPct <= -0.033) {
+        return { level: -2, name: "Panic", color: "#6a5cff" }; // Level -2  
+      } else if (fundingPct < 0.011 && premiumPct < 0.034) {
+        return { level: -1, name: "Uncertainty", color: "#ffe45e" }; // Level -1
+      } else if (fundingPct < 0.030 && premiumPct < 0.089) {
+        return { level: 1, name: "Canary Call", color: "#f7c341" }; // Level 1
+      } else if (fundingPct < 0.052 && premiumPct < 0.156) {
+        return { level: 2, name: "Greed", color: "#ff7a3e" }; // Level 2
+      } else if (fundingPct >= 0.052 || premiumPct >= 0.156) {
+        return { level: 3, name: "FOMO", color: "#ff3e33" }; // Level 3
       } else {
-        level = -3; // Capitulation - very negative
+        return { level: 0, name: "Balanced", color: "#ffe34d" }; // Level 0 (fallback)
       }
-      
-      return {
-        level: level,
-        name: LEVEL_NAMES[String(level)] || "Balanced",
-        color: LEVEL_COLORS[String(level)] || "#ffe34d"
-      };
     }
     
     // Process recent data points
@@ -1954,11 +1950,6 @@ case "fomo-finder-hybrid": {
     });
   }
 }
-
-
-
-
-
 
     
       default:
