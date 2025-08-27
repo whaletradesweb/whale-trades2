@@ -1486,162 +1486,218 @@ case "volume-total": {
 }
 
 
-// /api/fomo-finder.js
-// Vercel serverless function (Node 18+)
-// ENV: CG_API_KEY=your_coinglass_key
-
-const axios = require("axios");
-
-const CG_API = "https://open-api-v4.coinglass.com";
-const HEADERS = () => ({
-  accept: "application/json",
-  "CG-API-KEY": process.env.CG_API_KEY,
-  "User-Agent": "FOMO-Finder/1.0",
-});
-
-// ---- CONFIG ----
-const EXCHANGE = "Binance";
-const FUTURES_SYMBOL = "BTCUSDT"; // Perp for Binance
-const SPOT_SYMBOL = "BTC";
-
-// ---- LEVEL THRESHOLDS (reverse-engineered, tune if you like) ----
-// Funding is per 8h (decimal, e.g. 0.0001 = 0.01%)
-const LEVELS = [
-  { lvl: -3, name: "Capitulation", fundingMax: -0.0001, premiumMax: -0.000001 },
-  { lvl: -2, name: "Panic",        fundingMax:  0.0,     premiumMax:  0.0002    },
-  { lvl: -1, name: "Uncertainty",  fundingMax:  0.0001,  premiumMax:  0.0025    },
-  { lvl:  0, name: "Balanced",     fundingMax:  0.0001,  premiumMax:  0.0075    },
-  { lvl:  1, name: "Canary Call",  fundingMax:  0.0003,  premiumMax:  0.015     },
-  { lvl:  2, name: "Greed",        fundingMax:  0.0005,  premiumMax:  0.03      },
-  { lvl:  3, name: "FOMO",         fundingMax:  1,       premiumMax:  1         },
-];
-
-// Helper: safely pick Binance BTC rows
-const pickBinance = (arr, key = "exchange_name") =>
-  (arr || []).find(d => (d[key] || d.exchange) === EXCHANGE &&
-                        ((d.symbol || d.instrument_id || "").toUpperCase().includes("BTC")));
-
-function classifyLevel({ funding, premium }) {
-  // funding & premium are decimal (0.0001 = 0.01%)
-  // We “score” by the worst of the two directions.
-  // Strong positive funding/premium -> higher levels; negative -> lower.
-  let lvl = 0;
-
-  // Upward bias tiers
-  if (funding >= LEVELS[5].fundingMax || premium >= LEVELS[5].premiumMax) lvl = 3;
-  else if (funding >= LEVELS[4].fundingMax || premium >= LEVELS[4].premiumMax) lvl = 2;
-  else if (funding >= LEVELS[3].fundingMax || premium >= LEVELS[3].premiumMax) lvl = 1;
-  else if (funding >= LEVELS[2].fundingMax || premium >= LEVELS[2].premiumMax) lvl = 0;
-  else if (funding >= LEVELS[1].fundingMax || premium >= LEVELS[1].premiumMax) lvl = -1;
-  else if (funding >= LEVELS[0].fundingMax || premium >= LEVELS[0].premiumMax) lvl = -2;
-  else lvl = -3;
-
-  const name = LEVELS.find(L => L.lvl === lvl)?.name || "Balanced";
-  return { lvl, name };
-}
-
-/**
- * Approximate *predicted* funding for next interval (Binance-style):
- * Binance formula (simplified): Funding ≈ PremiumIndex + clamp(IR - PremiumIndex, -0.0005, 0.0005)
- * Where PremiumIndex ≈ (Mark - Index)/Index. We don't have Mark; use (perp - index)/index as proxy.
- * IR (USDⓈ-M) ≈ 0.0001 (0.01% per 8h). Clamp width 0.0005 (±0.05%).
- */
-function predictFundingFromPremium(premiumApprox) {
-  const IR = 0.0001; // 0.01% per 8h
-  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-  const adj = clamp(IR - premiumApprox, -0.0005, 0.0005);
-  const predicted = premiumApprox + adj;
-  return predicted;
-}
-
-module.exports = async (req, res) => {
+case "fomo-finder": {
+  console.log("DEBUG: Processing FOMO Finder request...");
+  
   try {
-    // CORS
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") return res.status(200).end();
-    if (!process.env.CG_API_KEY) {
-      return res.status(500).json({ error: "CG_API_KEY not set" });
+    const { interval = "1h", limit = "1000" } = req.query;
+    const EXCHANGE = "Binance";
+    const FUTURES_SYMBOL = "BTCUSDT";
+    const SPOT_SYMBOL = "BTC";
+    
+    // Level classification thresholds (reverse-engineered from your screenshots)
+    const FOMO_LEVELS = [
+      { level: -3, name: "Capitulation", color: "#ff3bbd", fundingMax: -0.0001, premiumMax: -0.005 },
+      { level: -2, name: "Panic", color: "#6a5cff", fundingMax: 0.0, premiumMax: 0.0 },
+      { level: -1, name: "Uncertainty", color: "#ffe45e", fundingMax: 0.0001, premiumMax: 0.0025 },
+      { level: 0, name: "Balanced", color: "#ffe34d", fundingMax: 0.0001, premiumMax: 0.0075 },
+      { level: 1, name: "Canary Call", color: "#f7c341", fundingMax: 0.0003, premiumMax: 0.015 },
+      { level: 2, name: "Greed", color: "#ff7a3e", fundingMax: 0.0005, premiumMax: 0.03 },
+      { level: 3, name: "FOMO", color: "#ff3e33", fundingMax: 1, premiumMax: 1 }
+    ];
+    
+    // Function to classify FOMO level based on funding and premium
+    function classifyFOMOLevel(fundingRate, premium) {
+      let level = 0;
+      
+      // Check upward bias (positive levels)
+      if (fundingRate >= 0.0005 || premium >= 0.03) {
+        level = 3; // FOMO
+      } else if (fundingRate >= 0.0003 || premium >= 0.015) {
+        level = 2; // Greed
+      } else if (fundingRate >= 0.0001 || premium >= 0.0075) {
+        level = 1; // Canary Call
+      } else if (fundingRate >= 0.0001 || premium >= 0.0025) {
+        level = 0; // Balanced
+      } else if (fundingRate >= 0.0 || premium >= 0.0) {
+        level = -1; // Uncertainty
+      } else if (fundingRate >= -0.0001 || premium >= -0.005) {
+        level = -2; // Panic
+      } else {
+        level = -3; // Capitulation
+      }
+      
+      const levelData = FOMO_LEVELS.find(l => l.level === level);
+      return {
+        level: level,
+        name: levelData?.name || "Balanced",
+        color: levelData?.color || "#ffe34d"
+      };
     }
-
-    // 1) Funding (current) for Binance BTC (exchange list)
-    const exList = await axios.get(
-      `${CG_API}/api/futures/funding-rate/exchange-list`,
-      { headers: HEADERS() }
+    
+    // 1. Get price history for the chart
+    console.log("DEBUG: Fetching price history...");
+    const priceResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/price/history?exchange=${EXCHANGE}&symbol=${FUTURES_SYMBOL}&interval=${interval}&limit=${limit}`,
+      { headers }
     );
-    const row = (exList.data?.data || []).find(d => d.symbol === "BTC");
-    const binStable = (row?.stablecoin_margin_list || []).find(x => x.exchange === EXCHANGE);
-    const fundingRateCurrent = Number(binStable?.funding_rate ?? 0); // decimal per 8h
-    const nextFundingTime = binStable?.next_funding_time || null;
-
-    // 2) Perp vs Index (Binance BTC) → premium proxy
-    const pairs = await axios.get(
-      `${CG_API}/api/futures/pairs-markets?symbol=BTC`,
-      { headers: HEADERS() }
+    
+    if (!priceResponse.data || priceResponse.data.code !== "0") {
+      throw new Error(`Price API error: ${priceResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    const priceData = priceResponse.data.data || [];
+    console.log(`DEBUG: Retrieved ${priceData.length} price points`);
+    
+    // 2. Get funding rate history
+    console.log("DEBUG: Fetching funding rate history...");
+    const fundingResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/funding-rate/history?exchange=${EXCHANGE}&symbol=${FUTURES_SYMBOL}&interval=${interval}&limit=${limit}`,
+      { headers }
     );
-    const binPerp = pickBinance(pairs.data?.data || []);
-    const perp = Number(binPerp?.current_price ?? 0);
-    const index = Number(binPerp?.index_price ?? 0);
-
-    // 3) Spot (BTC index price for “S(t)”)
-    const spotResp = await axios.get(
-      `${CG_API}/api/spot/coins-markets`,
-      { headers: HEADERS() }
+    
+    if (!fundingResponse.data || fundingResponse.data.code !== "0") {
+      throw new Error(`Funding API error: ${fundingResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    const fundingData = fundingResponse.data.data || [];
+    console.log(`DEBUG: Retrieved ${fundingData.length} funding points`);
+    
+    // 3. Get current market data for spot price
+    console.log("DEBUG: Fetching spot market data...");
+    const spotResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/spot/coins-markets",
+      { headers }
     );
-    const spotRow = (spotResp.data?.data || []).find(d => d.symbol === SPOT_SYMBOL);
-    const spot = Number(spotRow?.current_price ?? index || 0);
-
-    // 4) Premiums (two views)
-    // a) perp vs index (good proxy of “premium index” for funding mechanics)
-    const premiumPerpIndex = index ? (perp - index) / index : 0;
-    // b) perp vs spot (your term-structure headline)
-    const premiumPerpSpot = spot ? (perp - spot) / spot : premiumPerpIndex;
-
-    // 5) Predicted funding (derived)
-    const fundingPred = predictFundingFromPremium(premiumPerpIndex);
-
-    // 6) Classify level
-    const { lvl, name } = classifyLevel({
-      funding: fundingRateCurrent,
-      premium: premiumPerpSpot,
+    
+    if (!spotResponse.data || spotResponse.data.code !== "0") {
+      throw new Error(`Spot API error: ${spotResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    const spotData = spotResponse.data.data || [];
+    const btcSpot = spotData.find(coin => coin.symbol === SPOT_SYMBOL);
+    const spotPrice = btcSpot?.current_price || 0;
+    
+    console.log(`DEBUG: Current BTC spot price: $${spotPrice}`);
+    
+    // 4. Combine data and calculate FOMO levels
+    const combinedData = [];
+    const fundingMap = new Map();
+    
+    // Create a map of funding data by timestamp
+    fundingData.forEach(f => {
+      fundingMap.set(f.time, parseFloat(f.close) || 0);
     });
-
-    const payload = {
+    
+    priceData.forEach(candle => {
+      const timestamp = candle.time;
+      const price = parseFloat(candle.close) || 0;
+      const fundingRate = fundingMap.get(timestamp) || 0;
+      
+      // Calculate premium: (futures_price - spot_price) / spot_price
+      // For historical data, we approximate spot price as close to futures price
+      // In reality, you'd need historical spot data too
+      const approximateSpot = price * 0.999; // Rough approximation
+      const premium = spotPrice > 0 ? (price - approximateSpot) / approximateSpot : 0;
+      
+      // Classify FOMO level
+      const fomoLevel = classifyFOMOLevel(fundingRate, premium);
+      
+      combinedData.push({
+        t: timestamp,
+        price: price,
+        level: fomoLevel.level,
+        levelLabel: fomoLevel.name,
+        color: fomoLevel.color,
+        fundingRate: fundingRate,
+        premium: premium
+      });
+    });
+    
+    // Sort by timestamp
+    combinedData.sort((a, b) => a.t - b.t);
+    
+    console.log(`DEBUG: Generated ${combinedData.length} FOMO data points`);
+    
+    // 5. Get current real-time data for latest state
+    console.log("DEBUG: Fetching current funding rate...");
+    const currentFundingResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/futures/funding-rate/exchange-list",
+      { headers }
+    );
+    
+    let currentFunding = 0;
+    let nextFundingTime = null;
+    
+    if (currentFundingResponse.data && currentFundingResponse.data.code === "0") {
+      const btcData = currentFundingResponse.data.data?.find(d => d.symbol === SPOT_SYMBOL);
+      const binanceData = btcData?.stablecoin_margin_list?.find(x => x.exchange === EXCHANGE);
+      
+      if (binanceData) {
+        currentFunding = parseFloat(binanceData.funding_rate) || 0;
+        nextFundingTime = binanceData.next_funding_time;
+      }
+    }
+    
+    // 6. Get current futures price
+    const currentFuturesResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/pairs-markets?symbol=${SPOT_SYMBOL}`,
+      { headers }
+    );
+    
+    let currentFuturesPrice = 0;
+    let currentIndexPrice = 0;
+    
+    if (currentFuturesResponse.data && currentFuturesResponse.data.code === "0") {
+      const binanceFutures = currentFuturesResponse.data.data?.find(d => 
+        d.exchange_name === EXCHANGE && d.instrument_id === FUTURES_SYMBOL
+      );
+      
+      if (binanceFutures) {
+        currentFuturesPrice = parseFloat(binanceFutures.current_price) || 0;
+        currentIndexPrice = parseFloat(binanceFutures.index_price) || 0;
+      }
+    }
+    
+    // Calculate current premium
+    const currentPremium = spotPrice > 0 ? (currentFuturesPrice - spotPrice) / spotPrice : 0;
+    const currentFOMOLevel = classifyFOMOLevel(currentFunding, currentPremium);
+    
+    console.log(`DEBUG: Current FOMO Level: ${currentFOMOLevel.name} (${currentFOMOLevel.level})`);
+    console.log(`DEBUG: Current Funding: ${(currentFunding * 100).toFixed(4)}%`);
+    console.log(`DEBUG: Current Premium: ${(currentPremium * 100).toFixed(4)}%`);
+    
+    return res.json({
       success: true,
-      timestamp: new Date().toISOString(),
-      exchange: EXCHANGE,
-      symbols: { perp: FUTURES_SYMBOL, spot: SPOT_SYMBOL },
-      prices: {
-        perp,
-        index,
-        spot,
+      series: combinedData,
+      current: {
+        price: currentFuturesPrice,
+        spotPrice: spotPrice,
+        indexPrice: currentIndexPrice,
+        fundingRate: currentFunding,
+        premium: currentPremium,
+        fomoLevel: currentFOMOLevel,
+        nextFundingTime: nextFundingTime
       },
-      funding: {
-        current_8h: fundingRateCurrent,  // decimal, e.g. 0.0001 = 0.01%
-        predicted_8h: fundingPred,
-        next_funding_time: nextFundingTime,
+      metadata: {
+        exchange: EXCHANGE,
+        symbol: FUTURES_SYMBOL,
+        interval: interval,
+        dataPoints: combinedData.length,
+        levels: FOMO_LEVELS
       },
-      premium: {
-        perp_vs_index: premiumPerpIndex, // decimal (0.01 = 1%)
-        perp_vs_spot: premiumPerpSpot,   // decimal
-      },
-      fomo_level: { level: lvl, label: name },
-    };
-
-    return res.status(200).json(payload);
-  } catch (e) {
-    console.error("[fomo-finder] error:", e?.response?.data || e.message);
+      lastUpdated: new Date().toISOString()
+    });
+    
+  } catch (err) {
+    console.error("[FOMO Finder] Error:", err.message);
     return res.status(500).json({
-      success: false,
-      error: e?.response?.data || e.message,
+      error: "FOMO Finder calculation failed",
+      message: err.message,
+      success: false
     });
   }
-};
-
-
-
+}
 
 
 
