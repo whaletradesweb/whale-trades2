@@ -1699,6 +1699,250 @@ case "fomo-finder": {
   }
 }
 
+// Add this new case to your data.js file
+
+case "fomo-finder-hybrid": {
+  console.log("DEBUG: Processing Hybrid FOMO Finder request...");
+  
+  try {
+    // FOMO level configuration
+    const LEVEL_NAMES = {
+      "-3": "Capitulation",
+      "-2": "Panic", 
+      "-1": "Uncertainty",
+      "0": "Balanced",
+      "1": "Canary Call",
+      "2": "Greed",
+      "3": "FOMO"
+    };
+
+    const LEVEL_COLORS = {
+      "-3": "#ff3bbd",
+      "-2": "#6a5cff",
+      "-1": "#ffe45e", 
+      "0": "#ffe34d",
+      "1": "#f7c341",
+      "2": "#ff7a3e",
+      "3": "#ff3e33"
+    };
+
+    // Step 1: Load and process historical data from Excel (stored as JSON in KV)
+    let historicalData = [];
+    const CUTOFF_DATE = new Date('2024-12-01').getTime(); // Cutoff between historical and live data
+    
+    try {
+      // Try to get processed historical data from KV cache
+      const cachedHistorical = await kv.get("fomo_historical_data");
+      
+      if (cachedHistorical && Array.isArray(cachedHistorical)) {
+        historicalData = cachedHistorical;
+        console.log(`DEBUG: Loaded ${historicalData.length} historical points from cache`);
+      } else {
+        console.log("DEBUG: No cached historical data found - need to process Excel file");
+        // You'll need to upload the processed Excel data to KV store once
+        // This is a one-time setup step
+      }
+    } catch (error) {
+      console.error("Error loading historical data:", error);
+    }
+
+    // Step 2: Get recent live data from CoinGlass API
+    const { interval = "1d", limit = "100" } = req.query;
+    const EXCHANGE = "Binance";
+    const FUTURES_SYMBOL = "BTCUSDT";
+    const SPOT_SYMBOL = "BTC";
+    
+    console.log("DEBUG: Fetching recent live data...");
+    
+    // Get recent price data
+    const priceResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/price/history?exchange=${EXCHANGE}&symbol=${FUTURES_SYMBOL}&interval=${interval}&limit=${limit}`,
+      { headers }
+    );
+    
+    if (!priceResponse.data || priceResponse.data.code !== "0") {
+      throw new Error(`Price API error: ${priceResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    // Get recent funding data
+    const fundingResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/funding-rate/history?exchange=${EXCHANGE}&symbol=${FUTURES_SYMBOL}&interval=${interval}&limit=${limit}`,
+      { headers }
+    );
+    
+    if (!fundingResponse.data || fundingResponse.data.code !== "0") {
+      throw new Error(`Funding API error: ${fundingResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    // Get spot price for premium calculation
+    const spotResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/spot/coins-markets",
+      { headers }
+    );
+    
+    const spotData = spotResponse.data?.data || [];
+    const btcSpot = spotData.find(coin => coin.symbol === SPOT_SYMBOL);
+    const currentSpotPrice = btcSpot?.current_price || 0;
+    
+    // Step 3: Process recent live data
+    const recentPriceData = priceResponse.data.data || [];
+    const recentFundingData = fundingResponse.data.data || [];
+    
+    // Create funding lookup map
+    const fundingMap = new Map();
+    recentFundingData.forEach(f => {
+      fundingMap.set(f.time, parseFloat(f.close) || 0);
+    });
+    
+    // Function to classify FOMO level (same logic as your existing implementation)
+    function classifyFOMOLevel(fundingRate, premium) {
+      let level = 0;
+      
+      if (fundingRate >= 0.0005 || premium >= 0.03) {
+        level = 3; // FOMO
+      } else if (fundingRate >= 0.0003 || premium >= 0.015) {
+        level = 2; // Greed
+      } else if (fundingRate >= 0.0001 || premium >= 0.0075) {
+        level = 1; // Canary Call
+      } else if (fundingRate >= 0.0001 || premium >= 0.0025) {
+        level = 0; // Balanced
+      } else if (fundingRate >= 0.0 || premium >= 0.0) {
+        level = -1; // Uncertainty
+      } else if (fundingRate >= -0.0001 || premium >= -0.005) {
+        level = -2; // Panic
+      } else {
+        level = -3; // Capitulation
+      }
+      
+      return {
+        level: level,
+        name: LEVEL_NAMES[String(level)] || "Balanced",
+        color: LEVEL_COLORS[String(level)] || "#ffe34d"
+      };
+    }
+    
+    // Process recent data points
+    const recentData = [];
+    recentPriceData.forEach(candle => {
+      const timestamp = candle.time;
+      
+      // Only include data after cutoff date
+      if (timestamp <= CUTOFF_DATE) return;
+      
+      const price = parseFloat(candle.close) || 0;
+      const fundingRate = fundingMap.get(timestamp) || 0;
+      
+      // Calculate premium (simplified - using current spot as approximation)
+      const premium = currentSpotPrice > 0 ? (price - currentSpotPrice) / currentSpotPrice : 0;
+      
+      // Classify FOMO level
+      const fomoLevel = classifyFOMOLevel(fundingRate, premium);
+      
+      recentData.push({
+        t: timestamp,
+        price: price,
+        level: fomoLevel.level,
+        levelLabel: fomoLevel.name,
+        color: fomoLevel.color,
+        fundingRate: fundingRate,
+        premium: premium
+      });
+    });
+    
+    // Step 4: Combine historical and recent data
+    const allData = [...historicalData];
+    
+    // Add recent data points that don't overlap with historical data
+    recentData.forEach(point => {
+      const exists = allData.find(h => Math.abs(h.t - point.t) < 24 * 60 * 60 * 1000); // Within 1 day
+      if (!exists) {
+        allData.push(point);
+      }
+    });
+    
+    // Sort by timestamp
+    allData.sort((a, b) => a.t - b.t);
+    
+    // Step 5: Get current real-time state
+    console.log("DEBUG: Fetching current market state...");
+    const currentFundingResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/futures/funding-rate/exchange-list",
+      { headers }
+    );
+    
+    let currentFunding = 0;
+    let nextFundingTime = null;
+    
+    if (currentFundingResponse.data && currentFundingResponse.data.code === "0") {
+      const btcData = currentFundingResponse.data.data?.find(d => d.symbol === SPOT_SYMBOL);
+      const binanceData = btcData?.stablecoin_margin_list?.find(x => x.exchange === EXCHANGE);
+      
+      if (binanceData) {
+        currentFunding = parseFloat(binanceData.funding_rate) || 0;
+        nextFundingTime = binanceData.next_funding_time;
+      }
+    }
+    
+    const currentFuturesResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/pairs-markets?symbol=${SPOT_SYMBOL}`,
+      { headers }
+    );
+    
+    let currentFuturesPrice = 0;
+    let currentIndexPrice = 0;
+    
+    if (currentFuturesResponse.data && currentFuturesResponse.data.code === "0") {
+      const binanceFutures = currentFuturesResponse.data.data?.find(d => 
+        d.exchange_name === EXCHANGE && d.instrument_id === FUTURES_SYMBOL
+      );
+      
+      if (binanceFutures) {
+        currentFuturesPrice = parseFloat(binanceFutures.current_price) || 0;
+        currentIndexPrice = parseFloat(binanceFutures.index_price) || 0;
+      }
+    }
+    
+    const currentPremium = currentSpotPrice > 0 ? (currentFuturesPrice - currentSpotPrice) / currentSpotPrice : 0;
+    const currentFOMOLevel = classifyFOMOLevel(currentFunding, currentPremium);
+    
+    console.log(`DEBUG: Combined dataset: ${allData.length} total points`);
+    console.log(`DEBUG: Historical: ${historicalData.length}, Recent: ${recentData.length}`);
+    console.log(`DEBUG: Current FOMO Level: ${currentFOMOLevel.name} (${currentFOMOLevel.level})`);
+    
+    return res.json({
+      success: true,
+      series: allData,
+      current: {
+        price: currentFuturesPrice,
+        spotPrice: currentSpotPrice,
+        indexPrice: currentIndexPrice,
+        fundingRate: currentFunding,
+        premium: currentPremium,
+        fomoLevel: currentFOMOLevel,
+        nextFundingTime: nextFundingTime
+      },
+      metadata: {
+        exchange: EXCHANGE,
+        symbol: FUTURES_SYMBOL,
+        interval: interval,
+        totalPoints: allData.length,
+        historicalPoints: historicalData.length,
+        recentPoints: recentData.length,
+        cutoffDate: new Date(CUTOFF_DATE).toISOString(),
+        levels: LEVEL_NAMES
+      },
+      lastUpdated: new Date().toISOString()
+    });
+    
+  } catch (err) {
+    console.error("[Hybrid FOMO Finder] Error:", err.message);
+    return res.status(500).json({
+      error: "Hybrid FOMO Finder calculation failed",
+      message: err.message,
+      success: false
+    });
+  }
+}
 
 
 
