@@ -1622,9 +1622,11 @@ case "fomo-finder": {
       
       // Calculate premium: (futures_price - spot_price) / spot_price
       // For historical data, we approximate spot price as close to futures price
-      // In reality, you'd need historical spot data too
       const approximateSpot = price * 0.999; // Rough approximation
-      const premium = spotPrice > 0 ? (price - approximateSpot) / approximateSpot : 0;
+      const premiumRaw = spotPrice > 0 ? (price - approximateSpot) / approximateSpot : 0;
+      
+      // CRITICAL FIX: Convert premium from percentage to decimal
+      const premium = premiumRaw / 100;
       
       // Classify FOMO level using corrected function
       const fomoLevel = classifyFOMOLevel(fundingRate, premium);
@@ -1686,7 +1688,9 @@ case "fomo-finder": {
     }
     
     // Calculate current premium
-    const currentPremium = spotPrice > 0 ? (currentFuturesPrice - spotPrice) / spotPrice : 0;
+    const currentPremiumRaw = spotPrice > 0 ? (currentFuturesPrice - spotPrice) / spotPrice : 0;
+    // CRITICAL FIX: Convert current premium from percentage to decimal
+    const currentPremium = currentPremiumRaw / 100;
     const currentFOMOLevel = classifyFOMOLevel(currentFunding, currentPremium);
     
     console.log(`DEBUG: Current FOMO Level: ${currentFOMOLevel.name} (${currentFOMOLevel.level})`);
@@ -1913,7 +1917,10 @@ case "fomo-finder-hybrid": {
       const fundingRate = fundingMap.get(timestamp) || 0;
       
       // Calculate premium (simplified - using current spot as approximation)
-      const premium = currentSpotPrice > 0 ? (price - currentSpotPrice) / currentSpotPrice : 0;
+      const premiumRaw = currentSpotPrice > 0 ? (price - currentSpotPrice) / currentSpotPrice : 0;
+      
+      // CRITICAL FIX: Convert premium from percentage to decimal
+      const premium = premiumRaw / 100;
       
       // Classify FOMO level for recent data only using corrected function
       const fomoLevel = classifyFOMOLevel(fundingRate, premium);
@@ -1982,7 +1989,9 @@ case "fomo-finder-hybrid": {
       }
     }
     
-    const currentPremium = currentSpotPrice > 0 ? (currentFuturesPrice - currentSpotPrice) / currentSpotPrice : 0;
+    const currentPremiumRaw = currentSpotPrice > 0 ? (currentFuturesPrice - currentSpotPrice) / currentSpotPrice : 0;
+    // CRITICAL FIX: Convert current premium from percentage to decimal
+    const currentPremium = currentPremiumRaw / 100;
     const currentFOMOLevel = classifyFOMOLevel(currentFunding, currentPremium);
     
     console.log(`DEBUG: Combined dataset: ${allData.length} total points`);
