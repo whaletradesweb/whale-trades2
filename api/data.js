@@ -1379,29 +1379,39 @@ case "volume-total": {
     
     console.log(`DEBUG: Fetched ${allCoins.length} coins in ${page} API calls`);
     
-    // Calculate total volume using available volume fields
+    // Calculate total volume by summing long + short for each coin
     let totalVolume24h = 0;
+    let totalWeightedChange = 0;
     let coinsWithVolume = 0;
     
     const coinData = allCoins.map(coin => {
-      // Try different volume field names that might exist in the API
-      const volume = coin.volume_usd_24h || 
-                    coin.volume_24h_usd || 
-                    coin.trading_volume_24h || 
-                    coin.volume_24h ||
-                    0;
+      const longVolume = coin.long_volume_usd_24h || 0;
+      const shortVolume = coin.short_volume_usd_24h || 0;
+      const coinTotalVolume = longVolume + shortVolume;
+      const changePercent = coin.volume_change_percent_24h || 0;
       
-      if (volume > 0) {
-        totalVolume24h += volume;
+      if (coinTotalVolume > 0) {
+        totalVolume24h += coinTotalVolume;
         coinsWithVolume++;
+        
+        // Calculate volume-weighted change contribution
+        if (changePercent !== 0) {
+          totalWeightedChange += (coinTotalVolume * changePercent);
+        }
       }
       
       return {
         symbol: coin.symbol,
-        volume_usd_24h: volume,
-        volume_formatted: fmtUSD(volume)
+        volume_usd_24h: coinTotalVolume,
+        volume_formatted: fmtUSD(coinTotalVolume),
+        long_volume: longVolume,
+        short_volume: shortVolume,
+        change_percent: changePercent
       };
     });
+    
+    // Calculate overall percentage change (volume-weighted average)
+    const overallChangePercent = totalVolume24h > 0 ? (totalWeightedChange / totalVolume24h) : 0;
     
     // Sort by volume and get top coins
     const topCoins = coinData
@@ -1414,12 +1424,13 @@ case "volume-total": {
     return res.json({
       total_volume_24h: totalVolume24h,
       total_formatted: fmtUSD(totalVolume24h),
+      percent_change_24h: overallChangePercent,
       coins_count: allCoins.length,
       coins_with_volume: coinsWithVolume,
-      api_calls_used: page, // Much fewer calls!
+      api_calls_used: page,
       top_coins: topCoins,
       last_updated: new Date().toISOString(),
-      method: "coins-markets-aggregated"
+      method: "long-short-volume-sum"
     });
 
   } catch (err) {
