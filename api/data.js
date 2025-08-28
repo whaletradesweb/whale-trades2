@@ -2,6 +2,38 @@ const axios = require("axios");
 const { kv } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 
+// caching
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedResponse(key) {
+  const cached = cache.get(key);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
+  cache.delete(key);
+  return null;
+}
+
+function setCachedResponse(key, data) {
+  cache.set(key, { data, expiry: Date.now() + CACHE_TTL });
+}
+
+// Wrap your liquidations-table case:
+case "liquidations-table": {
+  const cacheKey = 'liquidations-table';
+  const cached = getCachedResponse(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+  
+  // ... your existing liquidations code ...
+  
+  // Before returning, cache the result:
+  setCachedResponse(cacheKey, finalResponse);
+  return res.json(finalResponse);
+}
+
 module.exports = async (req, res) => {
   // Enhanced CORS headers for better compatibility
   res.setHeader('Access-Control-Allow-Origin', '*');
