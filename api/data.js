@@ -241,7 +241,6 @@ case "etf-eth-flows": {
       }
 
 
-
 case "liquidations-table": {
   console.log("DEBUG: Using exchange-list endpoint for liquidations...");
   
@@ -301,32 +300,30 @@ case "liquidations-table": {
       console.log(`DEBUG ${timeframe} "All" entry:`, allExchanges);
       
       if (allExchanges) {
-  results[timeframe] = {
-    total: fmtUSD(allExchanges.liquidation_usd || 0),
-    long: fmtUSD(allExchanges.longLiquidation_usd || 0),   // CORRECT FIELD NAME
-    short: fmtUSD(allExchanges.shortLiquidation_usd || 0), // CORRECT FIELD NAME
-          // Raw values for further calculations if needed
+        results[timeframe] = {
+          total: fmtUSD(allExchanges.liquidation_usd || 0),
+          long: fmtUSD(allExchanges.longLiquidation_usd || 0),
+          short: fmtUSD(allExchanges.shortLiquidation_usd || 0),
           raw: {
             total: allExchanges.liquidation_usd || 0,
-            long: allExchanges.long_liquidation_usd || 0,
-            short: allExchanges.short_liquidation_usd || 0
+            long: allExchanges.longLiquidation_usd || 0,
+            short: allExchanges.shortLiquidation_usd || 0
           }
         };
       } else {
-  // Fallback: sum all exchanges if "All" entry not found
-  const totalLiq = data.reduce((sum, item) => sum + (item.liquidation_usd || 0), 0);
-  const totalLong = data.reduce((sum, item) => sum + (item.longLiquidation_usd || 0), 0);   // FIXED
-  const totalShort = data.reduce((sum, item) => sum + (item.shortLiquidation_usd || 0), 0); // FIXED
+        // Fallback: sum all exchanges if "All" entry not found
+        const totalLiq = data.reduce((sum, item) => sum + (item.liquidation_usd || 0), 0);
+        const totalLong = data.reduce((sum, item) => sum + (item.longLiquidation_usd || 0), 0);
+        const totalShort = data.reduce((sum, item) => sum + (item.shortLiquidation_usd || 0), 0);
         
         results[timeframe] = {
           total: fmtUSD(totalLiq),
           long: fmtUSD(totalLong),
           short: fmtUSD(totalShort),
           raw: {
-  total: allExchanges.liquidation_usd || 0,
-  long: allExchanges.longLiquidation_usd || 0,   // FIXED
-  short: allExchanges.shortLiquidation_usd || 0  // FIXED
-}
+            total: totalLiq,
+            long: totalLong,
+            short: totalShort
           }
         };
       }
