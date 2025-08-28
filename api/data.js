@@ -1333,214 +1333,108 @@ case "bull-market-peak-indicators": {
   });
 }
 
+
+
 case "volume-total": {
+  console.log("DEBUG: Using optimized volume-total endpoint...");
+  
+  const fmtUSD = (v) => {
+    const n = Math.abs(v);
+    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+    return `$${Math.round(v).toLocaleString()}`;
+  };
+
   try {
-    /**
-     * Goal:
-     *  1) Start with YOUR Top-50 seed (always compute this so the page never loads blank).
-     *  2) Then rank by OI from coins-markets (binance, okx, bybit).
-     *  3) Replace/augment with OI Top-50 and fetch missing coins’ volume_usd from pairs-markets.
-     *  4) Return final list sorted by OI (if rank succeeds); otherwise return seed results.
-     */
-
-    // -------- YOUR SEED (Top 50) --------
-    const SEED_LIST = [
-      "BTC","ETH","SOL","XRP","DOGE","HYPE","SUI","ADA","LINK","BNB",
-      "ENA","LTC","AVAX","AAVE","UNI","FARTCOIN","PEPE","TRX","BCH","DOT",
-      "1000PEPE","TRUMP","ONDO","ARB","HBAR","WIF","PUMP","WLFI","PENGU","APT",
-      "TON","XLM","WLD","CRV","TAO","FIL","NEAR","SEI","LDO","ETC",
-      "OP","XPL","1000BONK","APE","KAS","TIA","IP","SHIB","COIN50","INJ"
-    ];
-
-    // Allow optional override via ?seed=SYM1,SYM2,... (up to 50); we still fallback to your list
-    const seedRaw = (req.query.seed || "").trim();
-    const seedInput = seedRaw
-      ? seedRaw.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
-      : SEED_LIST;
-    const SEED = Array.from(new Set(seedInput)).slice(0, 50);
-
-    // ---- config ----
-    const RANK_EXCHANGES = "binance,okx,bybit"; // as requested
-    const PER_PAGE_PM = 200; // pairs-markets pagination
-    const PER_PAGE_CM = 200; // coins-markets pagination
-    const CONCURRENCY  = 10; // modest fan-out for pairs requests
-
-    const fmtUSD = (v) =>
-      v >= 1e12 ? `$${(v/1e12).toFixed(2)}T` :
-      v >= 1e9  ? `$${(v/1e9 ).toFixed(2)}B` :
-      v >= 1e6  ? `$${(v/1e6 ).toFixed(2)}M` :
-                  `$${Math.round(v).toLocaleString()}`;
-
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-    async function getWithRetry(url, params, label, tries = 3) {
-      let last;
-      for (let i = 1; i <= tries; i++) {
-        try {
-          const res = await axios.get(url, {
-            headers,
-            timeout: 15000,
-            validateStatus: () => true,
-            params
-          });
-          if (res.status === 200 && res.data?.code === "0") return res;
-          if (res.status >= 500) throw new Error(`HTTP ${res.status} ${res.data?.msg || ""}`);
-          return res; // non-200 or code!=0 but not 5xx -> bubble up to caller
-        } catch (e) {
-          last = e;
-          if (i < tries) await sleep(250 * i * i + Math.random() * 200);
+    // Use coins-markets to get volume data for all coins in fewer calls
+    let allCoins = [];
+    let page = 1;
+    const PER_PAGE = 200;
+    
+    // Fetch all coins with pagination (much fewer calls than per-symbol requests)
+    for (;;) {
+      const response = await axios.get(
+        "https://open-api-v4.coinglass.com/api/futures/coins-markets",
+        {
+          headers,
+          timeout: 15000,
+          params: { per_page: PER_PAGE, page },
+          validateStatus: s => s < 500
         }
+      );
+      
+      if (response.status !== 200 || response.data?.code !== "0") {
+        throw new Error(`API request failed: ${response.status} - ${response.data?.message || 'Unknown error'}`);
       }
-      throw last || new Error(`${label}: retries exhausted`);
+      
+      const rows = response.data?.data || [];
+      if (!rows.length) break;
+      
+      allCoins = allCoins.concat(rows);
+      
+      if (rows.length < PER_PAGE) break; // Last page
+      page++;
     }
-
-    // ---- Step A: ALWAYS compute seed volumes first so UI never loads blank ----
-    const PM_URL = "https://open-api-v4.coinglass.com/api/futures/pairs-markets";
-
-    async function sumPairsVolume(symbol) {
-      let total = 0, pairs = 0, page = 1;
-      for (;;) {
-        const rr = await getWithRetry(PM_URL, { symbol, per_page: PER_PAGE_PM, page }, `pairs-markets:${symbol}`);
-        if (rr.status !== 200 || rr.data?.code !== "0" || !Array.isArray(rr.data?.data)) {
-          return { symbol, volume_usd_24h: 0, volume_formatted: "$0", pairs_count: 0, error: rr.data?.msg || `HTTP ${rr.status}` };
-        }
-        const rows = rr.data.data;
-        if (!rows.length) break;
-        for (const row of rows) total += Number(row.volume_usd || 0);
-        pairs += rows.length;
-        if (rows.length < PER_PAGE_PM) break;
-        page++;
+    
+    console.log(`DEBUG: Fetched ${allCoins.length} coins in ${page} API calls`);
+    
+    // Calculate total volume using available volume fields
+    let totalVolume24h = 0;
+    let coinsWithVolume = 0;
+    
+    const coinData = allCoins.map(coin => {
+      // Try different volume field names that might exist in the API
+      const volume = coin.volume_usd_24h || 
+                    coin.volume_24h_usd || 
+                    coin.trading_volume_24h || 
+                    coin.volume_24h ||
+                    0;
+      
+      if (volume > 0) {
+        totalVolume24h += volume;
+        coinsWithVolume++;
       }
-      return { symbol, volume_usd_24h: total, volume_formatted: fmtUSD(total), pairs_count: pairs };
-    }
-
-    const seedResults = new Array(SEED.length);
-    let seedIdx = 0;
-    async function seedWorker() {
-      while (seedIdx < SEED.length) {
-        const i = seedIdx++;
-        seedResults[i] = await sumPairsVolume(SEED[i]);
-      }
-    }
-    await Promise.all(Array(Math.min(CONCURRENCY, SEED.length)).fill(0).map(seedWorker));
-
-    const seedTotal = seedResults.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
-
-    // ---- Step B: TRY to fetch OI Top-50 (binance,okx,bybit). If it fails, we still return seed. ----
-    const CM_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-    async function rankTopByOI() {
-      const ranked = [];
-      let page = 1;
-      for (;;) {
-        const r = await getWithRetry(
-          CM_URL,
-          { exchange_list: RANK_EXCHANGES, per_page: PER_PAGE_CM, page },
-          "coins-markets(rank)"
-        );
-        if (r.status !== 200 || r.data?.code !== "0" || !Array.isArray(r.data?.data)) {
-          throw new Error(r.data?.msg || `HTTP ${r.status}`);
-        }
-        const rows = r.data.data;
-        if (!rows.length) break;
-        for (const row of rows) {
-          const sym = String(row.symbol || "").toUpperCase();
-          const oi  = Number(row.open_interest_usd ?? 0);
-          if (sym && Number.isFinite(oi)) ranked.push({ symbol: sym, open_interest_usd: oi });
-        }
-        if (rows.length < PER_PAGE_CM) break;
-        page++;
-      }
-      ranked.sort((a,b) => (b.open_interest_usd || 0) - (a.open_interest_usd || 0));
-      // dedupe to Top-50
-      const out = [];
-      const seen = new Set();
-      for (const r of ranked) {
-        if (!seen.has(r.symbol)) {
-          out.push(r);
-          seen.add(r.symbol);
-          if (out.length >= 50) break;
-        }
-      }
-      return out; // [{symbol, open_interest_usd}]
-    }
-
-    let oiList = null, rankError = null;
-    try {
-      oiList = await rankTopByOI();
-    } catch (e) {
-      rankError = e.message || String(e);
-    }
-
-    // ---- Step C: If OI succeeded, ensure final list matches OI Top-50 ----
-    let finalCoins = seedResults.map(r => ({ ...r })); // default to seed
-    let finalTotal = seedTotal;
-    let missingFromSeed = [], extraInSeed = [];
-
-    if (oiList && oiList.length) {
-      const oiSymbols = oiList.map(x => x.symbol);
-      const seedSet   = new Set(SEED);
-      const rankSet   = new Set(oiSymbols);
-
-      missingFromSeed = oiSymbols.filter(s => !seedSet.has(s)); // in OI top-50 but not in seed
-      extraInSeed     = SEED.filter(s => !rankSet.has(s));       // in seed but not in OI top-50
-
-      // Fetch pairs volumes for missing symbols so we can build a complete OI-ordered result
-      const extrasResults = [];
-      if (missingFromSeed.length) {
-        let mi = 0;
-        async function extraWorker() {
-          while (mi < missingFromSeed.length) {
-            const j = mi++;
-            extrasResults[j] = await sumPairsVolume(missingFromSeed[j]);
-          }
-        }
-        await Promise.all(Array(Math.min(CONCURRENCY, missingFromSeed.length)).fill(0).map(extraWorker));
-      }
-
-      // Build a map for quick lookups
-      const seedMap   = new Map(seedResults.map(r => [r.symbol, r]));
-      const extraMap  = new Map((extrasResults || []).map(r => [r.symbol, r]));
-      const oiMap     = new Map(oiList.map(r => [r.symbol, r.open_interest_usd]));
-
-      // Compose final list in EXACT OI order, using whichever result we have
-      finalCoins = oiSymbols.map(sym => {
-        const volRow = seedMap.get(sym) || extraMap.get(sym) || { symbol: sym, volume_usd_24h: 0, volume_formatted: "$0", pairs_count: 0 };
-        return {
-          symbol: sym,
-          open_interest_usd: oiMap.get(sym) || 0,
-          volume_usd_24h: volRow.volume_usd_24h || 0,
-          volume_formatted: fmtUSD(volRow.volume_usd_24h || 0),
-          pairs_count: volRow.pairs_count || 0,
-          ...(volRow.error ? { error: volRow.error } : {})
-        };
-      });
-
-      finalTotal = finalCoins.reduce((s, r) => s + (r.volume_usd_24h || 0), 0);
-    }
-
+      
+      return {
+        symbol: coin.symbol,
+        volume_usd_24h: volume,
+        volume_formatted: fmtUSD(volume)
+      };
+    });
+    
+    // Sort by volume and get top coins
+    const topCoins = coinData
+      .filter(coin => coin.volume_usd_24h > 0)
+      .sort((a, b) => b.volume_usd_24h - a.volume_usd_24h)
+      .slice(0, 50);
+    
+    console.log(`DEBUG: Total volume: ${fmtUSD(totalVolume24h)} from ${coinsWithVolume} coins`);
+    
     return res.json({
-      total_volume_24h: finalTotal,
-      total_formatted: fmtUSD(finalTotal),
-      coins_count: finalCoins.length,
-      exchanges_for_rank: RANK_EXCHANGES,
-      coins: finalCoins,                 // sorted by OI if rank succeeded; otherwise seed order
-      seed_used: SEED,                   // the seed we used to guarantee no blank load
-      ranking_diff: {
-        missing_from_seed: oiList ? missingFromSeed : null,
-        extra_in_seed:     oiList ? extraInSeed     : null,
-        rank_error:        rankError || null
-      },
+      total_volume_24h: totalVolume24h,
+      total_formatted: fmtUSD(totalVolume24h),
+      coins_count: allCoins.length,
+      coins_with_volume: coinsWithVolume,
+      api_calls_used: page, // Much fewer calls!
+      top_coins: topCoins,
       last_updated: new Date().toISOString(),
-      method: oiList
-        ? "Seed Top-50 → pairs-markets volume_usd; then aligned to OI Top-50 (binance,okx,bybit)"
-        : "Seed Top-50 → pairs-markets volume_usd (OI rank unavailable this run)"
+      method: "coins-markets-aggregated"
     });
 
   } catch (err) {
-    console.error("[volume-total] Error:", err?.response?.data || err.message);
-    return res.status(500).json({ error: "Volume API failed", message: err.message || "Unknown error" });
+    console.error("[volume-total] Error:", err.message);
+    return res.status(500).json({
+      error: "Volume API failed",
+      message: err.message,
+      total_volume_24h: 0,
+      total_formatted: "$0",
+      last_updated: new Date().toISOString()
+    });
   }
 }
+
+        
 
 
 case "api-usage-debug": {
