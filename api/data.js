@@ -242,11 +242,11 @@ case "etf-eth-flows": {
 
 
 case "liquidations-table": {
-  const COINS_URL = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-  const PER_PAGE = 200;
-  const TF = ["1h","4h","12h","24h"];
-
-  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  console.log("DEBUG: Using optimized liquidations endpoint...");
+  
+  const timeframes = ['1h', '4h', '12h', '24h'];
+  const results = {};
+  
   const fmtUSD = (v) => {
     const n = Math.abs(v);
     if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
@@ -256,68 +256,102 @@ case "liquidations-table": {
     return `$${v.toFixed(2)}`;
   };
 
-  const agg = Object.fromEntries(TF.map(tf => [tf, { total:0, long:0, short:0 }]));
+  try {
+    // Make parallel requests for all timeframes
+    const requests = timeframes.map(range => 
+      axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list", {
+        headers,
+        timeout: 10000,
+        params: { range },
+        validateStatus: s => s < 500
+      })
+    );
 
-  const axiosOpts = {
-    headers,                 // your existing headers with CG-API-KEY
-    timeout: 10000,
-    validateStatus: s => s < 500
-  };
+    const responses = await Promise.all(requests);
 
-  async function fetchPage(page) {
-    // IMPORTANT: no exchange_list param → All Exchanges
-    return axios.get(COINS_URL, {
-      ...axiosOpts,
-      params: { per_page: PER_PAGE, page }
+    // Process each timeframe
+    timeframes.forEach((timeframe, index) => {
+      const response = responses[index];
+      
+      if (response.status !== 200 || response.data?.code !== "0") {
+        console.warn(`Failed to fetch ${timeframe} liquidations:`, response.status, response.data?.msg);
+        results[timeframe] = {
+          total: "$0",
+          long: "$0", 
+          short: "$0",
+          error: response.data?.msg || `HTTP ${response.status}`
+        };
+        return;
+      }
+
+      const data = response.data.data || [];
+      
+      // Find the "All" exchange entry (cumulative data)
+      const allExchanges = data.find(item => item.exchange === "All");
+      
+      if (allExchanges) {
+        results[timeframe] = {
+          total: fmtUSD(allExchanges.liquidation_usd || 0),
+          long: fmtUSD(allExchanges.long_liquidation_usd || 0),
+          short: fmtUSD(allExchanges.short_liquidation_usd || 0),
+          // Raw values for further calculations if needed
+          raw: {
+            total: allExchanges.liquidation_usd || 0,
+            long: allExchanges.long_liquidation_usd || 0,
+            short: allExchanges.short_liquidation_usd || 0
+          }
+        };
+      } else {
+        // Fallback: sum all exchanges if "All" entry not found
+        const totalLiq = data.reduce((sum, item) => sum + (item.liquidation_usd || 0), 0);
+        const totalLong = data.reduce((sum, item) => sum + (item.long_liquidation_usd || 0), 0);
+        const totalShort = data.reduce((sum, item) => sum + (item.short_liquidation_usd || 0), 0);
+        
+        results[timeframe] = {
+          total: fmtUSD(totalLiq),
+          long: fmtUSD(totalLong),
+          short: fmtUSD(totalShort),
+          raw: {
+            total: totalLiq,
+            long: totalLong,
+            short: totalShort
+          }
+        };
+      }
+    });
+
+    console.log("DEBUG: Liquidations data processed successfully");
+    
+    return res.json({
+      success: true,
+      ...results, // This spreads: { "1h": {...}, "4h": {...}, etc. }
+      lastUpdated: new Date().toISOString(),
+      method: "exchange-list-aggregated",
+      api_calls_used: timeframes.length // Only 4 API calls total!
+    });
+
+  } catch (err) {
+    console.error("[liquidations-table] Error:", err.message);
+    
+    // Return fallback data structure on error
+    const fallbackResults = {};
+    timeframes.forEach(tf => {
+      fallbackResults[tf] = {
+        total: "$0",
+        long: "$0", 
+        short: "$0",
+        error: "API request failed"
+      };
+    });
+    
+    return res.status(500).json({
+      success: false,
+      ...fallbackResults,
+      error: "Liquidations API failed",
+      message: err.message,
+      lastUpdated: new Date().toISOString()
     });
   }
-
-  let page = 1, rowsProcessed = 0;
-
-  for (;;) {
-    const resp = await fetchPage(page);
-    if (resp.status !== 200 || resp.data?.code !== "0") {
-      return res.status(resp.status || 500).json({
-        error: "API Request Failed",
-        message: resp.data?.message || `Bad response (code: ${resp.data?.code ?? "unknown"})`,
-        status: resp.status || 500
-      });
-    }
-
-    const rows = Array.isArray(resp.data?.data) ? resp.data.data : [];
-    if (!rows.length) break;
-
-    for (const r of rows) {
-      for (const tf of TF) {
-        agg[tf].total += toNum(r[`liquidation_usd_${tf}`]);
-        agg[tf].long  += toNum(r[`long_liquidation_usd_${tf}`]);
-        agg[tf].short += toNum(r[`short_liquidation_usd_${tf}`]);
-      }
-    }
-
-    rowsProcessed += rows.length;
-    if (rows.length < PER_PAGE) break; // last page
-    page++;
-  }
-
-  const formatted = Object.fromEntries(
-    TF.map(tf => [tf, {
-      total: fmtUSD(agg[tf].total),
-      long:  fmtUSD(agg[tf].long),
-      short: fmtUSD(agg[tf].short)
-    }])
-  );
-
-  return res.json({
-    success: true,
-    totals: agg,
-    formatted,
-    mode: "all-exchanges",          // for clarity/debug
-    per_page: PER_PAGE,
-    pages_processed: page,
-    rows_processed: rowsProcessed,
-    lastUpdated: new Date().toISOString()
-  });
 }
 
 
