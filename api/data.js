@@ -242,7 +242,7 @@ case "etf-eth-flows": {
 
 
 case "liquidations-table": {
-  console.log("DEBUG: Using optimized liquidations endpoint...");
+  console.log("DEBUG: Using exchange-list endpoint for liquidations...");
   
   const timeframes = ['1h', '4h', '12h', '24h'];
   const results = {};
@@ -286,8 +286,18 @@ case "liquidations-table": {
 
       const data = response.data.data || [];
       
+      // DEBUG: Log the raw response to see what we're getting
+      console.log(`DEBUG ${timeframe} response:`, {
+        status: response.status,
+        dataLength: data.length,
+        firstItem: data[0],
+        allFields: data[0] ? Object.keys(data[0]) : []
+      });
+      
       // Find the "All" exchange entry (cumulative data)
       const allExchanges = data.find(item => item.exchange === "All");
+      
+      console.log(`DEBUG ${timeframe} "All" entry:`, allExchanges);
       
       if (allExchanges) {
         results[timeframe] = {
@@ -322,12 +332,28 @@ case "liquidations-table": {
 
     console.log("DEBUG: Liquidations data processed successfully");
     
+    // Format response to match Webflow element IDs
+    const webflowFormatted = {};
+    timeframes.forEach(tf => {
+      const tfUpper = tf.toUpperCase(); // Convert 1h -> 1H
+      if (results[tf] && !results[tf].error) {
+        webflowFormatted[`${tfUpper}-Total`] = results[tf].total;
+        webflowFormatted[`${tfUpper}-Total-Long`] = results[tf].long;
+        webflowFormatted[`${tfUpper}-Total-Short`] = results[tf].short;
+      } else {
+        webflowFormatted[`${tfUpper}-Total`] = "$0";
+        webflowFormatted[`${tfUpper}-Total-Long`] = "$0";
+        webflowFormatted[`${tfUpper}-Total-Short`] = "$0";
+      }
+    });
+    
     return res.json({
       success: true,
-      ...results, // This spreads: { "1h": {...}, "4h": {...}, etc. }
+      ...webflowFormatted, // Flat structure matching Webflow IDs
+      nested_data: results, // Keep nested format for debugging
       lastUpdated: new Date().toISOString(),
       method: "exchange-list-aggregated",
-      api_calls_used: timeframes.length // Only 4 API calls total!
+      api_calls_used: timeframes.length
     });
 
   } catch (err) {
@@ -336,12 +362,10 @@ case "liquidations-table": {
     // Return fallback data structure on error
     const fallbackResults = {};
     timeframes.forEach(tf => {
-      fallbackResults[tf] = {
-        total: "$0",
-        long: "$0", 
-        short: "$0",
-        error: "API request failed"
-      };
+      const tfUpper = tf.toUpperCase();
+      fallbackResults[`${tfUpper}-Total`] = "$0";
+      fallbackResults[`${tfUpper}-Total-Long`] = "$0";
+      fallbackResults[`${tfUpper}-Total-Short`] = "$0";
     });
     
     return res.status(500).json({
