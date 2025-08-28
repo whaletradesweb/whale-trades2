@@ -1804,24 +1804,35 @@ function classifyFOMOLevel(fundingRate, premium) {
   };
 }
 
-// Complete updated fomo-finder-hybrid case with recalibrated thresholds:
+
 case "fomo-finder-hybrid": {
   console.log("DEBUG: Processing Hybrid FOMO Finder request with recalibrated thresholds...");
   
   try {
-    // Updated FOMO Level Classification Function with data-driven thresholds
+    // FOMO level configuration
+    const LEVEL_NAMES = {
+      "-3": "Capitulation",
+      "-2": "Panic", 
+      "-1": "Uncertainty",
+      "0": "Balanced",
+      "1": "Canary Call",
+      "2": "Greed",
+      "3": "FOMO"
+    };
+
+    // RECALIBRATED FOMO Level Classification Function (data-driven thresholds)
     function classifyFOMOLevel(fundingRate, premium) {
-      // Level 3 (FOMO) - Around 90th percentile
+      // Level 3 (FOMO) - Around 90th percentile (7.5% premium)
       if (fundingRate >= 0.0005 || premium >= 0.075) {
         return { level: 3, name: "FOMO", color: "#ff3e33" };
       }
       
-      // Level 2 (Greed) - Around 75th percentile  
+      // Level 2 (Greed) - Around 75th percentile (5.5% premium)
       if (fundingRate >= 0.0003 || premium >= 0.055) {
         return { level: 2, name: "Greed", color: "#ff7a3e" };
       }
       
-      // Level 1 (Canary Call) - Around 50th percentile
+      // Level 1 (Canary Call) - Around 50th percentile (2.0% premium)
       if (fundingRate >= 0.0001 || premium >= 0.02) {
         return { level: 1, name: "Canary Call", color: "#f7c341" };
       }
@@ -1831,12 +1842,12 @@ case "fomo-finder-hybrid": {
         return { level: 0, name: "Balanced", color: "#ffe34d" };
       }
       
-      // Level -1 (Uncertainty) - Around 10th percentile
+      // Level -1 (Uncertainty) - Around 10th percentile (-0.5% premium)
       if (fundingRate >= -0.0001 || premium >= -0.005) {
         return { level: -1, name: "Uncertainty", color: "#ffe45e" };
       }
       
-      // Level -2 (Panic) - Around 5th percentile
+      // Level -2 (Panic) - Around 5th percentile (-1.5% premium)
       if (fundingRate >= -0.0003 || premium >= -0.015) {
         return { level: -2, name: "Panic", color: "#6a5cff" };
       }
@@ -1845,7 +1856,7 @@ case "fomo-finder-hybrid": {
       return { level: -3, name: "Capitulation", color: "#ff3bbd" };
     }
 
-    // Step 1: Load historical data and classify with new thresholds
+    // Step 1: Load historical data from GitHub and classify with recalibrated thresholds
     let historicalData = [];
     const CUTOFF_DATE = new Date('2024-12-01').getTime();
     
@@ -1894,35 +1905,164 @@ case "fomo-finder-hybrid": {
           "Panic": historicalData.filter(p => p.level === -2).length,
           "Capitulation": historicalData.filter(p => p.level === -3).length
         };
-        console.log("DEBUG: New level distribution:", levelCounts);
-        
-        // Calculate percentages
-        const total = historicalData.length;
-        const levelPercentages = {};
-        Object.entries(levelCounts).forEach(([level, count]) => {
-          levelPercentages[level] = ((count / total) * 100).toFixed(1) + '%';
-        });
-        console.log("DEBUG: Level percentages:", levelPercentages);
-        
+        console.log("DEBUG: Recalibrated level distribution:", levelCounts);
       }
     } catch (error) {
       console.error("Error loading historical data:", error.message);
     }
 
-    // Step 2: Process recent live data (same as before)
+    // Step 2: Get recent live data from CoinGlass API
     const { interval = "1d", limit = "100" } = req.query;
     const EXCHANGE = "Binance";
     const FUTURES_SYMBOL = "BTCUSDT";
     const SPOT_SYMBOL = "BTC";
     
-    // [Include the rest of the live data processing code from the previous version]
-    // ... (same code for fetching and processing recent data)
+    console.log("DEBUG: Fetching recent live data...");
     
-    // Step 3: Get current real-time state with recalibrated classification
-    // [Include current state fetching code]
-    // ... 
+    // Get recent price data
+    const priceResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/price/history?exchange=${EXCHANGE}&symbol=${FUTURES_SYMBOL}&interval=${interval}&limit=${limit}`,
+      { headers }
+    );
     
+    if (!priceResponse.data || priceResponse.data.code !== "0") {
+      throw new Error(`Price API error: ${priceResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    // Get recent funding data
+    const fundingResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/funding-rate/history?exchange=${EXCHANGE}&symbol=${FUTURES_SYMBOL}&interval=${interval}&limit=${limit}`,
+      { headers }
+    );
+    
+    if (!fundingResponse.data || fundingResponse.data.code !== "0") {
+      throw new Error(`Funding API error: ${fundingResponse.data?.msg || 'Unknown error'}`);
+    }
+    
+    // Get spot price for premium calculation
+    const spotResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/spot/coins-markets",
+      { headers }
+    );
+    
+    const spotData = spotResponse.data?.data || [];
+    const btcSpot = spotData.find(coin => coin.symbol === SPOT_SYMBOL);
+    const currentSpotPrice = btcSpot?.current_price || 0;
+    
+    // Step 3: Process recent live data
+    const recentPriceData = priceResponse.data.data || [];
+    const recentFundingData = fundingResponse.data.data || [];
+    
+    // Create funding lookup map
+    const fundingMap = new Map();
+    recentFundingData.forEach(f => {
+      fundingMap.set(f.time, parseFloat(f.close) || 0);
+    });
+    
+    // Process recent data points
+    const recentData = [];
+    recentPriceData.forEach(candle => {
+      const timestamp = candle.time;
+      
+      // Only include data after cutoff date (for live data only)
+      if (timestamp <= CUTOFF_DATE) return;
+      
+      const price = parseFloat(candle.close) || 0;
+      if (price <= 0) return; // Skip invalid prices
+      
+      const fundingRate = fundingMap.get(timestamp) || 0;
+      
+      // Calculate premium (simplified - using current spot as approximation)
+      const premiumRaw = currentSpotPrice > 0 ? (price - currentSpotPrice) / currentSpotPrice : 0;
+      const premium = premiumRaw;
+      
+      // Classify FOMO level for recent data
+      const fomoLevel = classifyFOMOLevel(fundingRate, premium);
+      
+      recentData.push({
+        t: timestamp,
+        price: price,
+        level: fomoLevel.level,
+        levelLabel: fomoLevel.name,
+        color: fomoLevel.color,
+        fundingRate: fundingRate,
+        premium: premium
+      });
+    });
+    
+    // Step 4: Combine historical and recent data
+    const allData = [...historicalData];
+    
+    // Add recent data points that don't overlap with historical data
+    recentData.forEach(point => {
+      const exists = allData.find(h => Math.abs(h.t - point.t) < 24 * 60 * 60 * 1000); // Within 1 day
+      if (!exists) {
+        allData.push(point);
+      }
+    });
+    
+    // Sort by timestamp
+    allData.sort((a, b) => a.t - b.t);
+    
+    // Step 5: Get current real-time state
+    console.log("DEBUG: Fetching current market state...");
+    const currentFundingResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/futures/funding-rate/exchange-list",
+      { headers }
+    );
+    
+    let currentFunding = 0;
+    let nextFundingTime = null;
+    
+    if (currentFundingResponse.data && currentFundingResponse.data.code === "0") {
+      const btcData = currentFundingResponse.data.data?.find(d => d.symbol === SPOT_SYMBOL);
+      const binanceData = btcData?.stablecoin_margin_list?.find(x => x.exchange === EXCHANGE);
+      
+      if (binanceData) {
+        currentFunding = parseFloat(binanceData.funding_rate) || 0;
+        nextFundingTime = binanceData.next_funding_time;
+      }
+    }
+    
+    const currentFuturesResponse = await axios.get(
+      `https://open-api-v4.coinglass.com/api/futures/pairs-markets?symbol=${SPOT_SYMBOL}`,
+      { headers }
+    );
+    
+    let currentFuturesPrice = 0;
+    let currentIndexPrice = 0;
+    
+    if (currentFuturesResponse.data && currentFuturesResponse.data.code === "0") {
+      const binanceFutures = currentFuturesResponse.data.data?.find(d => 
+        d.exchange_name === EXCHANGE && d.instrument_id === FUTURES_SYMBOL
+      );
+      
+      if (binanceFutures) {
+        currentFuturesPrice = parseFloat(binanceFutures.current_price) || 0;
+        currentIndexPrice = parseFloat(binanceFutures.index_price) || 0;
+      }
+    }
+    
+    const currentPremiumRaw = currentSpotPrice > 0 ? (currentFuturesPrice - currentSpotPrice) / currentSpotPrice : 0;
+    const currentPremium = currentPremiumRaw;
     const currentFOMOLevel = classifyFOMOLevel(currentFunding, currentPremium);
+    
+    // Final level distribution check
+    const finalLevelCounts = {
+      "FOMO": allData.filter(p => p.level === 3).length,
+      "Greed": allData.filter(p => p.level === 2).length,
+      "Canary Call": allData.filter(p => p.level === 1).length,
+      "Balanced": allData.filter(p => p.level === 0).length,
+      "Uncertainty": allData.filter(p => p.level === -1).length,
+      "Panic": allData.filter(p => p.level === -2).length,
+      "Capitulation": allData.filter(p => p.level === -3).length
+    };
+    
+    console.log(`DEBUG: Combined dataset: ${allData.length} total points`);
+    console.log(`DEBUG: Historical: ${historicalData.length}, Recent: ${recentData.length}`);
+    console.log(`DEBUG: Final level distribution:`, finalLevelCounts);
+    console.log(`DEBUG: Current FOMO Level: ${currentFOMOLevel.name} (${currentFOMOLevel.level})`);
+    console.log(`DEBUG: Current Funding: ${(currentFunding * 100).toFixed(4)}%, Premium: ${(currentPremium * 100).toFixed(4)}%`);
     
     return res.json({
       success: true,
@@ -1943,6 +2083,8 @@ case "fomo-finder-hybrid": {
         totalPoints: allData.length,
         historicalPoints: historicalData.length,
         recentPoints: recentData.length,
+        cutoffDate: new Date(CUTOFF_DATE).toISOString(),
+        levels: LEVEL_NAMES,
         thresholdsRecalibrated: true,
         premiumThresholds: {
           "FOMO": "≥7.5%",
@@ -1953,8 +2095,7 @@ case "fomo-finder-hybrid": {
           "Panic": "≥-1.5%",
           "Capitulation": "<-1.5%"
         },
-        levelDistribution: levelCounts,
-        levelPercentages: levelPercentages
+        levelDistribution: finalLevelCounts
       },
       lastUpdated: new Date().toISOString()
     });
@@ -1968,7 +2109,6 @@ case "fomo-finder-hybrid": {
     });
   }
 }
-
 
 
     
