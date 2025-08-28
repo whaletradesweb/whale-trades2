@@ -1544,6 +1544,38 @@ case "volume-total": {
   }
 }
 
+
+case "api-usage-debug": {
+  // Make a simple test call to see if you're rate limited
+  try {
+    const testResponse = await axios.get(
+      "https://open-api-v4.coinglass.com/api/futures/supported-coins",
+      { 
+        headers,
+        timeout: 5000,
+        validateStatus: () => true // Don't throw on any status
+      }
+    );
+    
+    return res.json({
+      status: testResponse.status,
+      message: testResponse.status === 429 ? "Rate Limited" : 
+               testResponse.status === 200 ? "API Working" : 
+               `HTTP ${testResponse.status}`,
+      headers: {
+        remaining: testResponse.headers['x-ratelimit-remaining'],
+        limit: testResponse.headers['x-ratelimit-limit'],
+        reset: testResponse.headers['x-ratelimit-reset']
+      },
+      response_body: testResponse.data
+    });
+  } catch (err) {
+    return res.json({
+      error: err.message,
+      api_status: "Connection Failed"
+    });
+  }
+}
     
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
