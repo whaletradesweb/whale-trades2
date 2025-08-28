@@ -1806,7 +1806,7 @@ function classifyFOMOLevel(fundingRate, premium) {
 
 
 case "fomo-finder-hybrid": {
-  console.log("DEBUG: Processing Hybrid FOMO Finder request with recalibrated thresholds...");
+  console.log("DEBUG: Processing Hybrid FOMO Finder with improved contango/backwardation logic...");
   
   try {
     // FOMO level configuration
@@ -1820,208 +1820,109 @@ case "fomo-finder-hybrid": {
       "3": "FOMO"
     };
 
-// Improved FOMO Level Classification Function
-// Accounts for normal contango expectations and emphasizes backwardation signals
-function classifyFOMOLevel(fundingRate, premium) {
-  // Adjust premium for "normal" contango baseline
-  // Bitcoin futures typically trade 1-2% above spot due to carrying costs
-  const NORMAL_CONTANGO = 0.015; // 1.5% baseline expectation
-  const adjustedPremium = premium - NORMAL_CONTANGO;
-  
-  // Weight funding rate and premium based on market conditions
-  let fundingWeight = 1.0;
-  let premiumWeight = 1.0;
-  
-  // In backwardation, premium signals are more reliable (higher weight)
-  if (premium < 0) {
-    premiumWeight = 1.5;
-    fundingWeight = 0.8;
-  }
-  
-  // In extreme contango, funding becomes more important
-  if (premium > 0.05) {
-    fundingWeight = 1.3;
-    premiumWeight = 0.9;
-  }
-  
-  // Calculate weighted scores
-  const fundingScore = fundingRate * fundingWeight;
-  const premiumScore = adjustedPremium * premiumWeight;
-  
-  // Combined sentiment score
-  const sentimentScore = Math.max(fundingScore, premiumScore);
-  
-  // Classification based on adjusted thresholds
-  
-  // Level 3 (FOMO) - Extreme speculation beyond normal contango (>10% adjusted premium)
-  if (sentimentScore >= 0.10 || (fundingRate >= 0.002 && premium >= 0.08)) {
-    return { 
-      level: 3, 
-      name: "FOMO", 
-      color: "#ff3e33",
-      reason: premium < 0 ? "extreme_backwardation" : "excessive_contango"
-    };
-  }
-  
-  // Level 2 (Greed) - Strong speculation (>6% adjusted premium)
-  if (sentimentScore >= 0.06 || (fundingRate >= 0.001 && premium >= 0.05)) {
-    return { 
-      level: 2, 
-      name: "Greed", 
-      color: "#ff7a3e",
-      reason: premium < 0 ? "significant_backwardation" : "high_contango"
-    };
-  }
-  
-  // Level 1 (Canary Call) - Above normal speculation (>2% adjusted premium)
-  if (sentimentScore >= 0.02 || (fundingRate >= 0.0003 && premium >= 0.025)) {
-    return { 
-      level: 1, 
-      name: "Canary Call", 
-      color: "#f7c341",
-      reason: premium < 0 ? "mild_backwardation" : "elevated_contango"
-    };
-  }
-  
-  // Level 0 (Balanced) - Normal market conditions (within expected contango range)
-  if (sentimentScore >= -0.01 && premium >= -0.005) {
-    return { 
-      level: 0, 
-      name: "Balanced", 
-      color: "#ffe34d",
-      reason: "normal_contango"
-    };
-  }
-  
-  // Level -1 (Uncertainty) - Slight backwardation or funding stress
-  if (sentimentScore >= -0.025 || premium >= -0.015) {
-    return { 
-      level: -1, 
-      name: "Uncertainty", 
-      color: "#ffe45e",
-      reason: "slight_backwardation"
-    };
-  }
-  
-  // Level -2 (Panic) - Significant backwardation indicates selling pressure
-  if (sentimentScore >= -0.05 || premium >= -0.035) {
-    return { 
-      level: -2, 
-      name: "Panic", 
-      color: "#6a5cff",
-      reason: "significant_backwardation"
-    };
-  }
-  
-  // Level -3 (Capitulation) - Extreme backwardation and negative funding
-  return { 
-    level: -3, 
-    name: "Capitulation", 
-    color: "#ff3bbd",
-    reason: "extreme_backwardation"
-  };
-}
-
-// Enhanced case with improved classification and debugging
-case "fomo-finder-hybrid": {
-  console.log("DEBUG: Processing Hybrid FOMO Finder with improved contango/backwardation logic...");
-  
-  try {
-    // [Previous setup code remains the same...]
-    
-    // Process historical data with improved classification
-    historicalData = historicalResponse.data
-      .filter(point => point.t < CUTOFF_DATE && point.price > 0)
-      .map(point => {
-        const fundingRate = point.fundingRate || 0;
-        const premium = point.premium || 0;
-        
-        // Use improved classification
-        const fomoLevel = classifyFOMOLevel(fundingRate, premium);
-        
-        return {
-          t: point.t,
-          price: point.price,
-          fundingRate: fundingRate,
-          premium: premium,
-          adjustedPremium: premium - 0.015, // Show baseline-adjusted premium
-          level: fomoLevel.level,
-          levelLabel: fomoLevel.name,
-          color: fomoLevel.color,
-          marketStructure: fomoLevel.reason // Track market structure
+    // Improved FOMO Level Classification Function
+    // Accounts for normal contango expectations and emphasizes backwardation signals
+    function classifyFOMOLevel(fundingRate, premium) {
+      // Adjust premium for "normal" contango baseline
+      // Bitcoin futures typically trade 1-2% above spot due to carrying costs
+      const NORMAL_CONTANGO = 0.015; // 1.5% baseline expectation
+      const adjustedPremium = premium - NORMAL_CONTANGO;
+      
+      // Weight funding rate and premium based on market conditions
+      let fundingWeight = 1.0;
+      let premiumWeight = 1.0;
+      
+      // In backwardation, premium signals are more reliable (higher weight)
+      if (premium < 0) {
+        premiumWeight = 1.5;
+        fundingWeight = 0.8;
+      }
+      
+      // In extreme contango, funding becomes more important
+      if (premium > 0.05) {
+        fundingWeight = 1.3;
+        premiumWeight = 0.9;
+      }
+      
+      // Calculate weighted scores
+      const fundingScore = fundingRate * fundingWeight;
+      const premiumScore = adjustedPremium * premiumWeight;
+      
+      // Combined sentiment score
+      const sentimentScore = Math.max(fundingScore, premiumScore);
+      
+      // Classification based on adjusted thresholds
+      
+      // Level 3 (FOMO) - Extreme speculation beyond normal contango (>10% adjusted premium)
+      if (sentimentScore >= 0.10 || (fundingRate >= 0.002 && premium >= 0.08)) {
+        return { 
+          level: 3, 
+          name: "FOMO", 
+          color: "#ff3e33",
+          reason: premium < 0 ? "extreme_backwardation" : "excessive_contango"
         };
-      });
-    
-    // Enhanced debugging with market structure analysis
-    const structureAnalysis = {
-      normal_contango: historicalData.filter(p => p.marketStructure === "normal_contango").length,
-      elevated_contango: historicalData.filter(p => p.marketStructure === "elevated_contango").length,
-      high_contango: historicalData.filter(p => p.marketStructure === "high_contango").length,
-      excessive_contango: historicalData.filter(p => p.marketStructure === "excessive_contango").length,
-      slight_backwardation: historicalData.filter(p => p.marketStructure === "slight_backwardation").length,
-      significant_backwardation: historicalData.filter(p => p.marketStructure === "significant_backwardation").length,
-      extreme_backwardation: historicalData.filter(p => p.marketStructure === "extreme_backwardation").length
-    };
-    
-    console.log("DEBUG: Market structure analysis:", structureAnalysis);
-    
-    // Calculate contango/backwardation statistics
-    const premiums = historicalData.map(p => p.premium);
-    const contangoStats = {
-      avgPremium: (premiums.reduce((sum, p) => sum + p, 0) / premiums.length).toFixed(4),
-      contangoCount: premiums.filter(p => p > 0).length,
-      backwardationCount: premiums.filter(p => p < 0).length,
-      maxContango: Math.max(...premiums).toFixed(4),
-      maxBackwardation: Math.min(...premiums).toFixed(4)
-    };
-    
-    console.log("DEBUG: Contango/Backwardation stats:", contangoStats);
-    
-    // [Rest of the case continues with same structure...]
-    
-    return res.json({
-      success: true,
-      series: allData,
-      current: {
-        // ... existing current data ...
-        marketStructure: currentFOMOLevel.reason,
-        adjustedPremium: currentPremium - 0.015
-      },
-      metadata: {
-        // ... existing metadata ...
-        improvementsApplied: [
-          "baseline_contango_adjustment",
-          "backwardation_emphasis", 
-          "weighted_scoring",
-          "market_structure_classification"
-        ],
-        contangoBaseline: "1.5%",
-        marketStructureStats: structureAnalysis,
-        contangoStats: contangoStats,
-        premiumThresholds: {
-          "FOMO": "≥10% (adjusted for 1.5% baseline)",
-          "Greed": "≥6% (adjusted)", 
-          "Canary Call": "≥2% (adjusted)",
-          "Balanced": "±1% around baseline",
-          "Uncertainty": "Slight backwardation (-1.5%)",
-          "Panic": "Significant backwardation (-3.5%)",
-          "Capitulation": "Extreme backwardation (<-5%)"
-        }
-      },
-      lastUpdated: new Date().toISOString()
-    });
-    
-  } catch (err) {
-    console.error("[Hybrid FOMO Finder] Error:", err.message);
-    return res.status(500).json({
-      error: "Hybrid FOMO Finder calculation failed", 
-      message: err.message,
-      success: false
-    });
-  }
-}
+      }
+      
+      // Level 2 (Greed) - Strong speculation (>6% adjusted premium)
+      if (sentimentScore >= 0.06 || (fundingRate >= 0.001 && premium >= 0.05)) {
+        return { 
+          level: 2, 
+          name: "Greed", 
+          color: "#ff7a3e",
+          reason: premium < 0 ? "significant_backwardation" : "high_contango"
+        };
+      }
+      
+      // Level 1 (Canary Call) - Above normal speculation (>2% adjusted premium)
+      if (sentimentScore >= 0.02 || (fundingRate >= 0.0003 && premium >= 0.025)) {
+        return { 
+          level: 1, 
+          name: "Canary Call", 
+          color: "#f7c341",
+          reason: premium < 0 ? "mild_backwardation" : "elevated_contango"
+        };
+      }
+      
+      // Level 0 (Balanced) - Normal market conditions (within expected contango range)
+      if (sentimentScore >= -0.01 && premium >= -0.005) {
+        return { 
+          level: 0, 
+          name: "Balanced", 
+          color: "#ffe34d",
+          reason: "normal_contango"
+        };
+      }
+      
+      // Level -1 (Uncertainty) - Slight backwardation or funding stress
+      if (sentimentScore >= -0.025 || premium >= -0.015) {
+        return { 
+          level: -1, 
+          name: "Uncertainty", 
+          color: "#ffe45e",
+          reason: "slight_backwardation"
+        };
+      }
+      
+      // Level -2 (Panic) - Significant backwardation indicates selling pressure
+      if (sentimentScore >= -0.05 || premium >= -0.035) {
+        return { 
+          level: -2, 
+          name: "Panic", 
+          color: "#6a5cff",
+          reason: "significant_backwardation"
+        };
+      }
+      
+      // Level -3 (Capitulation) - Extreme backwardation and negative funding
+      return { 
+        level: -3, 
+        name: "Capitulation", 
+        color: "#ff3bbd",
+        reason: "extreme_backwardation"
+      };
+    }
 
-    // Step 1: Load historical data from GitHub and classify with recalibrated thresholds
+    // Step 1: Load historical data from GitHub and classify with improved thresholds
     let historicalData = [];
     const CUTOFF_DATE = new Date('2024-12-01').getTime();
     
@@ -2044,7 +1945,7 @@ case "fomo-finder-hybrid": {
             const fundingRate = point.fundingRate || 0;
             const premium = point.premium || 0;
             
-            // Classify using recalibrated thresholds
+            // Use improved classification
             const fomoLevel = classifyFOMOLevel(fundingRate, premium);
             
             return {
@@ -2052,25 +1953,40 @@ case "fomo-finder-hybrid": {
               price: point.price,
               fundingRate: fundingRate,
               premium: premium,
+              adjustedPremium: premium - 0.015, // Show baseline-adjusted premium
               level: fomoLevel.level,
               levelLabel: fomoLevel.name,
-              color: fomoLevel.color
+              color: fomoLevel.color,
+              marketStructure: fomoLevel.reason // Track market structure
             };
           });
         
-        console.log(`DEBUG: Processed ${historicalData.length} historical points with recalibrated thresholds`);
+        console.log(`DEBUG: Processed ${historicalData.length} historical points with improved thresholds`);
         
-        // Log new level distribution
-        const levelCounts = {
-          "FOMO": historicalData.filter(p => p.level === 3).length,
-          "Greed": historicalData.filter(p => p.level === 2).length,
-          "Canary Call": historicalData.filter(p => p.level === 1).length,
-          "Balanced": historicalData.filter(p => p.level === 0).length,
-          "Uncertainty": historicalData.filter(p => p.level === -1).length,
-          "Panic": historicalData.filter(p => p.level === -2).length,
-          "Capitulation": historicalData.filter(p => p.level === -3).length
+        // Enhanced debugging with market structure analysis
+        const structureAnalysis = {
+          normal_contango: historicalData.filter(p => p.marketStructure === "normal_contango").length,
+          elevated_contango: historicalData.filter(p => p.marketStructure === "elevated_contango").length,
+          high_contango: historicalData.filter(p => p.marketStructure === "high_contango").length,
+          excessive_contango: historicalData.filter(p => p.marketStructure === "excessive_contango").length,
+          slight_backwardation: historicalData.filter(p => p.marketStructure === "slight_backwardation").length,
+          significant_backwardation: historicalData.filter(p => p.marketStructure === "significant_backwardation").length,
+          extreme_backwardation: historicalData.filter(p => p.marketStructure === "extreme_backwardation").length
         };
-        console.log("DEBUG: Recalibrated level distribution:", levelCounts);
+        
+        console.log("DEBUG: Market structure analysis:", structureAnalysis);
+        
+        // Calculate contango/backwardation statistics
+        const premiums = historicalData.map(p => p.premium);
+        const contangoStats = {
+          avgPremium: (premiums.reduce((sum, p) => sum + p, 0) / premiums.length).toFixed(4),
+          contangoCount: premiums.filter(p => p > 0).length,
+          backwardationCount: premiums.filter(p => p < 0).length,
+          maxContango: Math.max(...premiums).toFixed(4),
+          maxBackwardation: Math.min(...premiums).toFixed(4)
+        };
+        
+        console.log("DEBUG: Contango/Backwardation stats:", contangoStats);
       }
     } catch (error) {
       console.error("Error loading historical data:", error.message);
@@ -2151,7 +2067,8 @@ case "fomo-finder-hybrid": {
         levelLabel: fomoLevel.name,
         color: fomoLevel.color,
         fundingRate: fundingRate,
-        premium: premium
+        premium: premium,
+        marketStructure: fomoLevel.reason
       });
     });
     
@@ -2223,11 +2140,24 @@ case "fomo-finder-hybrid": {
       "Capitulation": allData.filter(p => p.level === -3).length
     };
     
+    // Enhanced market structure analysis
+    const marketStructureStats = {
+      normal_contango: allData.filter(p => p.marketStructure === "normal_contango").length,
+      elevated_contango: allData.filter(p => p.marketStructure === "elevated_contango").length,
+      high_contango: allData.filter(p => p.marketStructure === "high_contango").length,
+      excessive_contango: allData.filter(p => p.marketStructure === "excessive_contango").length,
+      slight_backwardation: allData.filter(p => p.marketStructure === "slight_backwardation").length,
+      significant_backwardation: allData.filter(p => p.marketStructure === "significant_backwardation").length,
+      extreme_backwardation: allData.filter(p => p.marketStructure === "extreme_backwardation").length
+    };
+    
     console.log(`DEBUG: Combined dataset: ${allData.length} total points`);
     console.log(`DEBUG: Historical: ${historicalData.length}, Recent: ${recentData.length}`);
     console.log(`DEBUG: Final level distribution:`, finalLevelCounts);
+    console.log(`DEBUG: Market structure distribution:`, marketStructureStats);
     console.log(`DEBUG: Current FOMO Level: ${currentFOMOLevel.name} (${currentFOMOLevel.level})`);
     console.log(`DEBUG: Current Funding: ${(currentFunding * 100).toFixed(4)}%, Premium: ${(currentPremium * 100).toFixed(4)}%`);
+    console.log(`DEBUG: Current Market Structure: ${currentFOMOLevel.reason}`);
     
     return res.json({
       success: true,
@@ -2239,7 +2169,9 @@ case "fomo-finder-hybrid": {
         fundingRate: currentFunding,
         premium: currentPremium,
         fomoLevel: currentFOMOLevel,
-        nextFundingTime: nextFundingTime
+        nextFundingTime: nextFundingTime,
+        marketStructure: currentFOMOLevel.reason,
+        adjustedPremium: currentPremium - 0.015
       },
       metadata: {
         exchange: EXCHANGE,
@@ -2250,17 +2182,24 @@ case "fomo-finder-hybrid": {
         recentPoints: recentData.length,
         cutoffDate: new Date(CUTOFF_DATE).toISOString(),
         levels: LEVEL_NAMES,
-        thresholdsRecalibrated: true,
+        improvementsApplied: [
+          "baseline_contango_adjustment",
+          "backwardation_emphasis", 
+          "weighted_scoring",
+          "market_structure_classification"
+        ],
+        contangoBaseline: "1.5%",
+        marketStructureStats: marketStructureStats,
+        levelDistribution: finalLevelCounts,
         premiumThresholds: {
-          "FOMO": "≥7.5%",
-          "Greed": "≥5.5%", 
-          "Canary Call": "≥2.0%",
-          "Balanced": "≥0.0%",
-          "Uncertainty": "≥-0.5%",
-          "Panic": "≥-1.5%",
-          "Capitulation": "<-1.5%"
-        },
-        levelDistribution: finalLevelCounts
+          "FOMO": "≥10% (adjusted for 1.5% baseline)",
+          "Greed": "≥6% (adjusted)", 
+          "Canary Call": "≥2% (adjusted)",
+          "Balanced": "±1% around baseline",
+          "Uncertainty": "Slight backwardation (-1.5%)",
+          "Panic": "Significant backwardation (-3.5%)",
+          "Capitulation": "Extreme backwardation (<-5%)"
+        }
       },
       lastUpdated: new Date().toISOString()
     });
