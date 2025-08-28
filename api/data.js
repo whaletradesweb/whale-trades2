@@ -1820,39 +1820,38 @@ case "fomo-finder-hybrid": {
       "3": "FOMO"
     };
 
-    // RECALIBRATED FOMO Level Classification Function (data-driven thresholds)
-function classifyFOMOLevel(fundingRate, premium) {
-  // Level 3 (FOMO) - Top 5% most extreme conditions only (10%+ premium)
-  if (fundingRate >= 0.001 || premium >= 0.10) {
+   function classifyFOMOLevel(fundingRate, premium) {
+  // Level 3 (FOMO) - Top 1-2% most extreme conditions (15%+ premium)
+  if (fundingRate >= 0.0015 || premium >= 0.15) {
     return { level: 3, name: "FOMO", color: "#ff3e33" };
   }
   
-  // Level 2 (Greed) - Top 15% conditions (8%+ premium)
-  if (fundingRate >= 0.0005 || premium >= 0.08) {
+  // Level 2 (Greed) - Top 5-8% conditions (12%+ premium)
+  if (fundingRate >= 0.001 || premium >= 0.12) {
     return { level: 2, name: "Greed", color: "#ff7a3e" };
   }
   
-  // Level 1 (Canary Call) - Above average conditions (4%+ premium)
-  if (fundingRate >= 0.0002 || premium >= 0.04) {
+  // Level 1 (Canary Call) - Bull market conditions (3%+ premium) - DOMINANT BULL COLOR
+  if (fundingRate >= 0.0001 || premium >= 0.03) {
     return { level: 1, name: "Canary Call", color: "#f7c341" };
   }
   
-  // Level 0 (Balanced) - Normal positive conditions (0.5%+ premium)
-  if (fundingRate >= 0.0 || premium >= 0.005) {
+  // Level 0 (Balanced) - Normal conditions (0%+ premium)
+  if (fundingRate >= 0.0 || premium >= 0.0) {
     return { level: 0, name: "Balanced", color: "#ffe34d" };
   }
   
-  // Level -1 (Uncertainty) - Slightly negative conditions
-  if (fundingRate >= -0.0001 || premium >= -0.005) {
+  // Level -1 (Uncertainty) - Slightly negative
+  if (fundingRate >= -0.0002 || premium >= -0.01) {
     return { level: -1, name: "Uncertainty", color: "#ffe45e" };
   }
   
-  // Level -2 (Panic) - Significantly negative conditions  
-  if (fundingRate >= -0.0005 || premium >= -0.02) {
+  // Level -2 (Panic) - Bear market conditions
+  if (fundingRate >= -0.001 || premium >= -0.03) {
     return { level: -2, name: "Panic", color: "#6a5cff" };
   }
   
-  // Level -3 (Capitulation) - Extreme negative conditions
+  // Level -3 (Capitulation) - Extreme crashes
   return { level: -3, name: "Capitulation", color: "#ff3bbd" };
 }
 
