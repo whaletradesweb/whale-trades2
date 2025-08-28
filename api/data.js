@@ -1821,40 +1821,40 @@ case "fomo-finder-hybrid": {
     };
 
     // RECALIBRATED FOMO Level Classification Function (data-driven thresholds)
-    function classifyFOMOLevel(fundingRate, premium) {
-      // Level 3 (FOMO) - Around 90th percentile (7.5% premium)
-      if (fundingRate >= 0.0005 || premium >= 0.075) {
-        return { level: 3, name: "FOMO", color: "#ff3e33" };
-      }
-      
-      // Level 2 (Greed) - Around 75th percentile (5.5% premium)
-      if (fundingRate >= 0.0003 || premium >= 0.055) {
-        return { level: 2, name: "Greed", color: "#ff7a3e" };
-      }
-      
-      // Level 1 (Canary Call) - Around 50th percentile (2.0% premium)
-      if (fundingRate >= 0.0001 || premium >= 0.02) {
-        return { level: 1, name: "Canary Call", color: "#f7c341" };
-      }
-      
-      // Level 0 (Balanced) - Neutral to slightly positive
-      if (fundingRate >= 0.0 || premium >= 0.0) {
-        return { level: 0, name: "Balanced", color: "#ffe34d" };
-      }
-      
-      // Level -1 (Uncertainty) - Around 10th percentile (-0.5% premium)
-      if (fundingRate >= -0.0001 || premium >= -0.005) {
-        return { level: -1, name: "Uncertainty", color: "#ffe45e" };
-      }
-      
-      // Level -2 (Panic) - Around 5th percentile (-1.5% premium)
-      if (fundingRate >= -0.0003 || premium >= -0.015) {
-        return { level: -2, name: "Panic", color: "#6a5cff" };
-      }
-      
-      // Level -3 (Capitulation) - Extreme negative conditions
-      return { level: -3, name: "Capitulation", color: "#ff3bbd" };
-    }
+function classifyFOMOLevel(fundingRate, premium) {
+  // Level 3 (FOMO) - Top 5% most extreme conditions only (10%+ premium)
+  if (fundingRate >= 0.001 || premium >= 0.10) {
+    return { level: 3, name: "FOMO", color: "#ff3e33" };
+  }
+  
+  // Level 2 (Greed) - Top 15% conditions (8%+ premium)
+  if (fundingRate >= 0.0005 || premium >= 0.08) {
+    return { level: 2, name: "Greed", color: "#ff7a3e" };
+  }
+  
+  // Level 1 (Canary Call) - Above average conditions (4%+ premium)
+  if (fundingRate >= 0.0002 || premium >= 0.04) {
+    return { level: 1, name: "Canary Call", color: "#f7c341" };
+  }
+  
+  // Level 0 (Balanced) - Normal positive conditions (0.5%+ premium)
+  if (fundingRate >= 0.0 || premium >= 0.005) {
+    return { level: 0, name: "Balanced", color: "#ffe34d" };
+  }
+  
+  // Level -1 (Uncertainty) - Slightly negative conditions
+  if (fundingRate >= -0.0001 || premium >= -0.005) {
+    return { level: -1, name: "Uncertainty", color: "#ffe45e" };
+  }
+  
+  // Level -2 (Panic) - Significantly negative conditions  
+  if (fundingRate >= -0.0005 || premium >= -0.02) {
+    return { level: -2, name: "Panic", color: "#6a5cff" };
+  }
+  
+  // Level -3 (Capitulation) - Extreme negative conditions
+  return { level: -3, name: "Capitulation", color: "#ff3bbd" };
+}
 
     // Step 1: Load historical data from GitHub and classify with recalibrated thresholds
     let historicalData = [];
