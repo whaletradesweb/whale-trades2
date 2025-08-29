@@ -1496,7 +1496,128 @@ case "api-usage-debug": {
     });
   }
 }
-    
+
+
+
+
+
+case "market-sentiment-flow": {
+  // Query: &basis=market_cap|volume  &interval=1h|4h|1d|1w  &limit=10
+  const {
+    basis = "market_cap",     // "market_cap" or "volume"
+    interval = "1h",          // "1h" | "4h" | "1d" | "1w"
+    limit = "10"
+  } = req.query;
+
+  const validIntervals = ["1h", "4h", "1d", "1w"];
+  if (!validIntervals.includes(interval)) {
+    return res.status(400).json({ error: "Invalid interval. Use 1h, 4h, 1d, 1w" });
+  }
+
+  // Map 1d → 24h fields on the API
+  const fieldKey = interval === "1d" ? "24h" : interval;
+
+  const buyField  = `buy_volume_usd_${fieldKey}`;
+  const sellField = `sell_volume_usd_${fieldKey}`;
+  const flowField = `volume_flow_usd_${fieldKey}`;
+  const mcapField = "market_cap";                 // USD
+  const vol24hField = "volume_usd_24h";           // USD
+
+  // Helper: ratio in [-1..1] → gaugeScore in [0..1]
+  const toScore = (r) => (isFinite(r) ? (r + 1) / 2 : 0.5);
+
+  // Helper: label by ratio
+  const toLabel = (r) => {
+    if (r <= -0.25) return "Strong sell";
+    if (r <  -0.05) return "Sell";
+    if (r <=  0.05) return "Neutral";
+    if (r <   0.25) return "Buy";
+    return "Strong buy";
+  };
+
+  try {
+    const url = "https://open-api-v4.coinglass.com/api/spot/coins-markets";
+    const cg = await axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 });
+
+    if (cg.status !== 200 || cg.data?.code !== "0") {
+      return res.status(cg.status).json({
+        error: "CoinGlass spot coins-markets failed",
+        message: cg.data?.msg || cg.data?.message || `HTTP ${cg.status}`
+      });
+    }
+
+    let rows = Array.isArray(cg.data?.data) ? cg.data.data : [];
+    if (!rows.length) return res.json({ success: true, data: [], lastUpdated: new Date().toISOString() });
+
+    // Rank by basis
+    rows = rows
+      .filter(r => typeof r[buyField] === "number" || typeof r[sellField] === "number")
+      .sort((a, b) => {
+        if (basis === "volume") return (b[vol24hField] || 0) - (a[vol24hField] || 0);
+        return (b[mcapField] || 0) - (a[mcapField] || 0);
+      })
+      .slice(0, Math.max(1, Math.min(+limit || 10, 50)));
+
+    // Compute ratios and shape output
+    const data = rows.map((r) => {
+      const buy  = Math.max(0, r[buyField]  || 0);
+      const sell = Math.max(0, r[sellField] || 0);
+      const flow = typeof r[flowField] === "number" ? r[flowField] : (buy - sell);
+      const denom = buy + sell;
+      const ratio = denom > 0 ? (buy - sell) / denom : 0; // -1..1
+      const score = toScore(ratio);                       // 0..1 for gauge
+      return {
+        symbol: r.symbol,
+        current_price: r.current_price,
+        market_cap: r[mcapField] || 0,
+        volume_usd_24h: r[vol24hField] || 0,
+        interval,
+        buy_usd: buy,
+        sell_usd: sell,
+        flow_usd: flow,
+        ratio,             // (-1..1) buy-vs-sell dominance
+        score,             // (0..1) for the gauge pointer
+        sentiment: toLabel(ratio)
+      };
+    });
+
+    // Also compute an overall market score for the selected cohort
+    const totBuy  = data.reduce((s, d) => s + d.buy_usd, 0);
+    const totSell = data.reduce((s, d) => s + d.sell_usd, 0);
+    const groupRatio = (totBuy + totSell) > 0 ? (totBuy - totSell) / (totBuy + totSell) : 0;
+
+    return res.json({
+      success: true,
+      meta: {
+        basis,
+        interval,
+        limit: data.length,
+        overall: {
+          ratio: groupRatio,
+          score: toScore(groupRatio),
+          sentiment: toLabel(groupRatio),
+          buy_usd: totBuy,
+          sell_usd: totSell,
+          flow_usd: totBuy - totSell
+        }
+      },
+      data,
+      lastUpdated: new Date().toISOString(),
+      source: "coinglass_spot_coins_markets"
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      error: "market-sentiment-flow failed",
+      message: err.message
+    });
+  }
+}
+
+
+
+
+        
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
     }
