@@ -431,40 +431,57 @@ case "liquidations-table": {
         return res.json({ data: finalData });
       }
 
-      case "open-interest": {
-        const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets?exchange_list=Binance";
-        const response = await axios.get(url, { headers });
-        const coins = response.data?.data || [];
+     case "open-interest": {
+  const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+  const response = await axios.get(url, { headers });
+  const coins = Array.isArray(response.data?.data) ? response.data.data : [];
+  if (!coins.length) throw new Error("Coinglass returned empty or malformed data");
 
-        if (!Array.isArray(coins) || coins.length === 0) {
-          throw new Error("Coinglass returned empty or malformed data");
-        }
+  // 1) Total global OI (all coins, all exchanges)
+  const totalOpenInterest = coins.reduce((sum, c) => sum + (c.open_interest_usd || 0), 0);
 
-        const totalOpenInterest = coins.reduce((sum, coin) => sum + (coin.open_interest_usd || 0), 0);
+  // 2) Simple average of 24h OI change % across coins
+  const pctList = coins
+    .map(c => c.open_interest_change_percent_24h)
+    .filter(v => typeof v === "number" && Number.isFinite(v));
+  const avgChangePct = pctList.length ? (pctList.reduce((a, b) => a + b, 0) / pctList.length) : 0;
 
-        // Load or update KV baseline for % change
-        let previousOI = await kv.get("open_interest:previous_total");
-        let previousTimestamp = await kv.get("open_interest:timestamp");
-        const now = Date.now();
-        let percentChange = 0;
+  // (Optional) Weighted average by each coin's OI (often more meaningful)
+  let wNum = 0, wDen = 0;
+  for (const c of coins) {
+    const oi = c.open_interest_usd || 0;
+    const pct = c.open_interest_change_percent_24h;
+    if (oi > 0 && typeof pct === "number" && Number.isFinite(pct)) {
+      wNum += oi * pct;
+      wDen += oi;
+    }
+  }
+  const weightedAvgChangePct = wDen ? (wNum / wDen) : 0;
 
-        if (previousOI && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
-          percentChange = ((totalOpenInterest - previousOI) / previousOI) * 100;
-          console.log(`[Open Interest] % Change: ${percentChange.toFixed(2)}%`);
-        } else {
-          await kv.set("open_interest:previous_total", totalOpenInterest);
-          await kv.set("open_interest:timestamp", now);
-          previousOI = totalOpenInterest;
-          previousTimestamp = now;
-          console.log(`[Open Interest] New baseline stored: ${previousOI.toFixed(2)}`);
-        }
+  // Keep your KV baseline logic if you still want a rolling 24h delta from your last fetch
+  let previousOI = await kv.get("open_interest:previous_total");
+  let previousTimestamp = await kv.get("open_interest:timestamp");
+  const now = Date.now();
+  let baselineChangePct = 0;
+  if (previousOI && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
+    baselineChangePct = ((totalOpenInterest - previousOI) / previousOI) * 100;
+  } else {
+    await kv.set("open_interest:previous_total", totalOpenInterest);
+    await kv.set("open_interest:timestamp", now);
+    previousOI = totalOpenInterest;
+    previousTimestamp = now;
+  }
 
-        return res.json({
-          total_open_interest_usd: totalOpenInterest,
-          open_interest_change_24h: percentChange,
-          baseline_timestamp: new Date(previousTimestamp).toUTCString()
-        });
-      }
+  return res.json({
+    total_open_interest_usd: totalOpenInterest,
+    avg_open_interest_change_percent_24h: avgChangePct,         // simple mean
+    weighted_open_interest_change_percent_24h: weightedAvgChangePct, // OI-weighted
+    baseline_change_percent_since_last_fetch: baselineChangePct, // from KV baseline
+    coin_count: coins.length,
+    baseline_timestamp: new Date(previousTimestamp).toUTCString()
+  });
+}
+
 
       case "coin-bar-race": {
         console.log("DEBUG: Starting simplified coin-bar-race...");
