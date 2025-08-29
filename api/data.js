@@ -1545,7 +1545,7 @@ case "market-sentiment-flow": {
     // Your minimal palette
     if (lbl === "Strong sell") return "#dc2b2b";
     if (lbl === "Sell")        return "#ff5a65";
-    if (lbl === "Neutral")     return "#ff4e00";
+    if (lbl === "Neutral")     return "#ffd19b";
     if (lbl === "Buy")         return "#14ca74";
     return "#11845b"; // Strong buy
   }
