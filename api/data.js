@@ -1517,23 +1517,38 @@ case "market-sentiment-flow": {
   // Map 1d → 24h fields on the API
   const fieldKey = interval === "1d" ? "24h" : interval;
 
-  const buyField  = `buy_volume_usd_${fieldKey}`;
-  const sellField = `sell_volume_usd_${fieldKey}`;
-  const flowField = `volume_flow_usd_${fieldKey}`;
-  const mcapField = "market_cap";                 // USD
-  const vol24hField = "volume_usd_24h";           // USD
+  const buyField   = `buy_volume_usd_${fieldKey}`;
+  const sellField  = `sell_volume_usd_${fieldKey}`;
+  const flowField  = `volume_flow_usd_${fieldKey}`;
+  const mcapField  = "market_cap";       // USD
+  const vol24Field = "volume_usd_24h";   // USD
 
-  // Helper: ratio in [-1..1] → gaugeScore in [0..1]
-  const toScore = (r) => (isFinite(r) ? (r + 1) / 2 : 0.5);
-
-  // Helper: label by ratio
-  const toLabel = (r) => {
+  // --- Helpers: label, snapped score, and color (keep UI+pointer consistent)
+  function labelFromRatio(r){
     if (r <= -0.25) return "Strong sell";
     if (r <  -0.05) return "Sell";
     if (r <=  0.05) return "Neutral";
     if (r <   0.25) return "Buy";
     return "Strong buy";
-  };
+  }
+  function scoreFromLabel(lbl){
+    switch (lbl) {
+      case "Strong sell": return 0.10;
+      case "Sell":        return 0.30;
+      case "Neutral":     return 0.50;
+      case "Buy":         return 0.70;
+      case "Strong buy":  return 0.90;
+      default:            return 0.50;
+    }
+  }
+  function colorFromLabel(lbl){
+    // Your minimal palette
+    if (lbl === "Strong sell") return "#dc2b2b";
+    if (lbl === "Sell")        return "#ff5a65";
+    if (lbl === "Neutral")     return "#ff4e00";
+    if (lbl === "Buy")         return "#14ca74";
+    return "#11845b"; // Strong buy
+  }
 
   try {
     const url = "https://open-api-v4.coinglass.com/api/spot/coins-markets";
@@ -1547,13 +1562,15 @@ case "market-sentiment-flow": {
     }
 
     let rows = Array.isArray(cg.data?.data) ? cg.data.data : [];
-    if (!rows.length) return res.json({ success: true, data: [], lastUpdated: new Date().toISOString() });
+    if (!rows.length) {
+      return res.json({ success: true, data: [], lastUpdated: new Date().toISOString() });
+    }
 
     // Rank by basis
     rows = rows
       .filter(r => typeof r[buyField] === "number" || typeof r[sellField] === "number")
       .sort((a, b) => {
-        if (basis === "volume") return (b[vol24hField] || 0) - (a[vol24hField] || 0);
+        if (basis === "volume") return (b[vol24Field] || 0) - (a[vol24Field] || 0);
         return (b[mcapField] || 0) - (a[mcapField] || 0);
       })
       .slice(0, Math.max(1, Math.min(+limit || 10, 50)));
@@ -1562,29 +1579,37 @@ case "market-sentiment-flow": {
     const data = rows.map((r) => {
       const buy  = Math.max(0, r[buyField]  || 0);
       const sell = Math.max(0, r[sellField] || 0);
-      const flow = typeof r[flowField] === "number" ? r[flowField] : (buy - sell);
+      const flow = Number.isFinite(r[flowField]) ? r[flowField] : (buy - sell);
       const denom = buy + sell;
       const ratio = denom > 0 ? (buy - sell) / denom : 0; // -1..1
-      const score = toScore(ratio);                       // 0..1 for gauge
+
+      const sentiment = labelFromRatio(ratio);
+      const score     = scoreFromLabel(sentiment); // snapped to band center
+      const band_color = colorFromLabel(sentiment);
+
       return {
         symbol: r.symbol,
         current_price: r.current_price,
         market_cap: r[mcapField] || 0,
-        volume_usd_24h: r[vol24hField] || 0,
+        volume_usd_24h: r[vol24Field] || 0,
         interval,
         buy_usd: buy,
         sell_usd: sell,
         flow_usd: flow,
-        ratio,             // (-1..1) buy-vs-sell dominance
-        score,             // (0..1) for the gauge pointer
-        sentiment: toLabel(ratio)
+        ratio,              // (-1..1) buy-vs-sell dominance
+        score,              // (0..1) snapped pointer value
+        sentiment,          // label matching thresholds
+        band_color          // convenience color for UI
       };
     });
 
-    // Also compute an overall market score for the selected cohort
+    // Overall market score for the selected cohort (also snapped)
     const totBuy  = data.reduce((s, d) => s + d.buy_usd, 0);
     const totSell = data.reduce((s, d) => s + d.sell_usd, 0);
-    const groupRatio = (totBuy + totSell) > 0 ? (totBuy - totSell) / (totBuy + totSell) : 0;
+    const groupRatio   = (totBuy + totSell) > 0 ? (totBuy - totSell) / (totBuy + totSell) : 0;
+    const groupLabel   = labelFromRatio(groupRatio);
+    const groupScore   = scoreFromLabel(groupLabel);
+    const groupColor   = colorFromLabel(groupLabel);
 
     return res.json({
       success: true,
@@ -1594,8 +1619,9 @@ case "market-sentiment-flow": {
         limit: data.length,
         overall: {
           ratio: groupRatio,
-          score: toScore(groupRatio),
-          sentiment: toLabel(groupRatio),
+          score: groupScore,
+          sentiment: groupLabel,
+          band_color: groupColor,
           buy_usd: totBuy,
           sell_usd: totSell,
           flow_usd: totBuy - totSell
@@ -1613,6 +1639,7 @@ case "market-sentiment-flow": {
     });
   }
 }
+
 
 
 
