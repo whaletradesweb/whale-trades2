@@ -1467,11 +1467,11 @@ case "market-sentiment-flow": {
   }
   function colorFromLabel(lbl){
     // Your minimal palette
-    if (lbl === "Strong sell") return "#dc2b2b";
-    if (lbl === "Sell")        return "#ff5a65";
-    if (lbl === "Neutral")     return "#ffd19b";
-    if (lbl === "Buy")         return "#14ca74";
-    return "#11845b"; // Strong buy
+    if (lbl === "Strong sell") return "#ff5a65";
+    if (lbl === "Sell")        return "#ffbec2";
+    if (lbl === "Neutral")     return "#f7f7f7";
+    if (lbl === "Buy")         return "#7fdca4";
+    return "#14ca74"; // Strong buy
   }
 
   try {
