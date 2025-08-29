@@ -1565,6 +1565,63 @@ case "market-sentiment-flow": {
 }
 
 
+case "coins-flow-sankey": {
+  // --- local helpers (like your other cases) ---
+  const tfMap = { "1h":"1h","4h":"4h","24h":"24h","1w":"1w" };
+  const tf = (req.query.tf || "24h").toLowerCase();
+  const top = Math.max(5, Math.min(parseInt(req.query.top || "20", 10), 200));
+  const perPage = Math.max(top, Math.min(parseInt(req.query.per_page || "200", 10), 200));
+
+  if (!tfMap[tf]) {
+    return res.status(400).json({ error: "Invalid tf. Use 1h|4h|24h|1w" });
+  }
+
+  const volField  = `volume_usd_${tfMap[tf]}`;
+  const buyField  = `buy_volume_usd_${tfMap[tf]}`;
+  const sellField = `sell_volume_usd_${tfMap[tf]}`;
+  const flowField = `volume_flow_usd_${tfMap[tf]}`;
+
+  try {
+    const url = `https://open-api-v4.coinglass.com/api/spot/coins-markets?per_page=${perPage}&page=1`;
+    const cg = await axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 });
+
+    if (cg.status !== 200 || cg.data?.code !== "0") {
+      return res.status(cg.status).json({
+        error: "CoinGlass spot coins-markets failed",
+        message: cg.data?.msg || cg.data?.message || `HTTP ${cg.status}`
+      });
+    }
+
+    let rows = Array.isArray(cg.data?.data) ? cg.data.data : [];
+    rows = rows
+      .filter(r => typeof r[volField] === "number")
+      .sort((a,b) => (b[volField]||0) - (a[volField]||0))
+      .slice(0, top);
+
+    const items = rows.map(r => ({
+      symbol: r.symbol,
+      volume: r[volField] || 0,
+      buy:    r[buyField] || 0,
+      sell:   r[sellField] || 0,
+      flow:   r[flowField] ?? ((r[buyField]||0) - (r[sellField]||0))
+    }));
+
+    return res.json({
+      success: true,
+      timeframe: tf,
+      top,
+      items,
+      lastUpdated: new Date().toISOString(),
+      source: "coinglass_spot_coins_markets"
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      error: "coins-flow-sankey failed",
+      message: err.message
+    });
+  }
+}
 
 
 
