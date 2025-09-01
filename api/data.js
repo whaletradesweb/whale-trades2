@@ -1624,6 +1624,96 @@ case "coins-flow-sankey": {
 }
 
 
+// Add this case to your existing switch statement in data.js
+
+case "discord-feed": {
+  console.log("DEBUG: Requesting Discord messages from external service...");
+  
+  // The Discord service URL - replace with your actual deployed URL
+  const DISCORD_SERVICE_URL = process.env.DISCORD_SERVICE_URL || "https://discord-monitor.azurewebsites.net";
+  const limit = Math.min(parseInt(req.query.limit || "50"), 100);
+  
+  try {
+    const discordUrl = `${DISCORD_SERVICE_URL}/messages`;
+    const response = await axios.get(discordUrl, {
+      timeout: 15000,
+      validateStatus: function (status) {
+        return status < 500;
+      },
+      params: {
+        limit: limit
+      }
+    });
+
+    if (response.status === 404) {
+      return res.status(404).json({
+        error: 'Discord service not found',
+        message: 'Discord monitoring service is not available at the configured URL.'
+      });
+    }
+
+    if (response.status === 503) {
+      return res.status(503).json({
+        error: 'Discord service unavailable',
+        message: 'Discord monitoring service is temporarily unavailable.'
+      });
+    }
+
+    if (response.status !== 200) {
+      return res.status(response.status).json({
+        error: 'Discord service error',
+        message: `Discord service returned status ${response.status}`
+      });
+    }
+
+    const messages = response.data || [];
+    
+    // Validate and format the messages
+    const processedMessages = Array.isArray(messages) ? messages.map(msg => ({
+      author: msg.author || 'Unknown',
+      content: msg.content || '',
+      images: Array.isArray(msg.images) ? msg.images : [],
+      timestamp: msg.timestamp,
+      // Add any additional processing if needed
+      formatted_time: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : null
+    })) : [];
+
+    console.log(`DEBUG: Processed ${processedMessages.length} Discord messages`);
+
+    return res.json({
+      success: true,
+      data: processedMessages,
+      lastUpdated: new Date().toISOString(),
+      totalMessages: processedMessages.length,
+      source: 'discord_monitor_service'
+    });
+
+  } catch (err) {
+    console.error("[discord-feed] Error:", err.message);
+    
+    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        error: "Discord service connection failed",
+        message: "Unable to connect to Discord monitoring service. Please try again later."
+      });
+    }
+    
+    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+      return res.status(504).json({
+        error: "Request timeout",
+        message: "Discord service request timed out. Please try again."
+      });
+    }
+    
+    return res.status(500).json({
+      error: "Discord feed failed",
+      message: err.message,
+      data: [],
+      lastUpdated: new Date().toISOString()
+    });
+  }
+}
+
 
         
       default:
