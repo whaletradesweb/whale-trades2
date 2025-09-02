@@ -9,6 +9,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   res.setHeader('Access-Control-Allow-Credentials', 'false');
   res.setHeader('Access-Control-Max-Age', '86400');
   
