@@ -241,63 +241,63 @@ case "etf-eth-flows": {
       }
 
 
+// ... inside your switch (type) statement ...
+
 case "liquidations-table": {
   console.log("DEBUG: Using exchange-list endpoint for liquidations...");
-  
-  const timeframes = ['1h', '4h', '12h', '24h'];
-  const results = {};
-  
-  const fmtUSD = (v) => {
-    const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
-    return `$${v.toFixed(2)}`;
-  };
 
+  // --> Caching: Define a unique key for this data in Vercel KV.
+  const cacheKey = "cache:liquidations-table";
+  
   try {
-    // Make parallel requests for all timeframes
-    const requests = timeframes.map(range => 
+    // --> Caching: Try to get the data from the cache first.
+    const cachedData = await kv.get(cacheKey);
+    if (cachedData) {
+      console.log("DEBUG: Returning cached liquidations data.");
+      // Add a header to easily see that the response was cached.
+      res.setHeader('X-Vercel-Cache', 'HIT');
+      return res.json(cachedData);
+    }
+    console.log("DEBUG: No cache found. Fetching fresh liquidations data.");
+    res.setHeader('X-Vercel-Cache', 'MISS');
+
+    const timeframes = ['1h', '4h', '12h', '24h'];
+    const results = {};
+
+    const fmtUSD = (v) => {
+      const n = Math.abs(v);
+      if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+      if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+      if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+      if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+      return `$${v.toFixed(2)}`;
+    };
+
+    const requests = timeframes.map(range =>
       axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list", {
         headers,
         timeout: 10000,
         params: { range },
         validateStatus: s => s < 500
-      })
+      } )
     );
 
     const responses = await Promise.all(requests);
 
-    // Process each timeframe
     timeframes.forEach((timeframe, index) => {
       const response = responses[index];
       
       if (response.status !== 200 || response.data?.code !== "0") {
         console.warn(`Failed to fetch ${timeframe} liquidations:`, response.status, response.data?.msg);
         results[timeframe] = {
-          total: "$0",
-          long: "$0", 
-          short: "$0",
+          total: "$0", long: "$0", short: "$0",
           error: response.data?.msg || `HTTP ${response.status}`
         };
         return;
       }
 
       const data = response.data.data || [];
-      
-      // DEBUG: Log the raw response to see what we're getting
-      console.log(`DEBUG ${timeframe} response:`, {
-        status: response.status,
-        dataLength: data.length,
-        firstItem: data[0],
-        allFields: data[0] ? Object.keys(data[0]) : []
-      });
-      
-      // Find the "All" exchange entry (cumulative data)
       const allExchanges = data.find(item => item.exchange === "All");
-      
-      console.log(`DEBUG ${timeframe} "All" entry:`, allExchanges);
       
       if (allExchanges) {
         results[timeframe] = {
@@ -311,30 +311,20 @@ case "liquidations-table": {
           }
         };
       } else {
-        // Fallback: sum all exchanges if "All" entry not found
         const totalLiq = data.reduce((sum, item) => sum + (item.liquidation_usd || 0), 0);
         const totalLong = data.reduce((sum, item) => sum + (item.longLiquidation_usd || 0), 0);
         const totalShort = data.reduce((sum, item) => sum + (item.shortLiquidation_usd || 0), 0);
         
         results[timeframe] = {
-          total: fmtUSD(totalLiq),
-          long: fmtUSD(totalLong),
-          short: fmtUSD(totalShort),
-          raw: {
-            total: totalLiq,
-            long: totalLong,
-            short: totalShort
-          }
+          total: fmtUSD(totalLiq), long: fmtUSD(totalLong), short: fmtUSD(totalShort),
+          raw: { total: totalLiq, long: totalLong, short: totalShort }
         };
       }
     });
 
-    console.log("DEBUG: Liquidations data processed successfully");
-    
-    // Format response to match Webflow element IDs
     const webflowFormatted = {};
     timeframes.forEach(tf => {
-      const tfUpper = tf.toUpperCase(); // Convert 1h -> 1H
+      const tfUpper = tf.toUpperCase();
       if (results[tf] && !results[tf].error) {
         webflowFormatted[`${tfUpper}-Total`] = results[tf].total;
         webflowFormatted[`${tfUpper}-Total-Long`] = results[tf].long;
@@ -346,21 +336,27 @@ case "liquidations-table": {
       }
     });
     
-    return res.json({
+    const finalResponse = {
       success: true,
-      ...webflowFormatted, // Flat structure matching Webflow IDs
-      nested_data: results, // Keep nested format for debugging
+      ...webflowFormatted,
+      nested_data: results,
       lastUpdated: new Date().toISOString(),
       method: "exchange-list-aggregated",
       api_calls_used: timeframes.length
-    });
+    };
+
+    // --> Caching: Save the fresh data to the cache before returning it.
+    // `ex: 300` sets the cache to expire in 300 seconds (5 minutes).
+    await kv.set(cacheKey, finalResponse, { ex: 300 });
+    
+    console.log("DEBUG: Liquidations data fetched and cached successfully.");
+    return res.json(finalResponse);
 
   } catch (err) {
     console.error("[liquidations-table] Error:", err.message);
     
-    // Return fallback data structure on error
     const fallbackResults = {};
-    timeframes.forEach(tf => {
+    ['1h', '4h', '12h', '24h'].forEach(tf => {
       const tfUpper = tf.toUpperCase();
       fallbackResults[`${tfUpper}-Total`] = "$0";
       fallbackResults[`${tfUpper}-Total-Long`] = "$0";
@@ -376,6 +372,7 @@ case "liquidations-table": {
     });
   }
 }
+
 
 
 
