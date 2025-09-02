@@ -237,7 +237,6 @@ case "liquidations-table": {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
     
-    // Use your original fallback structure
     const fallbackResults = {};
     ['1h', '4h', '12h', '24h'].forEach(tf => {
       const tfUpper = tf.toUpperCase();
@@ -252,7 +251,6 @@ case "liquidations-table": {
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
     
-    // --- YOUR ORIGINAL, WORKING LOGIC STARTS HERE ---
     const timeframes = ['1h', '4h', '12h', '24h'];
     const results = {};
     const fmtUSD = (v) => {
@@ -264,6 +262,7 @@ case "liquidations-table": {
       return `$${v.toFixed(2)}`;
     };
 
+    // --- THIS BLOCK IS CORRECTED ---
     const requests = timeframes.map(range => 
       axiosWithBackoff(() => 
         axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list", {
@@ -311,17 +310,15 @@ case "liquidations-table": {
         webflowFormatted[`${tfUpper}-Total-Short`] = "$0";
       }
     });
-    // --- YOUR ORIGINAL, WORKING LOGIC ENDS HERE ---
 
     const payload = {
       success: true,
       ...webflowFormatted,
-      nested_data: results, // Keep your original nested data for debugging
+      nested_data: results,
       lastUpdated: new Date().toISOString(),
       method: "live-fetch"
     };
 
-    // 4. Cache the successful payload
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
 
@@ -332,7 +329,6 @@ case "liquidations-table": {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
     
-    // Use your original error fallback structure
     const fallbackResults = {};
     ['1h', '4h', '12h', '24h'].forEach(tf => {
       const tfUpper = tf.toUpperCase();
@@ -343,6 +339,7 @@ case "liquidations-table": {
     return res.status(500).json({ success: false, ...fallbackResults, error: "API fetch failed", message: error.message });
   }
 }
+
 
 
 
