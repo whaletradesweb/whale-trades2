@@ -637,99 +637,249 @@ case "open-interest": {
 case "rsi-heatmap": {
   const { interval = "1h" } = req.query;
   const TTL = 120;
-  const cacheKey = `cg:rsi-heatmap:${interval}`;
-  const lastGoodKey = `last:rsi-heatmap:${interval}`;
+  const cacheKey   = `cg:rsi-heatmap:${interval}`;
+  const lastGoodKey= `last:rsi-heatmap:${interval}`;
 
-  const cachedData = await kv.get(cacheKey);
-  if (cachedData) return res.json(cachedData);
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) return res.json(cached);
 
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.json({ success: false, data: [], statistics: {}, message: "Guarded: Rate limit active" });
+    return res.json({
+      success: false,
+      data: [],
+      interval,
+      statistics: {
+        total_coins: 0,
+        overbought_count: 0,
+        oversold_count: 0,
+        neutral_count: 0,
+        overbought_percent: "0.0",
+        oversold_percent: "0.0",
+        average_rsi: "0.00"
+      },
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback",
+      message: "Guarded: Rate limit active"
+    });
   }
 
+  // 3) Live fetch
   try {
-    const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
-    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
-    
-    const rawData = response.data.data || [];
-    if (!Array.isArray(rawData) || rawData.length === 0) return { success: true, data: [], statistics: {}, message: "No data available" };
+    // Map UI interval → API field set
+    // Note: CoinGlass doesn't expose 8h; we map 8h → 4h for continuity.
+    const intervalMap = { "15m":"15m","1h":"1h","4h":"4h","8h":"4h","12h":"12h","1d":"24h","1w":"1w" };
+    const validIntervals = Object.keys(intervalMap);
+    if (!validIntervals.includes(interval)) {
+      return res.status(400).json({ error: `Invalid interval. Use ${validIntervals.join(", ")}` });
+    }
+    const mappedInterval = intervalMap[interval];
 
-    // Your full processing logic
-    const intervalMap = {"15m":"15m","1h":"1h","4h":"4h","8h":"4h","12h":"12h","1d":"24h","1w":"1w"};
-    const mappedInterval = intervalMap[interval] || "1h";
-    const processedData = rawData.map(coin => {
-      const rsiData = {"15m":coin.rsi_15m,"1h":coin.rsi_1h,"4h":coin.rsi_4h,"12h":coin.rsi_12h,"24h":coin.rsi_24h,"1w":coin.rsi_1w};
-      const priceChangeData = {"15m":coin.price_change_percent_15m||0,"1h":coin.price_change_percent_1h||0,"4h":coin.price_change_percent_4h||0,"12h":coin.price_change_percent_12h||0,"24h":coin.price_change_percent_24h||0,"1w":coin.price_change_percent_1w||0};
-      return { symbol: coin.symbol || 'UNKNOWN', current_price: coin.current_price || 0, rsi: rsiData, price_change_percent: priceChangeData, current_rsi: rsiData[mappedInterval], current_price_change: priceChangeData[mappedInterval] };
-    }).filter(c => c.current_rsi != null).sort((a, b) => b.current_price - a.current_price).slice(0, 150);
-    const rsiValues = processedData.map(c => c.current_rsi);
+    const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
+    const response = await axiosWithBackoff(() =>
+      axios.get(url, { headers, timeout: 10000, validateStatus: s => s < 500 })
+    );
+    if (response.status !== 200 || response.data?.code !== "0" || !Array.isArray(response.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.msg || response.data?.message || "unknown"}`);
+    }
+
+    const rawData = response.data.data;
+
+    if (!rawData.length) {
+      const payload = {
+        success: true,
+        data: [],
+        interval,
+        statistics: {
+          total_coins: 0,
+          overbought_count: 0,
+          oversold_count: 0,
+          neutral_count: 0,
+          overbought_percent: "0.0",
+          oversold_percent: "0.0",
+          average_rsi: "0.00"
+        },
+        lastUpdated: new Date().toISOString(),
+        method: "live-empty"
+      };
+      await kv.set(cacheKey, payload, { ex: TTL });
+      await kv.set(lastGoodKey, payload, { ex: 3600 });
+      return res.json(payload);
+    }
+
+    const processedData = rawData.map((coin) => {
+      const rsi = {
+        "15m": coin.rsi_15m,
+        "1h":  coin.rsi_1h,
+        "4h":  coin.rsi_4h,
+        "12h": coin.rsi_12h,
+        "24h": coin.rsi_24h,
+        "1w":  coin.rsi_1w
+      };
+      const priceChange = {
+        "15m": coin.price_change_percent_15m || 0,
+        "1h":  coin.price_change_percent_1h || 0,
+        "4h":  coin.price_change_percent_4h || 0,
+        "12h": coin.price_change_percent_12h || 0,
+        "24h": coin.price_change_percent_24h || 0,
+        "1w":  coin.price_change_percent_1w || 0
+      };
+
+      return {
+        symbol: coin.symbol || "UNKNOWN",
+        current_price: Number(coin.current_price || 0),
+        rsi,
+        price_change_percent: priceChange,
+        current_rsi: rsi[mappedInterval],
+        current_price_change: priceChange[mappedInterval]
+      };
+    })
+    .filter(c => c.current_rsi != null && Number.isFinite(c.current_rsi))
+    .sort((a, b) => (b.current_price || 0) - (a.current_price || 0))
+    .slice(0, 150);
+
+    const rsiValues = processedData.map(c => Number(c.current_rsi)).filter(Number.isFinite);
+    const total = rsiValues.length || 0;
     const overbought = rsiValues.filter(r => r >= 70).length;
-    const oversold = rsiValues.filter(r => r <= 30).length;
-    const stats = { total_coins: processedData.length, overbought_count: overbought, oversold_count: oversold, neutral_count: rsiValues.length - overbought - oversold, overbought_percent: ((overbought / rsiValues.length) * 100).toFixed(1), oversold_percent: ((oversold / rsiValues.length) * 100).toFixed(1), average_rsi: (rsiValues.reduce((s, r) => s + r, 0) / rsiValues.length).toFixed(2) };
-    const payload = { success: true, data: processedData, interval: interval, statistics: stats, lastUpdated: new Date().toISOString() };
+    const oversold   = rsiValues.filter(r => r <= 30).length;
+    const neutral    = Math.max(0, total - overbought - oversold);
+    const avgRsi     = total ? (rsiValues.reduce((s, r) => s + r, 0) / total) : 0;
+
+    const stats = {
+      total_coins: total,
+      overbought_count: overbought,
+      oversold_count: oversold,
+      neutral_count: neutral,
+      overbought_percent: total ? ((overbought / total) * 100).toFixed(1) : "0.0",
+      oversold_percent:   total ? ((oversold   / total) * 100).toFixed(1) : "0.0",
+      average_rsi: avgRsi.toFixed(2)
+    };
+
+    const payload = {
+      success: true,
+      data: processedData,
+      interval,
+      statistics: stats,
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
 
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
+
     return res.json(payload);
+
   } catch (error) {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+    return res.status(500).json({
+      success: false,
+      data: [],
+      interval,
+      statistics: {
+        total_coins: 0,
+        overbought_count: 0,
+        oversold_count: 0,
+        neutral_count: 0,
+        overbought_percent: "0.0",
+        oversold_percent: "0.0",
+        average_rsi: "0.00"
+      },
+      error: "API fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
   }
 }
-
-
 
 
 
 case "crypto-ticker": {
   const TTL = 60;
-  const cacheKey = "cg:crypto-ticker";
-  const lastGoodKey = "last:crypto-ticker";
+  const cacheKey   = "cg:crypto-ticker";
+  const lastGoodKey= "last:crypto-ticker";
 
-  const cachedData = await kv.get(cacheKey);
-  if (cachedData) return res.json(cachedData);
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) return res.json(cached);
 
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.json({ success: false, data: [], message: "Guarded: Rate limit active" });
+    // fully-shaped guarded fallback so UI won’t break if it expects fields
+    return res.json({
+      success: true,
+      data: [],
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback"
+    });
   }
 
+  // 3) Live fetch
   try {
     const url = "https://open-api-v4.coinglass.com/api/futures/coins-price-change";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
-    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
+    const resp = await axiosWithBackoff(() =>
+      axios.get(url, { headers, timeout: 10000, validateStatus: s => s < 500 })
+    );
+    if (resp.status !== 200 || resp.data?.code !== "0" || !Array.isArray(resp.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${resp.status} code=${resp.data?.code} msg=${resp.data?.msg || resp.data?.message || "unknown"}`);
+    }
 
-    const rawData = response.data.data || [];
-    const targetCoins = ['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'TRX', 'TON', 'AVAX', 'LINK', 'DOT', 'LTC', 'BCH', 'UNI', 'XLM', 'HBAR', 'SUI', 'PEPE', 'SHIB', 'INJ', 'ONDO'];
-    const filteredData = rawData
-      .filter(coin => targetCoins.includes(coin.symbol))
-      .map(coin => ({
-        symbol: coin.symbol,
-        current_price: coin.current_price,
-        price_change_percent_24h: coin.price_change_percent_24h || 0,
-        logo_url: `https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/logos/${coin.symbol.toLowerCase( )}.svg`
-      }))
+    const raw = resp.data.data;
+
+    const targetCoins = [
+      "BTC","ETH","BNB","SOL","XRP","ADA","DOGE","TRX","TON","AVAX","LINK","DOT",
+      "LTC","BCH","UNI","XLM","HBAR","SUI","PEPE","SHIB","INJ","ONDO"
+    ];
+
+    // normalize + stable order (as in targetCoins list)
+    const filtered = raw
+      .filter(c => targetCoins.includes(String(c.symbol).toUpperCase()))
+      .map(c => {
+        const sym = String(c.symbol).toUpperCase();
+        return {
+          symbol: sym,
+          current_price: Number(c.current_price || 0),
+          price_change_percent_24h: Number(c.price_change_percent_24h || 0),
+          logo_url: `https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/logos/${sym.toLowerCase()}.svg`
+        };
+      })
       .sort((a, b) => targetCoins.indexOf(a.symbol) - targetCoins.indexOf(b.symbol));
 
-    const payload = { success: true, data: filteredData, lastUpdated: new Date().toISOString() };
+    const payload = {
+      success: true,
+      data: filtered,
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
 
+    // 4) Cache to both stores
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
+
     return res.json(payload);
 
   } catch (error) {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "API fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
   }
 }
+
 
 
 
