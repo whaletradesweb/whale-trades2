@@ -50,149 +50,109 @@ module.exports = async (req, res) => {
         });
       }
 
-      case "altcoin-season": {
-        console.log("DEBUG: Requesting Altcoin Season from Coinglass...");
-        
-        const altUrl = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
-        const altResponse = await axios.get(altUrl, { 
-          headers,
-          timeout: 10000,
-          validateStatus: function (status) {
-            return status < 500;
-          }
-        });
-        
-        console.log("DEBUG: Coinglass Response Status:", altResponse.status);
-        
-        if (altResponse.status === 401) {
-          return res.status(401).json({
-            error: 'API Authentication Failed',
-            message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-          });
-        }
-        
-        if (altResponse.status === 403) {
-          return res.status(403).json({
-            error: 'API Access Forbidden',
-            message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-          });
-        }
-        
-        if (altResponse.status === 404) {
-          return res.status(404).json({
-            error: 'API Endpoint Not Found',
-            message: 'The altcoin season endpoint may have changed. Check CoinGlass API documentation.'
-          });
-        }
-        
-        if (altResponse.status !== 200) {
-          return res.status(altResponse.status).json({
-            error: 'API Request Failed',
-            message: `CoinGlass API returned status ${altResponse.status}`,
-            details: altResponse.data
-          });
-        }
-        
-        if (!altResponse.data || altResponse.data.code !== "0") {
-          return res.status(400).json({
-            error: 'API Error',
-            message: altResponse.data?.message || 'CoinGlass API returned error code',
-            code: altResponse.data?.code
-          });
-        }
-        
-        const altRaw = altResponse.data.data;
-        const altcoinData = altRaw.map(d => ({
-          timestamp: d.timestamp,
-          altcoin_index: d.altcoin_index,
-          altcoin_marketcap: d.altcoin_marketcap || 0
-        }));
-        
-        altcoinData.sort((a, b) => a.timestamp - b.timestamp);
-        
-        return res.json({ 
-          success: true,
-          data: altcoinData,
-          lastUpdated: new Date().toISOString(),
-          dataPoints: altcoinData.length
+  case "altcoin-season": {
+  const TTL = 300; // This data changes less frequently, cache for 5 minutes.
+  const out = await cacheGetSet("altcoin-season", {}, TTL, async () => {
+    if (!(await allow("cg:GLOBAL", 250))) {
+      const last = await kv.get("last:altcoin-season");
+      if (last) return last;
+      return { success: false, data: [], message: "Guarded: Rate limit active" };
+    }
+
+    const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`Altcoin Season upstream failed: HTTP ${response.status}`);
+    }
+
+    const raw = response.data.data;
+    const altcoinData = raw.map(d => ({
+      timestamp: d.timestamp,
+      altcoin_index: d.altcoin_index,
+      altcoin_marketcap: d.altcoin_marketcap || 0
+    })).sort((a, b) => a.timestamp - b.timestamp);
+
+    const payload = { 
+      success: true,
+      data: altcoinData,
+      lastUpdated: new Date().toISOString(),
+      dataPoints: altcoinData.length
+    };
+    await kv.set("last:altcoin-season", payload, { ex: 3600 });
+    return payload;
+  });
+  return res.json(out);
+}
+
+
+ // DELETE the old "etf-btc-flows" and "etf-eth-flows" cases and REPLACE with this:
+
+case "etf-flows": {
+  // Determine the asset from the symbol query param, defaulting to BTC.
+  const asset = (req.query.symbol || "BTC").toLowerCase();
+  if (asset !== 'bitcoin' && asset !== 'ethereum' && asset !== 'btc' && asset !== 'eth') {
+    return res.status(400).json({ error: "Invalid symbol. Use 'BTC' or 'ETH'." });
+  }
+  const assetName = asset.startsWith('btc') ? 'bitcoin' : 'ethereum';
+
+  const TTL = 300; // Cache ETF data for 5 minutes.
+
+  // The cache key will now be unique for each asset.
+  const out = await cacheGetSet(`etf-flows:${assetName}`, {}, TTL, async () => {
+    // Check the global rate limit.
+    if (!(await allow("cg:GLOBAL", 250))) {
+      const last = await kv.get(`last:etf-flows:${assetName}`);
+      if (last) return last;
+      return { daily: [], weekly: [], message: "Guarded: Rate limit active" };
+    }
+
+    // Dynamically build the URL based on the asset.
+    const url = `https://open-api-v4.coinglass.com/api/etf/${assetName}/flow-history`;
+    console.log(`DEBUG: Fetching ETF flows from: ${url}` );
+    
+    const response = await axiosWithBackoff(() => axios.get(url, { headers }));
+
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`ETF ${assetName} Flows upstream failed: HTTP ${response.status}`);
+    }
+
+    const rawData = response.data?.data || [];
+    
+    // The rest of your processing logic remains the same.
+    const daily = rawData.map(d => ({
+      date: new Date(d.timestamp).toISOString().split("T")[0],
+      totalFlow: d.flow_usd,
+      price: d.price_usd,
+      etfs: d.etf_flows.map(etf => ({ ticker: etf.etf_ticker, flow: etf.flow_usd }))
+    }));
+
+    const weekly = [];
+    for (let i = 0; i < daily.length; i += 7) {
+      const chunk = daily.slice(i, i + 7);
+      if (chunk.length > 0) { // Handle cases with less than 7 days of data gracefully
+        const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
+        const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
+        const etfMap = {};
+        chunk.forEach(day => day.etfs.forEach(e => { etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow; }));
+        weekly.push({
+          weekStart: chunk[0].date,
+          weekEnd: chunk[chunk.length - 1].date,
+          totalFlow,
+          avgPrice: parseFloat(avgPrice.toFixed(2)),
+          etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
         });
       }
-
-  case "etf-btc-flows": {
-  const url = "https://open-api-v4.coinglass.com/api/etf/bitcoin/flow-history";
-  const response = await axios.get(url, { headers });
-  const rawData = response.data?.data || [];
-  // Format daily data
-  const daily = rawData.map(d => ({
-    date: new Date(d.timestamp).toISOString().split("T")[0],
-    totalFlow: d.flow_usd,
-    price: d.price_usd,
-    etfs: d.etf_flows.map(etf => ({
-      ticker: etf.etf_ticker,
-      flow: etf.flow_usd
-    }))
-  }));
-  // Weekly aggregate
-  const weekly = [];
-  for (let i = 0; i < daily.length; i += 7) {
-    const chunk = daily.slice(i, i + 7);
-    const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
-    const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
-    const etfMap = {};
-    chunk.forEach(day => {
-      day.etfs.forEach(e => {
-        etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
-      });
-    });
-    weekly.push({
-      weekStart: chunk[0].date,
-      weekEnd: chunk[chunk.length - 1].date,
-      totalFlow,
-      avgPrice: parseFloat(avgPrice.toFixed(2)),
-      etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
-    });
-  }
-  return res.json({ daily, weekly });
-}
-
-case "etf-eth-flows": {
-  const url = "https://open-api-v4.coinglass.com/api/etf/ethereum/flow-history";
-  const response = await axios.get(url, { headers });
-  const rawData = response.data?.data || [];
-  // Format daily data - using same field names as BTC
-  const daily = rawData.map(d => ({
-    date: new Date(d.timestamp).toISOString().split("T")[0],
-    totalFlow: d.flow_usd,        // Same as BTC
-    price: d.price_usd,           // Same as BTC
-    etfs: d.etf_flows.map(etf => ({
-      ticker: etf.etf_ticker,     // Same as BTC
-      flow: etf.flow_usd          // Same as BTC
-    }))
-  }));
-  // Weekly aggregate
-  const weekly = [];
-  for (let i = 0; i < daily.length; i += 7) {
-    const chunk = daily.slice(i, i + 7);
-    if (chunk.length === 7) {
-      const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
-      const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
-      const etfMap = {};
-      chunk.forEach(day => {
-        day.etfs.forEach(e => {
-          etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow;
-        });
-      });
-      weekly.push({
-        weekStart: chunk[0].date,
-        weekEnd: chunk[chunk.length - 1].date,
-        totalFlow,
-        avgPrice: parseFloat(avgPrice.toFixed(2)),
-        etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
-      });
     }
-  }
-  return res.json({ daily, weekly });
+    
+    const payload = { daily, weekly, lastUpdated: new Date().toISOString() };
+    await kv.set(`last:etf-flows:${assetName}`, payload, { ex: 3600 });
+    return payload;
+  });
+
+  return res.json(out);
 }
+
         
       case "liquidations-total": {
         const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list", { headers });
