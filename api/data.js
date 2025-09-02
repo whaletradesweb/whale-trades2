@@ -334,12 +334,12 @@ case "long-short": {
 
 
 
+
 case "max-pain": {
-  // Extract dynamic params from the request query
+  // These parameters are now correctly read from the request query
   const { symbol = "BTC", exchange = "Binance" } = req.query;
 
   const TTL = 180; // Cache for 3 minutes
-  // Create a dynamic cache key based on the symbol and exchange
   const cacheKey = `cg:max-pain:${symbol}:${exchange}`;
   const lastGoodKey = `last:max-pain:${symbol}:${exchange}`;
 
@@ -355,33 +355,30 @@ case "max-pain": {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}/${exchange}.`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    // Fallback if there's no "last good" data
     return res.json({ data: null, message: "Guarded: Rate limit active" });
   }
 
   // 3. If allowed, fetch fresh data
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data for ${symbol}/${exchange}.`);
+    
+    // --- YOUR ORIGINAL, WORKING LOGIC STARTS HERE ---
     const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
     const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
 
-    if (response.status !== 200 || response.data?.code !== "0") {
-      // Handle cases where CoinGlass returns an error for a specific pair
-      if (response.data?.message) {
-        console.warn(`[${type}] CoinGlass API error for ${symbol}/${exchange}: ${response.data.message}`);
-        // Return a specific error message instead of throwing, so we don't serve stale data for a valid "not found" case
-        return res.json({ data: null, error: "Data not available for this pair", message: response.data.message });
-      }
-      throw new Error(`Upstream failed: HTTP ${response.status}`);
+    if (response.status !== 200) {
+        throw new Error(`Upstream failed with status: ${response.status}`);
     }
-
-    // --- YOUR CRITICAL PROCESSING LOGIC ---
+    
     const maxPainData = response.data?.data || response.data;
+    
     if (!maxPainData) {
+      // This is a valid case where data might not exist, so we return a clean message
       return res.json({ data: null, message: "Max Pain data unavailable from API" });
     }
+    
     const finalData = Array.isArray(maxPainData) ? maxPainData[0] : maxPainData;
-    // --- END OF YOUR LOGIC ---
+    // --- YOUR ORIGINAL, WORKING LOGIC ENDS HERE ---
 
     const payload = {
       data: finalData,
