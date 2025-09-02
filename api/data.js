@@ -277,7 +277,7 @@ case "liquidations-total": {
     
     // --- YOUR ORIGINAL, WORKING LOGIC STARTS HERE ---
     const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
+    const response = await axiosWithBackoff(() => axios.get(url, { headers }));
 
     if (response.status !== 200 || !Array.isArray(response.data?.data)) {
       throw new Error(`Upstream failed: ${response.status}`);
@@ -478,7 +478,7 @@ case "long-short": {
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
     const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 15000 }));
+    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000 }));
 
     if (response.status !== 200 || !Array.isArray(response.data?.data)) {
       throw new Error(`Upstream failed: HTTP ${response.status}`);
@@ -686,7 +686,7 @@ case "open-interest": {
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
     const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 15000 }));
+    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000 }));
 
     if (response.status !== 200 || !Array.isArray(response.data?.data)) {
       throw new Error(`Upstream failed: HTTP ${response.status}`);
