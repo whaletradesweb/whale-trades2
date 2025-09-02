@@ -499,82 +499,50 @@ case "rsi-heatmap": {
 
 
 case "crypto-ticker": {
-  console.log("DEBUG: Requesting crypto ticker data from Coinglass...");
-  
-  const url = "https://open-api-v4.coinglass.com/api/futures/coins-price-change";
-  const response = await axios.get(url, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
-    }
-  });
-  
-  console.log("DEBUG: Coinglass Response Status:", response.status);
-  
-  if (response.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-    });
+  const TTL = 60;
+  const cacheKey = "cg:crypto-ticker";
+  const lastGoodKey = "last:crypto-ticker";
+
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) return res.json(cachedData);
+
+  if (!(await allow("cg:GLOBAL", 250))) {
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({ success: false, data: [], message: "Guarded: Rate limit active" });
   }
-  
-  if (response.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden',
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
+
+  try {
+    const url = "https://open-api-v4.coinglass.com/api/futures/coins-price-change";
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
+
+    const rawData = response.data.data || [];
+    const targetCoins = ['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'TRX', 'TON', 'AVAX', 'LINK', 'DOT', 'LTC', 'BCH', 'UNI', 'XLM', 'HBAR', 'SUI', 'PEPE', 'SHIB', 'INJ', 'ONDO'];
+    const filteredData = rawData
+      .filter(coin => targetCoins.includes(coin.symbol))
+      .map(coin => ({
+        symbol: coin.symbol,
+        current_price: coin.current_price,
+        price_change_percent_24h: coin.price_change_percent_24h || 0,
+        logo_url: `https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/logos/${coin.symbol.toLowerCase( )}.svg`
+      }))
+      .sort((a, b) => targetCoins.indexOf(a.symbol) - targetCoins.indexOf(b.symbol));
+
+    const payload = { success: true, data: filteredData, lastUpdated: new Date().toISOString() };
+
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
   }
-  
-  if (response.status !== 200) {
-    return res.status(response.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${response.status}`,
-      details: response.data
-    });
-  }
-  
-  if (!response.data || response.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: response.data?.message || 'CoinGlass API returned error code',
-      code: response.data?.code
-    });
-  }
-  
-  const rawData = response.data.data || [];
-  
-  // Define the coins you want to show, ordered by market cap
-  const targetCoins = [
-    'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'TRX', 'TON', 'AVAX',
-    'LINK', 'DOT', 'LTC', 'BCH', 'UNI', 'XLM', 'HBAR', 'SUI', 'PEPE', 'SHIB',
-    'INJ', 'ONDO'
-  ];
-  
-  // Filter and sort the data based on your target coins
-  const filteredData = rawData
-    .filter(coin => targetCoins.includes(coin.symbol))
-    .map(coin => ({
-      symbol: coin.symbol,
-      current_price: coin.current_price,
-      price_change_percent_24h: coin.price_change_percent_24h || 0,
-      // Add logo URL pointing to your GitHub logos
-      logo_url: `https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/logos/${coin.symbol.toLowerCase()}.svg`
-    }))
-    .sort((a, b) => {
-      // Sort by the order in targetCoins array (market cap order)
-      return targetCoins.indexOf(a.symbol) - targetCoins.indexOf(b.symbol);
-    });
-  
-  console.log(`DEBUG: Filtered ${filteredData.length} coins for ticker`);
-  
-  return res.json({ 
-    success: true,
-    data: filteredData,
-    lastUpdated: new Date().toISOString(),
-    totalCoins: filteredData.length
-  });
 }
+
 
 
 // Risk Calculator
@@ -947,265 +915,187 @@ case "hyperliquid-whale-alert": {
 
 // 
 
+
 case "bull-market-peak-indicators": {
-  console.log("DEBUG: Requesting Bull Market Peak Indicators from Coinglass...");
-  
-  const bullMarketUrl = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
-  const bullResponse = await axios.get(bullMarketUrl, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
+  const TTL = 300; // Cache for 5 minutes, as this data doesn't change rapidly
+  const cacheKey = "cg:bull-market-peak-indicators";
+  const lastGoodKey = "last:bull-market-peak-indicators";
+
+  // 1. Check for fresh data in the main cache
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: Returning main cached data.`);
+    return res.json(cachedData);
+  }
+
+  // 2. If no cache, check rate limit
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // Fallback if there's no "last good" data
+    return res.json({ success: false, data: {}, message: "Guarded: Rate limit active" });
+  }
+
+  // 3. If allowed, fetch fresh data
+  try {
+    console.log(`DEBUG [${type}]: Fetching fresh data.`);
+    const url = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`Upstream failed: HTTP ${response.status} - ${response.data?.message}`);
     }
-  });
-  
-  console.log("DEBUG: Bull Market Peak Indicators Response Status:", bullResponse.status);
-  
-  if (bullResponse.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-    });
-  }
-  
-  if (bullResponse.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden',
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (bullResponse.status === 404) {
-    return res.status(404).json({
-      error: 'API Endpoint Not Found',
-      message: 'The bull market peak indicators endpoint may have changed. Check CoinGlass API documentation.'
-    });
-  }
-  
-  if (bullResponse.status !== 200) {
-    return res.status(bullResponse.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${bullResponse.status}`,
-      details: bullResponse.data
-    });
-  }
-  
-  if (!bullResponse.data || bullResponse.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: bullResponse.data?.message || 'CoinGlass API returned error code',
-      code: bullResponse.data?.code
-    });
-  }
-  
-  const indicators = bullResponse.data.data || [];
-  
-  // Target indicators we want to display (using exact API names)
-  const targetIndicators = [
-    "Pi Cycle Top Indicator",
-    "Puell Multiple", 
-    "Bitcoin Rainbow Chart",
-    "MVRV Z-Score", // Fixed name
-    "Altcoin Season Index",
-    "Bitcoin Dominance", 
-    "Bitcoin Net Unrealized P&L (NUPL)", // Fixed name
-    "Bitcoin 4-Year Moving Average"
-  ];
-  
-  // Process and format the indicators data
-  const processedIndicators = {};
-  
-  indicators.forEach(indicator => {
-    if (targetIndicators.includes(indicator.indicator_name)) {
-      // Parse current and target values (handle percentage strings)
-      let current = parseFloat(indicator.current_value.toString().replace('%', '')) || 0;
-      let target = parseFloat(indicator.target_value.toString().replace('%', '')) || 0;
-      const previous = parseFloat(indicator.previous_value.toString().replace('%', '')) || 0;
-      const change = parseFloat(indicator.change_value) || 0;
-      
-      // Calculate progress percentage
-      let progressPercentage = 0;
-      if (indicator.comparison_type === ">=") {
-        // For >= comparisons, calculate how close we are to the target
-        progressPercentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
-      } else if (indicator.comparison_type === "<=") {
-        // For <= comparisons, calculate how close we are (inverted)
-        progressPercentage = target > 0 ? Math.max(100 - ((current / target) * 100), 0) : 0;
+
+    // --- YOUR CRITICAL PROCESSING LOGIC ---
+    const indicators = response.data.data || [];
+    const targetIndicators = [
+      "Pi Cycle Top Indicator", "Puell Multiple", "Bitcoin Rainbow Chart",
+      "MVRV Z-Score", "Altcoin Season Index", "Bitcoin Dominance",
+      "Bitcoin Net Unrealized P&L (NUPL)", "Bitcoin 4-Year Moving Average"
+    ];
+    const processedIndicators = {};
+    indicators.forEach(indicator => {
+      if (targetIndicators.includes(indicator.indicator_name)) {
+        let current = parseFloat(indicator.current_value.toString().replace('%', '')) || 0;
+        let target = parseFloat(indicator.target_value.toString().replace('%', '')) || 0;
+        const previous = parseFloat(indicator.previous_value.toString().replace('%', '')) || 0;
+        const change = parseFloat(indicator.change_value) || 0;
+        let progressPercentage = 0;
+        if (indicator.comparison_type === ">=") {
+          progressPercentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+        } else if (indicator.comparison_type === "<=") {
+          progressPercentage = target > 0 ? Math.max(100 - ((current / target) * 100), 0) : 0;
+        }
+        const distance = Math.abs(target - current);
+        const percentageChange = previous !== 0 ? ((current - previous) / previous) * 100 : 0;
+        processedIndicators[indicator.indicator_name] = {
+          current_value: current,
+          target_value: target,
+          previous_value: previous,
+          change_value: change,
+          comparison_type: indicator.comparison_type,
+          hit_status: indicator.hit_status,
+          progress_percentage: Math.round(progressPercentage * 100) / 100,
+          distance_to_target: distance,
+          percentage_change: Math.round(percentageChange * 100) / 100,
+          progress_bar_width: Math.min(progressPercentage, 100),
+          remaining_bar_width: Math.max(100 - progressPercentage, 0),
+          original_current_value: indicator.current_value,
+          original_target_value: indicator.target_value
+        };
       }
-      
-      // Calculate distance to target
-      const distance = Math.abs(target - current);
-      
-      // Calculate percentage change from previous
-      const percentageChange = previous !== 0 ? ((current - previous) / previous) * 100 : 0;
-      
-      processedIndicators[indicator.indicator_name] = {
-        current_value: current,
-        target_value: target,
-        previous_value: previous,
-        change_value: change,
-        comparison_type: indicator.comparison_type,
-        hit_status: indicator.hit_status,
-        progress_percentage: Math.round(progressPercentage * 100) / 100,
-        distance_to_target: distance,
-        percentage_change: Math.round(percentageChange * 100) / 100,
-        progress_bar_width: Math.min(progressPercentage, 100), // This is the green progress bar
-        remaining_bar_width: Math.max(100 - progressPercentage, 0), // This is the remaining gray bar
-        original_current_value: indicator.current_value, // Keep original format for display
-        original_target_value: indicator.target_value // Keep original format for display
-      };
-    }
-  });
-  
-  console.log(`DEBUG: Processed ${Object.keys(processedIndicators).length} indicators`);
-  
-  return res.json({ 
-    success: true,
-    data: processedIndicators,
-    lastUpdated: new Date().toISOString(),
-    totalIndicators: Object.keys(processedIndicators).length
-  });
+    });
+    // --- END OF YOUR LOGIC ---
+
+    const payload = {
+      success: true,
+      data: processedIndicators,
+      lastUpdated: new Date().toISOString(),
+      totalIndicators: Object.keys(processedIndicators).length,
+      method: "live-fetch"
+    };
+
+    // 4. Cache the successful payload
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
 
 
 
 case "volume-total": {
-  console.log("DEBUG: Using optimized & cached volume-total endpoint…");
+  const TTL = 60;
+  const cacheKey = "cg:volume-total";
+  const lastGoodKey = "last:volume-total";
 
-  const TTL = 60; // cache rollup for 60s
-  const PER_PAGE = 200;
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: Returning main cached data.`);
+    return res.json(cachedData);
+  }
 
-  const fmtUSD = (v) => {
-    const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-    return `$${Math.round(v).toLocaleString()}`;
-  };
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({ total_volume_24h: 0, total_formatted: "$0", method: "guarded-fallback" });
+  }
 
-  const out = await cacheGetSet("volume-total", {}, TTL, async () => {
-    // Global guard so all endpoints share the same bucket
-    if (!(await allow("cg:GLOBAL", 250))) {
-      const last = await kv.get("last:volume-total");
-      return (
-        last || {
-          total_volume_24h: 0,
-          total_formatted: "$0",
-          percent_change_24h: 0,
-          coins_count: 0,
-          coins_with_volume: 0,
-          api_calls_used: 0,
-          top_coins: [],
-          last_updated: new Date().toISOString(),
-          method: "guarded-return"
-        }
-      );
+  try {
+    console.log(`DEBUG [${type}]: Fetching fresh data.`);
+    const fmtUSD = (v) => {
+        const n = Math.abs(v);
+        if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+        if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+        if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+        return `$${Math.round(v).toLocaleString()}`;
+    };
+
+    let allCoins = [];
+    let page = 1;
+    const PER_PAGE = 200;
+    for (;;) {
+      const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+      const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 15000, params: { per_page: PER_PAGE, page } }));
+      if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed on page ${page}: ${response.status}`);
+      
+      const rows = response.data?.data || [];
+      if (!rows.length) break;
+      allCoins = allCoins.concat(rows);
+      if (rows.length < PER_PAGE) break;
+      page++;
     }
 
-    try {
-      // Pull paginated futures coins-markets with polite backoff
-      let allCoins = [];
-      let page = 1;
-
-      for (;;) {
-        const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-        const response = await axiosWithBackoff(() =>
-          axios.get(url, {
-            headers,
-            timeout: 15000,
-            params: { per_page: PER_PAGE, page },
-            validateStatus: (s) => s < 500
-          })
-        );
-
-        if (response.status !== 200 || response.data?.code !== "0") {
-          throw new Error(
-            `API request failed: ${response.status} - ${response.data?.message || "Unknown error"}`
-          );
-        }
-
-        const rows = Array.isArray(response.data?.data) ? response.data.data : [];
-        if (!rows.length) break;
-
-        allCoins = allCoins.concat(rows);
-
-        if (rows.length < PER_PAGE) break; // last page
-        page++;
-      }
-
-      console.log(`DEBUG: Fetched ${allCoins.length} coins in ${page} API calls`);
-
-      // Aggregate totals
-      let totalVolume24h = 0;
-      let totalWeightedChange = 0;
-      let coinsWithVolume = 0;
-
-      const coinData = allCoins.map((coin) => {
-        const longVolume  = coin.long_volume_usd_24h  || 0;
+    let totalVolume24h = 0;
+    let totalWeightedChange = 0;
+    let coinsWithVolume = 0;
+    const coinData = allCoins.map(coin => {
+        const longVolume = coin.long_volume_usd_24h || 0;
         const shortVolume = coin.short_volume_usd_24h || 0;
-        const coinTotal   = longVolume + shortVolume;
-        const changePct   = coin.volume_change_percent_24h || 0;
-
+        const coinTotal = longVolume + shortVolume;
+        const changePercent = coin.volume_change_percent_24h || 0;
         if (coinTotal > 0) {
-          totalVolume24h += coinTotal;
-          coinsWithVolume++;
-          if (changePct !== 0) totalWeightedChange += coinTotal * changePct;
+            totalVolume24h += coinTotal;
+            coinsWithVolume++;
+            if (changePercent !== 0) totalWeightedChange += coinTotal * changePercent;
         }
+        return { symbol: coin.symbol, volume_usd_24h: coinTotal, change_percent: changePercent };
+    });
+    const overallChangePercent = totalVolume24h > 0 ? totalWeightedChange / totalVolume24h : 0;
+    const topCoins = coinData.filter(c => c.volume_usd_24h > 0).sort((a, b) => b.volume_usd_24h - a.volume_usd_24h).slice(0, 50);
 
-        return {
-          symbol: coin.symbol,
-          volume_usd_24h: coinTotal,
-          volume_formatted: fmtUSD(coinTotal),
-          long_volume: longVolume,
-          short_volume: shortVolume,
-          change_percent: changePct
-        };
-      });
+    const payload = {
+      total_volume_24h: totalVolume24h,
+      total_formatted: fmtUSD(totalVolume24h),
+      percent_change_24h: overallChangePercent,
+      coins_count: allCoins.length,
+      coins_with_volume: coinsWithVolume,
+      top_coins: topCoins,
+      last_updated: new Date().toISOString(),
+      method: "live-fetch"
+    };
 
-      const overallChangePercent =
-        totalVolume24h > 0 ? totalWeightedChange / totalVolume24h : 0;
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    return res.json(payload);
 
-      const topCoins = coinData
-        .filter((c) => c.volume_usd_24h > 0)
-        .sort((a, b) => b.volume_usd_24h - a.volume_usd_24h)
-        .slice(0, 50);
-
-      const responseObject = {
-        total_volume_24h: totalVolume24h,
-        total_formatted: fmtUSD(totalVolume24h),
-        percent_change_24h: overallChangePercent,
-        coins_count: allCoins.length,
-        coins_with_volume: coinsWithVolume,
-        api_calls_used: page,
-        top_coins: topCoins,
-        last_updated: new Date().toISOString(),
-        method: "long-short-volume-sum"
-      };
-
-      // Save “last good” for guard fallback
-      await kv.set("last:volume-total", responseObject, { ex: 3600 });
-
-      return responseObject;
-    } catch (err) {
-      console.error("[volume-total] Error:", err.message);
-      return {
-        error: "Volume API failed",
-        message: err.message,
-        total_volume_24h: 0,
-        total_formatted: "$0",
-        percent_change_24h: 0,
-        coins_count: 0,
-        coins_with_volume: 0,
-        api_calls_used: 0,
-        top_coins: [],
-        last_updated: new Date().toISOString(),
-        method: "error-fallback"
-      };
-    }
-  });
-
-  return res.json(out);
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
+
 
 
         
