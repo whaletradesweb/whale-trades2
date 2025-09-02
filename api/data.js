@@ -258,7 +258,8 @@ case "liquidations-table": {
     };
 
     const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list";
-    const requests = timeframes.map((range ) =>
+    // --- Corrected line below ---
+    const requests = timeframes.map((range ) => 
       axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000, params: { range } }))
     );
     const responses = await Promise.all(requests);
@@ -304,6 +305,7 @@ case "liquidations-table": {
     return res.status(500).json({ error: "API fetch failed", message: error.message });
   }
 }
+
 
 
 
