@@ -1036,132 +1036,205 @@ case "hyperliquid-long-short": {
 
 
 
+
 case "hyperliquid-whale-position": {
-  console.log("DEBUG: Requesting raw Hyperliquid whale positions...");
-  
-  const url = "https://open-api-v4.coinglass.com/api/hyperliquid/whale-position";
-  const response = await axios.get(url, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
+  // Optional cap for UI/testing: &top=100
+  const top = Math.max(1, Math.min(parseInt(req.query.top || "0", 10) || 0, 500)); // 0 = no cap
+
+  // --- Cache keys (fast-lane + safety-net) ---
+  const TTL = 120; // 2 min fast cache
+  const cacheKey    = `cg:hyperliquid-whale-position:top=${top}`;
+  const lastGoodKey = `last:hyperliquid-whale-position:top=${top}`;
+
+  // 1) Fast lane: short-term cache
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: hyperliquid-whale-position → cache-hit (top=${top || "all"})`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop: global rate limiter
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: hyperliquid-whale-position → rate-limited, serving last-good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // fully shaped guarded fallback
+    return res.json({
+      success: true,
+      data: [],
+      lastUpdated: new Date().toISOString(),
+      dataSource: "hyperliquid_raw_whale_positions",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch
+  try {
+    console.log("DEBUG: Requesting raw Hyperliquid whale positions...");
+    const url = "https://open-api-v4.coinglass.com/api/hyperliquid/whale-position";
+
+    const response = await axiosWithBackoff(() => axios.get(url, {
+      headers,
+      timeout: 10000,
+      validateStatus: s => s < 500
+    }));
+
+    console.log("DEBUG: Hyperliquid Whale Position Response Status:", response.status);
+
+    if (response.status === 401) {
+      return res.status(401).json({
+        error: "API Authentication Failed",
+        message: "Invalid API key or insufficient permissions. Check your CoinGlass API plan."
+      });
     }
-  });
-  
-  console.log("DEBUG: Hyperliquid Whale Position Response Status:", response.status);
-  
-  if (response.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    if (response.status === 403) {
+      return res.status(403).json({
+        error: "API Access Forbidden",
+        message: "Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher."
+      });
+    }
+    if (response.status !== 200 || response.data?.code !== "0" || !Array.isArray(response.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
+    }
+
+    let rawData = response.data.data || [];
+    if (top > 0 && rawData.length > top) {
+      rawData = rawData.slice(0, top);
+    }
+
+    console.log(`DEBUG: Processed ${rawData.length} raw whale positions`);
+
+    const payload = {
+      success: true,
+      data: rawData,
+      lastUpdated: new Date().toISOString(),
+      dataSource: "hyperliquid_raw_whale_positions",
+      method: "live-fetch"
+    };
+
+    // 4) Cache to both stores
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
+
+  } catch (err) {
+    console.error(`[${type}] hyperliquid-whale-position fetch error:`, err.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "API fetch failed and no cached data available.",
+      lastUpdated: new Date().toISOString()
     });
   }
-  
-  if (response.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden',
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (response.status !== 200) {
-    return res.status(response.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${response.status}`,
-      details: response.data
-    });
-  }
-  
-  if (!response.data || response.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: response.data?.message || 'CoinGlass API returned error code',
-      code: response.data?.code
-    });
-  }
-  
-  const rawData = response.data.data || [];
-  
-  if (!Array.isArray(rawData) || rawData.length === 0) {
-    return res.status(404).json({
-      error: 'No Data',
-      message: 'No Hyperliquid whale position data available'
-    });
-  }
-  
-  console.log(`DEBUG: Processed ${rawData.length} raw whale positions`);
-  
-  return res.json({ 
-    success: true,
-    data: rawData,
-    lastUpdated: new Date().toISOString(),
-    dataSource: 'hyperliquid_raw_whale_positions'
-  });
 }
 
-
+        
 case "hyperliquid-whale-alert": {
-  console.log("DEBUG: Requesting Hyperliquid whale alerts...");
-  
-  const url = "https://open-api-v4.coinglass.com/api/hyperliquid/whale-alert";
-  const response = await axios.get(url, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
+  // Optional cap for UI/testing: &top=200 (0 = no cap)
+  const top = Math.max(0, Math.min(parseInt(req.query.top || "0", 10) || 0, 500));
+
+  // --- Cache keys (fast-lane + safety-net) ---
+  const TTL = 120; // 2 min fast cache
+  const cacheKey    = `cg:hyperliquid-whale-alert:top=${top}`;
+  const lastGoodKey = `last:hyperliquid-whale-alert:top=${top}`;
+
+  // 1) Fast lane: short-term cache
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: hyperliquid-whale-alert → cache-hit (top=${top || "all"})`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop: global rate limiter
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: hyperliquid-whale-alert → rate-limited, serving last-good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // fully shaped guarded fallback
+    return res.json({
+      success: true,
+      data: [],
+      lastUpdated: new Date().toISOString(),
+      dataSource: "hyperliquid_whale_alerts",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch
+  try {
+    console.log("DEBUG: Requesting Hyperliquid whale alerts...");
+    const url = "https://open-api-v4.coinglass.com/api/hyperliquid/whale-alert";
+
+    const response = await axiosWithBackoff(() => axios.get(url, {
+      headers,
+      timeout: 10000,
+      validateStatus: s => s < 500
+    }));
+
+    console.log("DEBUG: Hyperliquid Whale Alert Response Status:", response.status);
+
+    if (response.status === 401) {
+      return res.status(401).json({
+        error: "API Authentication Failed",
+        message: "Invalid API key or insufficient permissions. Check your CoinGlass API plan."
+      });
     }
-  });
-  
-  console.log("DEBUG: Hyperliquid Whale Alert Response Status:", response.status);
-  
-  if (response.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+    if (response.status === 403) {
+      return res.status(403).json({
+        error: "API Access Forbidden",
+        message: "Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher."
+      });
+    }
+    if (response.status !== 200 || response.data?.code !== "0" || !Array.isArray(response.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
+    }
+
+    // Normalize + optional cap
+    let rawData = response.data.data || [];
+
+    // (Optional) sort newest → oldest if timestamp exists
+    rawData.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (top > 0 && rawData.length > top) {
+      rawData = rawData.slice(0, top);
+    }
+
+    console.log(`DEBUG: Processed ${rawData.length} whale alerts`);
+
+    const payload = {
+      success: true,
+      data: rawData,
+      lastUpdated: new Date().toISOString(),
+      dataSource: "hyperliquid_whale_alerts",
+      method: "live-fetch"
+    };
+
+    // 4) Cache to both stores
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
+
+  } catch (err) {
+    console.error(`[${type}] hyperliquid-whale-alert fetch error:`, err.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "API fetch failed and no cached data available.",
+      lastUpdated: new Date().toISOString()
     });
   }
-  
-  if (response.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden',
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (response.status !== 200) {
-    return res.status(response.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${response.status}`,
-      details: response.data
-    });
-  }
-  
-  if (!response.data || response.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: response.data?.message || 'CoinGlass API returned error code',
-      code: response.data?.code
-    });
-  }
-  
-  const rawData = response.data.data || [];
-  
-  if (!Array.isArray(rawData)) {
-    return res.status(404).json({
-      error: 'No Data',
-      message: 'No Hyperliquid whale alert data available'
-    });
-  }
-  
-  console.log(`DEBUG: Processed ${rawData.length} whale alerts`);
-  
-  return res.json({ 
-    success: true,
-    data: rawData,
-    lastUpdated: new Date().toISOString(),
-    dataSource: 'hyperliquid_whale_alerts'
-  });
 }
+
+
+
 
 // 
 
