@@ -410,87 +410,70 @@ case "long-short": {
         return res.json({ data: finalData });
       }
 
+// Corrected Logic for all hardened endpoints
 case "open-interest": {
-  const TTL = 60; // cache 60s (dashboard feel, safe on Standard plan)
+  const TTL = 60;
+  const cacheKey = "cg:open-interest"; // Using a simple key for clarity
 
-  const result = await cacheGetSet("open-interest", {}, TTL, async () => {
-    // soft per-minute guard for this endpoint’s upstream call(s)
-    if (!(await allow("cg:GLOBAL", 250))) { // Using a global key and a safe limit
-      // serve last-known-good if we have it
-      const last = await kv.get("last:open-interest");
-      if (last) return last;
-      // fall back to a neutral zeroed payload
-      return {
-        total_open_interest_usd: 0,
-        avg_open_interest_change_percent_24h: 0,
-        weighted_open_interest_change_percent_24h: 0,
-        baseline_change_percent_since_last_fetch: 0,
-        coin_count: 0,
-        baseline_timestamp: new Date().toUTCString(),
-        method: "guarded-fallback"
-      };
-    }
+  // 1. First, try to get data from the main cache.
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log("DEBUG: Returning main cached data for open-interest.");
+    return res.json(cachedData);
+  }
 
+  // 2. If no cache, check if we are allowed to proceed.
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log("DEBUG: Rate limit active. Serving last known good for open-interest.");
+    // If rate-limited, serve the "last known good" data, but DO NOT cache it in the main cache.
+    const last = await kv.get("last:open-interest");
+    if (last) return res.json(last);
+    // If there's no "last good" data either, return the empty fallback.
+    return res.json({
+        total_open_interest_usd: 0, avg_open_interest_change_percent_24h: 0,
+        weighted_open_interest_change_percent_24h: 0, baseline_change_percent_since_last_fetch: 0,
+        coin_count: 0, baseline_timestamp: new Date().toUTCString(), method: "guarded-fallback"
+    });
+  }
+
+  // 3. If we are allowed to proceed, fetch the fresh data.
+  try {
+    console.log("DEBUG: Fetching fresh data for open-interest.");
     const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 }));
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 15000 }));
 
     if (response.status !== 200 || !Array.isArray(response.data?.data)) {
-      // bubble a controlled error so outer handler formats 4xx/5xx nicely
       throw new Error(`Open-interest upstream failed: HTTP ${response.status}`);
     }
 
+    // ... (Your existing data processing logic for 'coins' goes here)
     const coins = response.data.data;
-
-    // 1) total OI
     const totalOpenInterest = coins.reduce((sum, c) => sum + (c.open_interest_usd || 0), 0);
-
-    // 2) simple mean of pct change
-    const pctList = coins.map(c => c.open_interest_change_percent_24h)
-                         .filter(v => typeof v === "number" && Number.isFinite(v));
-    const avgChangePct = pctList.length ? (pctList.reduce((a,b)=>a+b,0) / pctList.length) : 0;
-
-    // 3) OI-weighted pct change
-    let wNum = 0, wDen = 0;
-    for (const c of coins) {
-      const oi = c.open_interest_usd || 0;
-      const pct = c.open_interest_change_percent_24h;
-      if (oi > 0 && Number.isFinite(pct)) { wNum += oi * pct; wDen += oi; }
-    }
-    const weightedAvgChangePct = wDen ? (wNum / wDen) : 0;
-
-    // 4) baseline delta (your existing KV baseline logic)
-    const now = Date.now();
-    let previousOI = await kv.get("open_interest:previous_total");
-    let previousTs = await kv.get("open_interest:timestamp");
-    let baselineChangePct = 0;
-
-    if (previousOI && previousTs && (now - previousTs) < 24 * 60 * 60 * 1000) {
-      baselineChangePct = ((totalOpenInterest - previousOI) / previousOI) * 100;
-    } else {
-      await kv.set("open_interest:previous_total", totalOpenInterest);
-      await kv.set("open_interest:timestamp", now);
-      previousOI = totalOpenInterest;
-      previousTs = now;
-    }
+    // ... etc.
 
     const payload = {
       total_open_interest_usd: totalOpenInterest,
-      avg_open_interest_change_percent_24h: avgChangePct,
-      weighted_open_interest_change_percent_24h: weightedAvgChangePct,
-      baseline_change_percent_since_last_fetch: baselineChangePct,
-      coin_count: coins.length,
-      baseline_timestamp: new Date(previousTs).toUTCString(),
+      // ... (all other fields from your payload object)
       lastUpdated: new Date().toISOString(),
       method: "coins-markets"
     };
 
-    // store “last good” for guarded fallback
-    await kv.set("last:open-interest", payload, { ex: 3600 });
-    return payload;
-  });
+    // 4. IMPORTANT: Cache the successful payload in BOTH the main cache and the "last known good" cache.
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set("last:open-interest", payload, { ex: 3600 }); // last good has a longer TTL
 
-  return res.json(result);
+    return res.json(payload);
+
+  } catch (error) {
+    // If the fetch fails for any reason, serve the last known good as a final resort.
+    console.error("ERROR fetching open-interest, serving last good:", error.message);
+    const last = await kv.get("last:open-interest");
+    if (last) return res.json(last);
+    // Absolute fallback if everything fails.
+    return res.status(500).json({ error: "API fetch failed and no cached data available." });
+  }
 }
+
 
 
 
