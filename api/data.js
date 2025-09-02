@@ -336,7 +336,6 @@ case "long-short": {
 
 
 case "max-pain": {
-  // These parameters are now correctly read from the request query
   const { symbol = "BTC", exchange = "Binance" } = req.query;
 
   const TTL = 180; // Cache for 3 minutes
@@ -354,31 +353,27 @@ case "max-pain": {
   if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}/${exchange}.`);
     const last = await kv.get(lastGoodKey);
+    // Ensure we always return a valid data structure, even on fallback
     if (last) return res.json(last);
-    return res.json({ data: null, message: "Guarded: Rate limit active" });
+    return res.json({ data: {}, message: "Guarded: Rate limit active" });
   }
 
   // 3. If allowed, fetch fresh data
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data for ${symbol}/${exchange}.`);
-    
-    // --- YOUR ORIGINAL, WORKING LOGIC STARTS HERE ---
     const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
     const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
 
     if (response.status !== 200) {
-        throw new Error(`Upstream failed with status: ${response.status}`);
+      throw new Error(`Upstream failed with status: ${response.status}`);
     }
     
+    // --- Corrected Logic ---
     const maxPainData = response.data?.data || response.data;
     
-    if (!maxPainData) {
-      // This is a valid case where data might not exist, so we return a clean message
-      return res.json({ data: null, message: "Max Pain data unavailable from API" });
-    }
-    
-    const finalData = Array.isArray(maxPainData) ? maxPainData[0] : maxPainData;
-    // --- YOUR ORIGINAL, WORKING LOGIC ENDS HERE ---
+    // If the API returns no data, we create an empty object to avoid frontend errors.
+    // This is the key change.
+    const finalData = (Array.isArray(maxPainData) ? maxPainData[0] : maxPainData) || {};
 
     const payload = {
       data: finalData,
@@ -386,9 +381,12 @@ case "max-pain": {
       method: "live-fetch"
     };
 
-    // 4. Cache the successful payload
+    // 4. Cache the successful payload, even if it's empty, to prevent re-fetching a known empty result.
     await kv.set(cacheKey, payload, { ex: TTL });
-    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    // Only set the "last known good" if the data is actually populated.
+    if (Object.keys(finalData).length > 0) {
+      await kv.set(lastGoodKey, payload, { ex: 3600 });
+    }
 
     return res.json(payload);
 
@@ -396,9 +394,11 @@ case "max-pain": {
     console.error(`[${type}] Fetch Error for ${symbol}/${exchange}:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed and no cached data available." });
+    // Final fallback returns an empty data object to prevent frontend errors.
+    return res.status(500).json({ data: {}, error: "API fetch failed and no cached data available." });
   }
 }
+
  
 
 
