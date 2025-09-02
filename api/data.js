@@ -60,7 +60,7 @@ module.exports = async (req, res) => {
     }
 
     const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 10000 }));
     
     if (response.status !== 200 || response.data?.code !== "0") {
       throw new Error(`Altcoin Season upstream failed: HTTP ${response.status} - ${response.data?.message}`);
@@ -511,7 +511,7 @@ case "rsi-heatmap": {
     }
 
     const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 10000 }));
 
     if (response.status !== 200 || response.data?.code !== "0") {
       throw new Error(`RSI Heatmap upstream failed: HTTP ${response.status} - ${response.data?.message}`);
