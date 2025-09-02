@@ -125,51 +125,122 @@ module.exports = async (req, res) => {
 
 
 case "etf-flows": {
-  const asset = (req.query.symbol || "BTC").toLowerCase();
-  const assetName = asset.startsWith('btc') ? 'bitcoin' : 'ethereum';
+  const asset = String(req.query.symbol || "BTC").toLowerCase();
+  const assetName = asset.includes("eth") ? "ethereum" : "bitcoin";
+
   const TTL = 300;
-  const cacheKey = `cg:etf-flows:${assetName}`;
+  const cacheKey    = `cg:etf-flows:${assetName}`;
   const lastGoodKey = `last:etf-flows:${assetName}`;
 
-  const cachedData = await kv.get(cacheKey);
-  if (cachedData) return res.json(cachedData);
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) return res.json(cached);
 
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.json({ daily: [], weekly: [], message: "Guarded: Rate limit active" });
+    return res.json({
+      daily: [],
+      weekly: [],
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback",
+      message: "Guarded: Rate limit active"
+    });
   }
 
+  // 3) Live fetch
   try {
     const url = `https://open-api-v4.coinglass.com/api/etf/${assetName}/flow-history`;
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
-    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
+    const resp = await axiosWithBackoff(() =>
+      axios.get(url, { headers, timeout: 12000, validateStatus: s => s < 500 })
+    );
 
-    const rawData = response.data?.data || [];
-    const daily = rawData.map(d => ({ date: new Date(d.timestamp).toISOString().split("T")[0], totalFlow: d.flow_usd, price: d.price_usd, etfs: d.etf_flows.map(etf => ({ ticker: etf.etf_ticker, flow: etf.flow_usd })) }));
+    if (resp.status !== 200 || resp.data?.code !== "0" || !Array.isArray(resp.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${resp.status} code=${resp.data?.code} msg=${resp.data?.msg || resp.data?.message || "unknown"}`);
+    }
+
+    const rows = resp.data.data;
+
+    // Sort by timestamp ascending; normalize seconds↔ms just in case
+    const normTs = (ts) => {
+      const n = Number(ts || 0);
+      return n < 1e12 ? n * 1000 : n; // if seconds, convert to ms
+    };
+    rows.sort((a,b) => normTs(a.timestamp) - normTs(b.timestamp));
+
+    // Build daily series (YYYY-MM-DD)
+    const daily = rows.map(d => {
+      const tsMs = normTs(d.timestamp);
+      const dateStr = new Date(tsMs).toISOString().split("T")[0];
+      const totalFlow = Number(d.flow_usd || 0);
+      const price = Number(d.price_usd || 0);
+      const etfs = Array.isArray(d.etf_flows)
+        ? d.etf_flows.map(etf => ({
+            ticker: etf?.etf_ticker || "UNKNOWN",
+            flow: Number(etf?.flow_usd || 0)
+          }))
+        : [];
+      return { date: dateStr, totalFlow, price, etfs };
+    });
+
+    // Aggregate into rolling weekly chunks of 7 consecutive daily entries
     const weekly = [];
     for (let i = 0; i < daily.length; i += 7) {
       const chunk = daily.slice(i, i + 7);
-      if (chunk.length > 0) {
-        const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
-        const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
-        const etfMap = {};
-        chunk.forEach(day => day.etfs.forEach(e => { etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow; }));
-        weekly.push({ weekStart: chunk[0].date, weekEnd: chunk[chunk.length - 1].date, totalFlow, avgPrice: parseFloat(avgPrice.toFixed(2)), etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow })) });
-      }
-    }
-    const payload = { daily, weekly, lastUpdated: new Date().toISOString() };
+      if (!chunk.length) continue;
 
+      const totalFlow = chunk.reduce((s, d) => s + Number(d.totalFlow || 0), 0);
+      const avgPrice = chunk.reduce((s, d) => s + Number(d.price || 0), 0) / chunk.length;
+
+      // Sum flows per ticker
+      const etfMap = new Map();
+      for (const day of chunk) {
+        for (const e of day.etfs) {
+          etfMap.set(e.ticker, (etfMap.get(e.ticker) || 0) + Number(e.flow || 0));
+        }
+      }
+      const etfs = Array.from(etfMap.entries()).map(([ticker, flow]) => ({ ticker, flow }));
+
+      weekly.push({
+        weekStart: chunk[0].date,
+        weekEnd: chunk[chunk.length - 1].date,
+        totalFlow,
+        avgPrice: Number.isFinite(avgPrice) ? Number(avgPrice.toFixed(2)) : 0,
+        etfs
+      });
+    }
+
+    const payload = {
+      daily,
+      weekly,
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch",
+      asset: assetName
+    };
+
+    // 4) Cache to both stores
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
+
     return res.json(payload);
+
   } catch (error) {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+    return res.status(500).json({
+      daily: [],
+      weekly: [],
+      error: "API fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error",
+      asset: assetName
+    });
   }
 }
+
 
 
 
