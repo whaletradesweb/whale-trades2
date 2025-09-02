@@ -1323,31 +1323,34 @@ case "api-usage-debug": {
 
 
 
-
-
 case "market-sentiment-flow": {
   // Query: &basis=market_cap|volume  &interval=1h|4h|1d|1w  &limit=10
   const {
-    basis = "market_cap",     // "market_cap" or "volume"
+    basis = "market_cap",     // "market_cap" | "volume"
     interval = "1h",          // "1h" | "4h" | "1d" | "1w"
     limit = "10"
   } = req.query;
 
+  // --- Input guards ---
   const validIntervals = ["1h", "4h", "1d", "1w"];
+  const validBasis = ["market_cap", "volume"];
   if (!validIntervals.includes(interval)) {
     return res.status(400).json({ error: "Invalid interval. Use 1h, 4h, 1d, 1w" });
   }
+  if (!validBasis.includes(basis)) {
+    return res.status(400).json({ error: "Invalid basis. Use market_cap or volume" });
+  }
+  const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 10, 50));
 
   // Map 1d → 24h fields on the API
   const fieldKey = interval === "1d" ? "24h" : interval;
-
   const buyField   = `buy_volume_usd_${fieldKey}`;
   const sellField  = `sell_volume_usd_${fieldKey}`;
   const flowField  = `volume_flow_usd_${fieldKey}`;
-  const mcapField  = "market_cap";       // USD
-  const vol24Field = "volume_usd_24h";   // USD
+  const mcapField  = "market_cap";      // USD
+  const vol24Field = "volume_usd_24h";  // USD
 
-  // --- Helpers: label, snapped score, and color (keep UI+pointer consistent)
+  // --- Helpers: label, snapped score, and color (UI-pointer consistency) ---
   function labelFromRatio(r){
     if (r <= -0.25) return "Strong sell";
     if (r <  -0.05) return "Sell";
@@ -1366,7 +1369,6 @@ case "market-sentiment-flow": {
     }
   }
   function colorFromLabel(lbl){
-    // Your minimal palette
     if (lbl === "Strong sell") return "#ff3333";
     if (lbl === "Sell")        return "#ff6666";
     if (lbl === "Neutral")     return "#ffffff";
@@ -1374,32 +1376,84 @@ case "market-sentiment-flow": {
     return "#00ff99"; // Strong buy
   }
 
+  // --- Cache + Safety-net keys ---
+  const TTL = 120; // 2 minutes fast-lane cache
+  const cacheKey   = `cg:market-sentiment-flow:${basis}:${interval}:limit=${safeLimit}`;
+  const lastGoodKey= `last:market-sentiment-flow:${basis}:${interval}:limit=${safeLimit}`;
+
+  // 1) Fast lane
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: market-sentiment-flow → cache-hit (${basis}, ${interval}, ${safeLimit})`);
+    return res.json(cachedData);
+  }
+
+  // 2) Global rate limiter
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: market-sentiment-flow → rate-limited, serving last-good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+
+    // Fully-shaped guarded fallback so UI never breaks
+    return res.json({
+      success: true,
+      meta: {
+        basis, interval, limit: 0,
+        overall: {
+          ratio: 0, score: 0.5, sentiment: "Neutral", band_color: colorFromLabel("Neutral"),
+          buy_usd: 0, sell_usd: 0, flow_usd: 0
+        }
+      },
+      data: [],
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch
   try {
     const url = "https://open-api-v4.coinglass.com/api/spot/coins-markets";
-    const cg = await axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 });
+    const cg = await axiosWithBackoff(() =>
+      axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 })
+    );
 
-    if (cg.status !== 200 || cg.data?.code !== "0") {
-      return res.status(cg.status).json({
-        error: "CoinGlass spot coins-markets failed",
-        message: cg.data?.msg || cg.data?.message || `HTTP ${cg.status}`
-      });
+    if (cg.status !== 200 || cg.data?.code !== "0" || !Array.isArray(cg.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${cg.status} code=${cg.data?.code} msg=${cg.data?.msg || cg.data?.message || "unknown"}`);
     }
 
-    let rows = Array.isArray(cg.data?.data) ? cg.data.data : [];
-    if (!rows.length) {
-      return res.json({ success: true, data: [], lastUpdated: new Date().toISOString() });
-    }
+    let rows = cg.data.data;
 
-    // Rank by basis
+    // Rank & slice by basis
     rows = rows
       .filter(r => typeof r[buyField] === "number" || typeof r[sellField] === "number")
       .sort((a, b) => {
         if (basis === "volume") return (b[vol24Field] || 0) - (a[vol24Field] || 0);
         return (b[mcapField] || 0) - (a[mcapField] || 0);
       })
-      .slice(0, Math.max(1, Math.min(+limit || 10, 50)));
+      .slice(0, safeLimit);
 
-    // Compute ratios and shape output
+    // If nothing valid, return an empty but valid payload
+    if (!rows.length) {
+      const payload = {
+        success: true,
+        meta: {
+          basis, interval, limit: 0,
+          overall: {
+            ratio: 0, score: 0.5, sentiment: "Neutral", band_color: colorFromLabel("Neutral"),
+            buy_usd: 0, sell_usd: 0, flow_usd: 0
+          }
+        },
+        data: [],
+        lastUpdated: new Date().toISOString(),
+        source: "coinglass_spot_coins_markets",
+        method: "live-empty"
+      };
+      await kv.set(cacheKey, payload, { ex: TTL });
+      await kv.set(lastGoodKey, payload, { ex: 3600 });
+      return res.json(payload);
+    }
+
+    // Compute ratios & shape output
     const data = rows.map((r) => {
       const buy  = Math.max(0, r[buyField]  || 0);
       const sell = Math.max(0, r[sellField] || 0);
@@ -1408,7 +1462,7 @@ case "market-sentiment-flow": {
       const ratio = denom > 0 ? (buy - sell) / denom : 0; // -1..1
 
       const sentiment = labelFromRatio(ratio);
-      const score     = scoreFromLabel(sentiment); // snapped to band center
+      const score     = scoreFromLabel(sentiment);
       const band_color = colorFromLabel(sentiment);
 
       return {
@@ -1420,22 +1474,22 @@ case "market-sentiment-flow": {
         buy_usd: buy,
         sell_usd: sell,
         flow_usd: flow,
-        ratio,              // (-1..1) buy-vs-sell dominance
-        score,              // (0..1) snapped pointer value
-        sentiment,          // label matching thresholds
-        band_color          // convenience color for UI
+        ratio,       // (-1..1) buy-vs-sell dominance
+        score,       // (0..1) snapped pointer value
+        sentiment,   // label matching thresholds
+        band_color   // convenience color for UI
       };
     });
 
-    // Overall market score for the selected cohort (also snapped)
+    // Overall market score for the selected cohort (snapped)
     const totBuy  = data.reduce((s, d) => s + d.buy_usd, 0);
     const totSell = data.reduce((s, d) => s + d.sell_usd, 0);
-    const groupRatio   = (totBuy + totSell) > 0 ? (totBuy - totSell) / (totBuy + totSell) : 0;
-    const groupLabel   = labelFromRatio(groupRatio);
-    const groupScore   = scoreFromLabel(groupLabel);
-    const groupColor   = colorFromLabel(groupLabel);
+    const groupRatio = (totBuy + totSell) > 0 ? (totBuy - totSell) / (totBuy + totSell) : 0;
+    const groupLabel = labelFromRatio(groupRatio);
+    const groupScore = scoreFromLabel(groupLabel);
+    const groupColor = colorFromLabel(groupLabel);
 
-    return res.json({
+    const payload = {
       success: true,
       meta: {
         basis,
@@ -1453,16 +1507,39 @@ case "market-sentiment-flow": {
       },
       data,
       lastUpdated: new Date().toISOString(),
-      source: "coinglass_spot_coins_markets"
-    });
+      source: "coinglass_spot_coins_markets",
+      method: "live-fetch"
+    };
+
+    // 4) Cache success to both caches
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    return res.json(payload);
 
   } catch (err) {
+    console.error(`[${type}] market-sentiment-flow fetch error:`, err.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+
+    // final shaped failure
     return res.status(500).json({
-      error: "market-sentiment-flow failed",
-      message: err.message
+      success: false,
+      meta: {
+        basis, interval, limit: 0,
+        overall: {
+          ratio: 0, score: 0.5, sentiment: "Neutral", band_color: colorFromLabel("Neutral"),
+          buy_usd: 0, sell_usd: 0, flow_usd: 0
+        }
+      },
+      data: [],
+      error: "API fetch failed and no cached data available.",
+      lastUpdated: new Date().toISOString()
     });
   }
 }
+
+
+
 
 
 case "coins-flow-sankey": {
