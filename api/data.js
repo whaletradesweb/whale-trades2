@@ -234,7 +234,6 @@ case "liquidations-table": {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    // Fallback if no last good data
     const fallback = {};
     ['1h', '4h', '12h', '24h'].forEach(tf => {
         const U = tf.toUpperCase();
@@ -258,10 +257,21 @@ case "liquidations-table": {
     };
 
     const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list";
-    // --- Corrected line below ---
-    const requests = timeframes.map((range ) => 
-      axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000, params: { range } }))
+    
+    // --- THIS IS THE CORRECTED LOGIC ---
+    const requests = timeframes.map((range ) =>
+      axiosWithBackoff(() => 
+        axios.get(url, { 
+          headers, 
+          timeout: 15000, 
+          params: { range },
+          // This validateStatus is now correctly placed inside the function that axiosWithBackoff calls
+          validateStatus: (s) => s < 500 
+        })
+      )
     );
+    // --- END OF CORRECTION ---
+
     const responses = await Promise.all(requests);
 
     const results = {};
@@ -305,6 +315,7 @@ case "liquidations-table": {
     return res.status(500).json({ error: "API fetch failed", message: error.message });
   }
 }
+
 
 
 
