@@ -224,85 +224,104 @@ case "liquidations-table": {
   const cacheKey = "cg:liquidations-table";
   const lastGoodKey = "last:liquidations-table";
 
+  // 1. Check for fresh data in the main cache
   const cachedData = await kv.get(cacheKey);
   if (cachedData) {
     console.log(`DEBUG [${type}]: Returning main cached data.`);
     return res.json(cachedData);
   }
 
+  // 2. If no cache, check rate limit
   if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    const fallback = {};
+    
+    // Use your original fallback structure
+    const fallbackResults = {};
     ['1h', '4h', '12h', '24h'].forEach(tf => {
-        const U = tf.toUpperCase();
-        fallback[`${U}-Total`] = "$0";
-        fallback[`${U}-Total-Long`] = "$0";
-        fallback[`${U}-Total-Short`] = "$0";
+      const tfUpper = tf.toUpperCase();
+      fallbackResults[`${tfUpper}-Total`] = "$0";
+      fallbackResults[`${tfUpper}-Total-Long`] = "$0";
+      fallbackResults[`${tfUpper}-Total-Short`] = "$0";
     });
-    return res.json({ success: true, ...fallback, method: "guarded-fallback" });
+    return res.json({ success: false, ...fallbackResults, method: "guarded-fallback" });
   }
 
+  // 3. If allowed, fetch fresh data
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
-    const timeframes = ["1h", "4h", "12h", "24h"];
+    
+    // --- YOUR ORIGINAL, WORKING LOGIC STARTS HERE ---
+    const timeframes = ['1h', '4h', '12h', '24h'];
+    const results = {};
     const fmtUSD = (v) => {
-        const n = Math.abs(v);
-        if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-        if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-        if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-        if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
-        return `$${v.toFixed(2)}`;
+      const n = Math.abs(v);
+      if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+      if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+      if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+      if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+      return `$${v.toFixed(2)}`;
     };
 
-    const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list";
-    
-    // --- THIS IS THE CORRECTED LOGIC ---
-    const requests = timeframes.map((range ) =>
+    const requests = timeframes.map(range => 
       axiosWithBackoff(() => 
-        axios.get(url, { 
-          headers, 
-          timeout: 15000, 
+        axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list", {
+          headers,
+          timeout: 10000,
           params: { range },
-          // This validateStatus is now correctly placed inside the function that axiosWithBackoff calls
-          validateStatus: (s) => s < 500 
-        })
+          validateStatus: s => s < 500
+        } )
       )
     );
-    // --- END OF CORRECTION ---
-
     const responses = await Promise.all(requests);
 
-    const results = {};
-    timeframes.forEach((timeframe, idx) => {
-        const response = responses[idx];
-        if (response.status !== 200 || response.data?.code !== "0") {
-            results[timeframe] = { error: `HTTP ${response.status}` }; return;
-        }
-        const data = response.data?.data || [];
-        const all = data.find((row) => row.exchange === "All");
-        if (all) {
-            results[timeframe] = { total: fmtUSD(all.liquidation_usd || 0), long: fmtUSD(all.longLiquidation_usd || 0), short: fmtUSD(all.shortLiquidation_usd || 0) };
-        } else {
-            results[timeframe] = { total: "$0", long: "$0", short: "$0" };
-        }
+    timeframes.forEach((timeframe, index) => {
+      const response = responses[index];
+      if (response.status !== 200 || response.data?.code !== "0") {
+        results[timeframe] = { total: "$0", long: "$0", short: "$0", error: response.data?.msg || `HTTP ${response.status}` };
+        return;
+      }
+      const data = response.data.data || [];
+      const allExchanges = data.find(item => item.exchange === "All");
+      if (allExchanges) {
+        results[timeframe] = {
+          total: fmtUSD(allExchanges.liquidation_usd || 0),
+          long: fmtUSD(allExchanges.longLiquidation_usd || 0),
+          short: fmtUSD(allExchanges.shortLiquidation_usd || 0)
+        };
+      } else {
+        const totalLiq = data.reduce((sum, item) => sum + (item.liquidation_usd || 0), 0);
+        const totalLong = data.reduce((sum, item) => sum + (item.longLiquidation_usd || 0), 0);
+        const totalShort = data.reduce((sum, item) => sum + (item.shortLiquidation_usd || 0), 0);
+        results[timeframe] = { total: fmtUSD(totalLiq), long: fmtUSD(totalLong), short: fmtUSD(totalShort) };
+      }
     });
 
     const webflowFormatted = {};
     timeframes.forEach(tf => {
-        const U = tf.toUpperCase();
-        if (results[tf] && !results[tf].error) {
-            webflowFormatted[`${U}-Total`] = results[tf].total;
-            webflowFormatted[`${U}-Total-Long`] = results[tf].long;
-            webflowFormatted[`${U}-Total-Short`] = results[tf].short;
-        } else {
-            webflowFormatted[`${U}-Total`] = "$0"; webflowFormatted[`${U}-Total-Long`] = "$0"; webflowFormatted[`${U}-Total-Short`] = "$0";
-        }
+      const tfUpper = tf.toUpperCase();
+      if (results[tf] && !results[tf].error) {
+        webflowFormatted[`${tfUpper}-Total`] = results[tf].total;
+        webflowFormatted[`${tfUpper}-Total-Long`] = results[tf].long;
+        webflowFormatted[`${tfUpper}-Total-Short`] = results[tf].short;
+      } else {
+        webflowFormatted[`${tfUpper}-Total`] = "$0";
+        webflowFormatted[`${tfUpper}-Total-Long`] = "$0";
+        webflowFormatted[`${tfUpper}-Total-Short`] = "$0";
+      }
     });
+    // --- YOUR ORIGINAL, WORKING LOGIC ENDS HERE ---
 
-    const payload = { success: true, ...webflowFormatted, lastUpdated: new Date().toISOString(), method: "live-fetch" };
+    const payload = {
+      success: true,
+      ...webflowFormatted,
+      nested_data: results, // Keep your original nested data for debugging
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
 
+    // 4. Cache the successful payload
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
 
@@ -312,7 +331,16 @@ case "liquidations-table": {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+    
+    // Use your original error fallback structure
+    const fallbackResults = {};
+    ['1h', '4h', '12h', '24h'].forEach(tf => {
+      const tfUpper = tf.toUpperCase();
+      fallbackResults[`${tfUpper}-Total`] = "$0";
+      fallbackResults[`${tfUpper}-Total-Long`] = "$0";
+      fallbackResults[`${tfUpper}-Total-Short`] = "$0";
+    });
+    return res.status(500).json({ success: false, ...fallbackResults, error: "API fetch failed", message: error.message });
   }
 }
 
