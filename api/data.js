@@ -1236,90 +1236,112 @@ case "hyperliquid-whale-alert": {
 
 
 
-// 
-
-
 case "bull-market-peak-indicators": {
-  const TTL = 300; // Cache for 5 minutes, as this data doesn't change rapidly
+  const TTL = 300; // 5 min
   const cacheKey = "cg:bull-market-peak-indicators";
   const lastGoodKey = "last:bull-market-peak-indicators";
 
-  // 1. Check for fresh data in the main cache
-  const cachedData = await kv.get(cacheKey);
-  if (cachedData) {
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) {
     console.log(`DEBUG [${type}]: Returning main cached data.`);
-    return res.json(cachedData);
+    return res.json(cached);
   }
 
-  // 2. If no cache, check rate limit
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    // Fallback if there's no "last good" data
-    return res.json({ success: false, data: {}, message: "Guarded: Rate limit active" });
+    // Fully-shaped guarded fallback
+    return res.json({
+      success: false,
+      data: {},
+      totalIndicators: 0,
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback",
+      message: "Guarded: Rate limit active"
+    });
   }
 
-  // 3. If allowed, fetch fresh data
+  // 3) Live fetch
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
     const url = "https://open-api-v4.coinglass.com/api/bull-market-peak-indicator";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    const response = await axiosWithBackoff(() =>
+      axios.get(url, { headers, timeout: 10000, validateStatus: s => s < 500 })
+    );
 
-    if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`Upstream failed: HTTP ${response.status} - ${response.data?.message}`);
+    if (response.status !== 200 || response.data?.code !== "0" || !Array.isArray(response.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
     }
 
-    // --- YOUR CRITICAL PROCESSING LOGIC ---
-    const indicators = response.data.data || [];
+    // --- Processing logic (hardened) ---
+    const indicators = response.data.data;
+
     const targetIndicators = [
       "Pi Cycle Top Indicator", "Puell Multiple", "Bitcoin Rainbow Chart",
       "MVRV Z-Score", "Altcoin Season Index", "Bitcoin Dominance",
       "Bitcoin Net Unrealized P&L (NUPL)", "Bitcoin 4-Year Moving Average"
     ];
-    const processedIndicators = {};
-    indicators.forEach(indicator => {
-      if (targetIndicators.includes(indicator.indicator_name)) {
-        let current = parseFloat(indicator.current_value.toString().replace('%', '')) || 0;
-        let target = parseFloat(indicator.target_value.toString().replace('%', '')) || 0;
-        const previous = parseFloat(indicator.previous_value.toString().replace('%', '')) || 0;
-        const change = parseFloat(indicator.change_value) || 0;
-        let progressPercentage = 0;
-        if (indicator.comparison_type === ">=") {
-          progressPercentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
-        } else if (indicator.comparison_type === "<=") {
-          progressPercentage = target > 0 ? Math.max(100 - ((current / target) * 100), 0) : 0;
-        }
-        const distance = Math.abs(target - current);
-        const percentageChange = previous !== 0 ? ((current - previous) / previous) * 100 : 0;
-        processedIndicators[indicator.indicator_name] = {
-          current_value: current,
-          target_value: target,
-          previous_value: previous,
-          change_value: change,
-          comparison_type: indicator.comparison_type,
-          hit_status: indicator.hit_status,
-          progress_percentage: Math.round(progressPercentage * 100) / 100,
-          distance_to_target: distance,
-          percentage_change: Math.round(percentageChange * 100) / 100,
-          progress_bar_width: Math.min(progressPercentage, 100),
-          remaining_bar_width: Math.max(100 - progressPercentage, 0),
-          original_current_value: indicator.current_value,
-          original_target_value: indicator.target_value
-        };
+
+    const num = (v) => {
+      if (v == null) return 0;
+      if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+      const s = String(v).replace(/\s+/g, "").replace("%", "");
+      const n = parseFloat(s);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const processed = {};
+    for (const indicator of indicators) {
+      const name = indicator?.indicator_name;
+      if (!targetIndicators.includes(name)) continue;
+
+      const current  = num(indicator?.current_value);
+      const target   = num(indicator?.target_value);
+      const previous = num(indicator?.previous_value);
+      const change   = num(indicator?.change_value);
+      const cmp      = indicator?.comparison_type || ">="; // default safe
+      const hit      = indicator?.hit_status ?? false;
+
+      let progressPct = 0;
+      if (cmp === ">=") {
+        progressPct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+      } else if (cmp === "<=") {
+        progressPct = target > 0 ? Math.max(100 - ((current / target) * 100), 0) : 0;
       }
-    });
-    // --- END OF YOUR LOGIC ---
+
+      const distance = Math.abs(target - current);
+      const pctChange = previous !== 0 ? ((current - previous) / previous) * 100 : 0;
+
+      processed[name] = {
+        current_value: current,
+        target_value: target,
+        previous_value: previous,
+        change_value: change,
+        comparison_type: cmp,
+        hit_status: hit,
+        progress_percentage: Math.round(progressPct * 100) / 100,
+        distance_to_target: distance,
+        percentage_change: Math.round(pctChange * 100) / 100,
+        progress_bar_width: Math.min(progressPct, 100),
+        remaining_bar_width: Math.max(100 - progressPct, 0),
+        original_current_value: indicator?.current_value ?? null,
+        original_target_value: indicator?.target_value ?? null
+      };
+    }
+    // --- end processing ---
 
     const payload = {
       success: true,
-      data: processedIndicators,
+      data: processed,
+      totalIndicators: Object.keys(processed).length,
       lastUpdated: new Date().toISOString(),
-      totalIndicators: Object.keys(processedIndicators).length,
       method: "live-fetch"
     };
 
-    // 4. Cache the successful payload
+    // 4) Cache both
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
 
@@ -1329,9 +1351,19 @@ case "bull-market-peak-indicators": {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+    return res.status(500).json({
+      success: false,
+      data: {},
+      totalIndicators: 0,
+      error: "API fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
   }
 }
+
+
 
 
 
