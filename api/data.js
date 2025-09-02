@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
       }
 
   case "altcoin-season": {
-  const TTL = 300; // This data changes less frequently, cache for 5 minutes.
+  const TTL = 300; // Cache for 5 minutes
   const out = await cacheGetSet("altcoin-season", {}, TTL, async () => {
     if (!(await allow("cg:GLOBAL", 250))) {
       const last = await kv.get("last:altcoin-season");
@@ -63,10 +63,10 @@ module.exports = async (req, res) => {
     const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
     
     if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`Altcoin Season upstream failed: HTTP ${response.status}`);
+      throw new Error(`Altcoin Season upstream failed: HTTP ${response.status} - ${response.data?.message}`);
     }
 
-    const raw = response.data.data;
+    const raw = response.data.data || [];
     const altcoinData = raw.map(d => ({
       timestamp: d.timestamp,
       altcoin_index: d.altcoin_index,
@@ -79,14 +79,13 @@ module.exports = async (req, res) => {
       lastUpdated: new Date().toISOString(),
       dataPoints: altcoinData.length
     };
-    await kv.set("last:altcoin-season", payload, { ex: 3600 });
+    await kv.set("last:altcoin-season", payload, { ex: 3600 }); // Keep last good for 1 hour
     return payload;
   });
   return res.json(out);
 }
 
 
- // DELETE the old "etf-btc-flows" and "etf-eth-flows" cases and REPLACE with this:
 
 case "etf-flows": {
   // Determine the asset from the symbol query param, defaulting to BTC.
@@ -497,222 +496,68 @@ case "open-interest": {
 
 case "rsi-heatmap": {
   const { interval = "1h" } = req.query;
-  
-  // Validate interval parameter
   const validIntervals = ["15m", "1h", "4h", "8h", "12h", "1d", "1w"];
   if (!validIntervals.includes(interval)) {
-    return res.status(400).json({ 
-      error: "Invalid interval", 
-      message: "Interval must be one of: " + validIntervals.join(", ")
-    });
+    return res.status(400).json({ error: "Invalid interval" });
   }
-  
-  console.log(`DEBUG: Requesting RSI data for interval: ${interval}`);
-  
-  const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
-  const response = await axios.get(url, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
+
+  const TTL = 120; // Cache for 2 minutes
+  // Add the interval to the cache key to store 1h, 4h, etc., separately
+  const out = await cacheGetSet(`rsi-heatmap:${interval}`, {}, TTL, async () => {
+    if (!(await allow("cg:GLOBAL", 250))) {
+      const last = await kv.get(`last:rsi-heatmap:${interval}`);
+      if (last) return last;
+      return { success: false, data: [], statistics: {}, message: "Guarded: Rate limit active" };
     }
-  });
-  
-  console.log("DEBUG: RSI Response Status:", response.status);
-  
-  if (response.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-    });
-  }
-  
-  if (response.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden',
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (response.status !== 200) {
-    return res.status(response.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${response.status}`,
-      details: response.data
-    });
-  }
-  
-  if (!response.data || response.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: response.data?.message || 'CoinGlass API returned error code',
-      code: response.data?.code
-    });
-  }
-  
-  const rawData = response.data.data || [];
-  
-  if (!Array.isArray(rawData) || rawData.length === 0) {
-    return res.status(404).json({
-      error: 'No Data',
-      message: 'No RSI data available for the requested interval'
-    });
-  }
-  
-  // Process and format the RSI data based on actual API response structure
-  const processedData = rawData.map(coin => {
-    const rsiData = {
-      "15m": coin.rsi_15m || null,
-      "1h": coin.rsi_1h || null,
-      "4h": coin.rsi_4h || null,
-      "12h": coin.rsi_12h || null,
-      "24h": coin.rsi_24h || null,
-      "1w": coin.rsi_1w || null
-    };
+
+    const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`RSI Heatmap upstream failed: HTTP ${response.status} - ${response.data?.message}`);
+    }
     
-    const priceChangeData = {
-      "15m": coin.price_change_percent_15m || 0,
-      "1h": coin.price_change_percent_1h || 0,
-      "4h": coin.price_change_percent_4h || 0,
-      "12h": coin.price_change_percent_12h || 0,
-      "24h": coin.price_change_percent_24h || 0,
-      "1w": coin.price_change_percent_1w || 0
-    };
-    
-    // Map interval parameter to API keys
-    const intervalMap = {
-      "15m": "15m",
-      "1h": "1h", 
-      "4h": "4h",
-      "8h": "4h", // Use 4h as fallback for 8h
-      "12h": "12h",
-      "1d": "24h", // Map 1d to 24h
-      "1w": "1w"
-    };
-    
+    const rawData = response.data.data || [];
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      return { success: true, data: [], statistics: {}, message: "No data available" };
+    }
+
+    // Your existing processing logic is great, no changes needed here
+    const intervalMap = {"15m":"15m","1h":"1h","4h":"4h","8h":"4h","12h":"12h","1d":"24h","1w":"1w"};
     const mappedInterval = intervalMap[interval] || "1h";
+    const processedData = rawData.map(coin => {
+      const rsiData = {"15m":coin.rsi_15m,"1h":coin.rsi_1h,"4h":coin.rsi_4h,"12h":coin.rsi_12h,"24h":coin.rsi_24h,"1w":coin.rsi_1w};
+      const priceChangeData = {"15m":coin.price_change_percent_15m||0,"1h":coin.price_change_percent_1h||0,"4h":coin.price_change_percent_4h||0,"12h":coin.price_change_percent_12h||0,"24h":coin.price_change_percent_24h||0,"1w":coin.price_change_percent_1w||0};
+      return {
+        symbol: coin.symbol || 'UNKNOWN', current_price: coin.current_price || 0, rsi: rsiData,
+        price_change_percent: priceChangeData, current_rsi: rsiData[mappedInterval],
+        current_price_change: priceChangeData[mappedInterval]
+      };
+    }).filter(c => c.current_rsi != null).sort((a, b) => b.current_price - a.current_price).slice(0, 150);
     
-    return {
-      symbol: coin.symbol || 'UNKNOWN',
-      current_price: coin.current_price || 0,
-      rsi: rsiData,
-      price_change_percent: priceChangeData,
-      current_rsi: rsiData[mappedInterval], // RSI for the requested interval
-      current_price_change: priceChangeData[mappedInterval] // Price change for the requested interval
+    const rsiValues = processedData.map(c => c.current_rsi);
+    const overbought = rsiValues.filter(r => r >= 70).length;
+    const oversold = rsiValues.filter(r => r <= 30).length;
+    const stats = {
+      total_coins: processedData.length, overbought_count: overbought, oversold_count: oversold,
+      neutral_count: rsiValues.length - overbought - oversold,
+      overbought_percent: ((overbought / rsiValues.length) * 100).toFixed(1),
+      oversold_percent: ((oversold / rsiValues.length) * 100).toFixed(1),
+      average_rsi: (rsiValues.reduce((s, r) => s + r, 0) / rsiValues.length).toFixed(2)
     };
-  })
-  .filter(coin => coin.current_rsi !== null && coin.current_rsi !== undefined)
-  .sort((a, b) => {
-    // Sort by current price descending (as proxy for market cap), then by RSI
-    if (b.current_price !== a.current_price) {
-      return b.current_price - a.current_price;
-    }
-    return b.current_rsi - a.current_rsi;
-  })
-  .slice(0, 150); // Limit to top 150 coins for performance
-  
-  // Calculate distribution statistics
-  const rsiValues = processedData.map(coin => coin.current_rsi);
-  const overbought = rsiValues.filter(rsi => rsi >= 70).length;
-  const oversold = rsiValues.filter(rsi => rsi <= 30).length;
-  const neutral = rsiValues.filter(rsi => rsi > 30 && rsi < 70).length;
-  const strong = rsiValues.filter(rsi => rsi >= 60 && rsi < 70).length;
-  const weak = rsiValues.filter(rsi => rsi > 30 && rsi <= 40).length;
-  
-  const stats = {
-    total_coins: processedData.length,
-    overbought_count: overbought,
-    oversold_count: oversold,
-    neutral_count: neutral,
-    strong_count: strong,
-    weak_count: weak,
-    overbought_percent: ((overbought / processedData.length) * 100).toFixed(1),
-    oversold_percent: ((oversold / processedData.length) * 100).toFixed(1),
-    average_rsi: (rsiValues.reduce((sum, rsi) => sum + rsi, 0) / rsiValues.length).toFixed(2)
-  };
-  
-  console.log(`DEBUG: Processed ${processedData.length} coins for ${interval} interval`);
-  console.log("DEBUG: RSI Distribution:", stats);
-  
-  return res.json({ 
-    success: true,
-    data: processedData,
-    interval: interval,
-    statistics: stats,
-    lastUpdated: new Date().toISOString(),
-    nextUpdate: new Date(Date.now() + 15 * 60 * 1000).toISOString() // Next update in 15 minutes
+
+    const payload = { 
+      success: true, data: processedData, interval: interval, statistics: stats,
+      lastUpdated: new Date().toISOString()
+    };
+    await kv.set(`last:rsi-heatmap:${interval}`, payload, { ex: 3600 });
+    return payload;
   });
+  return res.json(out);
 }
 
-  case "bitcoin-dominance": {
-  console.log("DEBUG: Requesting Bitcoin Dominance from Coinglass...");
-  
-  const btcDominanceUrl = "https://open-api-v4.coinglass.com/api/index/bitcoin-dominance";
-  const btcResponse = await axios.get(btcDominanceUrl, { 
-    headers,
-    timeout: 10000,
-    validateStatus: function (status) {
-      return status < 500;
-    }
-  });
-  
-  console.log("DEBUG: Coinglass Response Status:", btcResponse.status);
-  
-  if (btcResponse.status === 401) {
-    return res.status(401).json({
-      error: 'API Authentication Failed',
-      message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-    });
-  }
-  
-  if (btcResponse.status === 403) {
-    return res.status(403).json({
-      error: 'API Access Forbidden',
-      message: 'Your API plan does not include access to this endpoint. Upgrade to Startup plan or higher.'
-    });
-  }
-  
-  if (btcResponse.status === 404) {
-    return res.status(404).json({
-      error: 'API Endpoint Not Found',
-      message: 'The bitcoin dominance endpoint may have changed. Check CoinGlass API documentation.'
-    });
-  }
-  
-  if (btcResponse.status !== 200) {
-    return res.status(btcResponse.status).json({
-      error: 'API Request Failed',
-      message: `CoinGlass API returned status ${btcResponse.status}`,
-      details: btcResponse.data
-    });
-  }
-  
-  if (!btcResponse.data || btcResponse.data.code !== "0") {
-    return res.status(400).json({
-      error: 'API Error',
-      message: btcResponse.data?.message || 'CoinGlass API returned error code',
-      code: btcResponse.data?.code
-    });
-  }
-  
-  const btcRaw = btcResponse.data.data;
-  const btcDominanceData = btcRaw.map(d => ({
-    timestamp: d.timestamp,
-    price: d.price,
-    bitcoin_dominance: d.bitcoin_dominance,
-    market_cap: d.market_cap
-  }));
-  
-  // Sort by timestamp to ensure chronological order
-  btcDominanceData.sort((a, b) => a.timestamp - b.timestamp);
-  
-  return res.json({ 
-    success: true,
-    data: btcDominanceData,
-    lastUpdated: new Date().toISOString(),
-    dataPoints: btcDominanceData.length
-  });
-}
+
+
 
 
 case "crypto-ticker": {
@@ -1098,8 +943,6 @@ case "hyperliquid-whale-position": {
   });
 }
 
-
-// Add this case to your existing switch statement in data.js
 
 case "hyperliquid-whale-alert": {
   console.log("DEBUG: Requesting Hyperliquid whale alerts...");
@@ -1665,7 +1508,6 @@ case "coins-flow-sankey": {
 }
 
 
-// Add this case to your existing switch statement in data.js
 
 case "discord-feed": {
   console.log("DEBUG: Requesting Discord messages from external service...");
