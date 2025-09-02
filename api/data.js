@@ -414,48 +414,108 @@ case "long-short": {
 case "max-pain": {
   const { symbol = "BTC", exchange = "Binance" } = req.query;
 
-  const TTL = 180; // Cache for 3 minutes
+  const TTL = 180; // 3 min
   const cacheKey = `cg:max-pain:${symbol}:${exchange}`;
   const lastGoodKey = `last:max-pain:${symbol}:${exchange}`;
 
-  // 1. Check for fresh data in the main cache
+  // 1) Fast lane
   const cachedData = await kv.get(cacheKey);
   if (cachedData) {
     console.log(`DEBUG [${type}]: Returning main cached data for ${symbol}/${exchange}.`);
     return res.json(cachedData);
   }
 
-  // 2. If no cache, check rate limit
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}/${exchange}.`);
     const last = await kv.get(lastGoodKey);
-    // Ensure we always return a valid data structure, even on fallback
     if (last) return res.json(last);
-    return res.json({ data: {}, message: "Guarded: Rate limit active" });
+    // fully shaped fallback so UI never breaks
+    return res.json({
+      data: {
+        max_pain_price: 0,
+        call_open_interest_market_value: 0,
+        put_open_interest_market_value: 0,
+        call_open_interest: 0,
+        put_open_interest: 0,
+        call_open_interest_notional: 0,
+        put_open_interest_notional: 0,
+        date: null
+      },
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback"
+    });
   }
 
-  // 3. If allowed, fetch fresh data
+  // 3) Live fetch
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data for ${symbol}/${exchange}.`);
     const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
-    // --- THIS LINE IS CORRECTED ---
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
+    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 10000 }));
 
-    if (response.status !== 200) {
-      throw new Error(`Upstream failed with status: ${response.status}`);
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
     }
-    
-    const maxPainData = response.data?.data || response.data;
-    const finalData = (Array.isArray(maxPainData) ? maxPainData[0] : maxPainData) || {};
 
-    const payload = {
-      data: finalData,
-      lastUpdated: new Date().toISOString(),
-      method: "live-fetch"
+    // CoinGlass may return { data: {...} } or { data: [ ... expiries ... ] }
+    const raw = response.data?.data;
+    const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+
+    // Pick nearest future expiry; else latest by date/timestamp
+    const now = Date.now();
+    const parseExpiry = (item) => {
+      // accept 'date' (YYMMDD / YYYYMMDD), 'expire_date', or 'timestamp'
+      if (item.timestamp) return +item.timestamp;
+      const d = (item.date || item.expire_date || "").toString();
+      // try YYYYMMDD then YYMMDD
+      if (/^\d{8}$/.test(d)) {
+        const y = +d.slice(0,4), m = +d.slice(4,6)-1, dd = +d.slice(6,8);
+        return Date.UTC(y, m, dd);
+      }
+      if (/^\d{6}$/.test(d)) {
+        const y = 2000 + +d.slice(0,2), m = +d.slice(2,4)-1, dd = +d.slice(4,6);
+        return Date.UTC(y, m, dd);
+      }
+      return 0;
     };
 
+    list.sort((a,b) => parseExpiry(a) - parseExpiry(b));
+    let chosen = list.find(it => parseExpiry(it) >= now) || list[list.length - 1] || {};
+
+    // Normalize field names → what your Webflow expects
+    const norm = (k) => k == null ? 0 : Number(k) || 0;
+    const toYYMMDD = (tmsOrStr) => {
+      if (!tmsOrStr) return null;
+      if (typeof tmsOrStr === "number") {
+        const d = new Date(tmsOrStr);
+        const yy = String(d.getUTCFullYear()).slice(-2);
+        const mm = String(d.getUTCMonth()+1).padStart(2,"0");
+        const dd = String(d.getUTCDate()).padStart(2,"0");
+        return `${yy}${mm}${dd}`;
+      }
+      const s = String(tmsOrStr);
+      // accept YYYYMMDD or YYMMDD
+      if (/^\d{8}$/.test(s)) return s.slice(2);
+      if (/^\d{6}$/.test(s)) return s;
+      return null;
+    };
+
+    // Many APIs use camelCase; we defensively alias common variants
+    const finalData = {
+      max_pain_price:              norm(chosen.max_pain_price ?? chosen.maxPainPrice ?? chosen.max_pain ?? chosen.maxpain),
+      call_open_interest_market_value: norm(chosen.call_open_interest_market_value ?? chosen.callOiMarketValueUsd ?? chosen.call_oi_market_value_usd ?? chosen.call_oi_mv_usd),
+      put_open_interest_market_value:  norm(chosen.put_open_interest_market_value  ?? chosen.putOiMarketValueUsd  ?? chosen.put_oi_market_value_usd  ?? chosen.put_oi_mv_usd),
+      call_open_interest:          norm(chosen.call_open_interest ?? chosen.callOi ?? chosen.call_oi),
+      put_open_interest:           norm(chosen.put_open_interest  ?? chosen.putOi  ?? chosen.put_oi),
+      call_open_interest_notional: norm(chosen.call_open_interest_notional ?? chosen.callOiNotionalUsd ?? chosen.call_oi_notional_usd),
+      put_open_interest_notional:  norm(chosen.put_open_interest_notional  ?? chosen.putOiNotionalUsd  ?? chosen.put_oi_notional_usd),
+      date:                        toYYMMDD(chosen.date ?? chosen.expire_date ?? chosen.timestamp)
+    };
+
+    const payload = { data: finalData, lastUpdated: new Date().toISOString(), method: "live-fetch" };
+
     await kv.set(cacheKey, payload, { ex: TTL });
-    if (Object.keys(finalData).length > 0) {
+    if (Object.values(finalData).some(v => v)) {
       await kv.set(lastGoodKey, payload, { ex: 3600 });
     }
 
@@ -465,10 +525,21 @@ case "max-pain": {
     console.error(`[${type}] Fetch Error for ${symbol}/${exchange}:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ data: {}, error: "API fetch failed and no cached data available." });
+    return res.status(500).json({
+      data: {
+        max_pain_price: 0,
+        call_open_interest_market_value: 0,
+        put_open_interest_market_value: 0,
+        call_open_interest: 0,
+        put_open_interest: 0,
+        call_open_interest_notional: 0,
+        put_open_interest_notional: 0,
+        date: null
+      },
+      error: "API fetch failed and no cached data available."
+    });
   }
 }
-
 
  
 
