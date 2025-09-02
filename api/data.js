@@ -1543,62 +1543,119 @@ case "market-sentiment-flow": {
 
 
 case "coins-flow-sankey": {
-  // --- local helpers (like your other cases) ---
+  // --- Input guards & param shaping ---
   const tfMap = { "1h":"1h","4h":"4h","24h":"24h","1w":"1w" };
   const tf = (req.query.tf || "24h").toLowerCase();
-  const top = Math.max(5, Math.min(parseInt(req.query.top || "20", 10), 200));
-  const perPage = Math.max(top, Math.min(parseInt(req.query.per_page || "200", 10), 200));
-
   if (!tfMap[tf]) {
     return res.status(400).json({ error: "Invalid tf. Use 1h|4h|24h|1w" });
   }
+  const safeTop = Math.max(5, Math.min(parseInt(req.query.top || "20", 10) || 20, 200));
+  const safePerPage = Math.max(safeTop, Math.min(parseInt(req.query.per_page || "200", 10) || 200, 200));
 
   const volField  = `volume_usd_${tfMap[tf]}`;
   const buyField  = `buy_volume_usd_${tfMap[tf]}`;
   const sellField = `sell_volume_usd_${tfMap[tf]}`;
   const flowField = `volume_flow_usd_${tfMap[tf]}`;
 
-  try {
-    const url = `https://open-api-v4.coinglass.com/api/spot/coins-markets?per_page=${perPage}&page=1`;
-    const cg = await axios.get(url, { headers, timeout: 15000, validateStatus: s => s < 500 });
+  // --- Cache keys (fast-lane + safety-net) ---
+  const TTL = 120; // 2 min fast cache
+  const cacheKey    = `cg:coins-flow-sankey:tf=${tf}:top=${safeTop}:per=${safePerPage}`;
+  const lastGoodKey = `last:coins-flow-sankey:tf=${tf}:top=${safeTop}:per=${safePerPage}`;
 
-    if (cg.status !== 200 || cg.data?.code !== "0") {
-      return res.status(cg.status).json({
-        error: "CoinGlass spot coins-markets failed",
-        message: cg.data?.msg || cg.data?.message || `HTTP ${cg.status}`
-      });
-    }
+  // 1) Fast lane: short-term cache
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: coins-flow-sankey → cache-hit (tf=${tf}, top=${safeTop})`);
+    return res.json(cached);
+  }
 
-    let rows = Array.isArray(cg.data?.data) ? cg.data.data : [];
-    rows = rows
-      .filter(r => typeof r[volField] === "number")
-      .sort((a,b) => (b[volField]||0) - (a[volField]||0))
-      .slice(0, top);
-
-    const items = rows.map(r => ({
-      symbol: r.symbol,
-      volume: r[volField] || 0,
-      buy:    r[buyField] || 0,
-      sell:   r[sellField] || 0,
-      flow:   r[flowField] ?? ((r[buyField]||0) - (r[sellField]||0))
-    }));
-
+  // 2) Traffic cop: global rate limiter
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: coins-flow-sankey → rate-limited, serving last-good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // Fully-shaped guarded fallback so UI never breaks
     return res.json({
       success: true,
       timeframe: tf,
-      top,
-      items,
+      top: 0,
+      items: [],
       lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback",
       source: "coinglass_spot_coins_markets"
     });
+  }
+
+  // 3) Live fetch
+  try {
+    const url = `https://open-api-v4.coinglass.com/api/spot/coins-markets`;
+    const cg = await axiosWithBackoff(() =>
+      axios.get(url, {
+        headers,
+        timeout: 15000,
+        validateStatus: s => s < 500,
+        params: { per_page: safePerPage, page: 1 }
+      })
+    );
+
+    if (cg.status !== 200 || cg.data?.code !== "0" || !Array.isArray(cg.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${cg.status} code=${cg.data?.code} msg=${cg.data?.msg || cg.data?.message || "unknown"}`);
+    }
+
+    let rows = cg.data.data;
+
+    // Rank by timeframe volume, then slice
+    rows = rows
+      .filter(r => typeof r[volField] === "number")
+      .sort((a,b) => (b[volField] || 0) - (a[volField] || 0))
+      .slice(0, safeTop);
+
+    // Shape output; if empty, still return shaped payload
+    const items = rows.map(r => {
+      const buy  = Number(r[buyField]  || 0);
+      const sell = Number(r[sellField] || 0);
+      return {
+        symbol: r.symbol,
+        volume: Number(r[volField] || 0),
+        buy,
+        sell,
+        flow: Number.isFinite(r[flowField]) ? Number(r[flowField]) : (buy - sell)
+      };
+    });
+
+    const payload = {
+      success: true,
+      timeframe: tf,
+      top: items.length,
+      items,
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch",
+      source: "coinglass_spot_coins_markets"
+    };
+
+    // 4) Populate both caches
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
 
   } catch (err) {
+    console.error(`[${type}] coins-flow-sankey fetch error:`, err.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+
     return res.status(500).json({
+      success: false,
+      timeframe: tf,
+      top: 0,
+      items: [],
       error: "coins-flow-sankey failed",
-      message: err.message
+      message: err.message,
+      lastUpdated: new Date().toISOString()
     });
   }
 }
+
 
 
 
