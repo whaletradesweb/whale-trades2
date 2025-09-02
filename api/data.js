@@ -334,28 +334,77 @@ case "long-short": {
 
 
 
+case "max-pain": {
+  // Extract dynamic params from the request query
+  const { symbol = "BTC", exchange = "Binance" } = req.query;
+
+  const TTL = 180; // Cache for 3 minutes
+  // Create a dynamic cache key based on the symbol and exchange
+  const cacheKey = `cg:max-pain:${symbol}:${exchange}`;
+  const lastGoodKey = `last:max-pain:${symbol}:${exchange}`;
+
+  // 1. Check for fresh data in the main cache
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: Returning main cached data for ${symbol}/${exchange}.`);
+    return res.json(cachedData);
+  }
+
+  // 2. If no cache, check rate limit
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}/${exchange}.`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // Fallback if there's no "last good" data
+    return res.json({ data: null, message: "Guarded: Rate limit active" });
+  }
+
+  // 3. If allowed, fetch fresh data
+  try {
+    console.log(`DEBUG [${type}]: Fetching fresh data for ${symbol}/${exchange}.`);
+    const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
+
+    if (response.status !== 200 || response.data?.code !== "0") {
+      // Handle cases where CoinGlass returns an error for a specific pair
+      if (response.data?.message) {
+        console.warn(`[${type}] CoinGlass API error for ${symbol}/${exchange}: ${response.data.message}`);
+        // Return a specific error message instead of throwing, so we don't serve stale data for a valid "not found" case
+        return res.json({ data: null, error: "Data not available for this pair", message: response.data.message });
+      }
+      throw new Error(`Upstream failed: HTTP ${response.status}`);
+    }
+
+    // --- YOUR CRITICAL PROCESSING LOGIC ---
+    const maxPainData = response.data?.data || response.data;
+    if (!maxPainData) {
+      return res.json({ data: null, message: "Max Pain data unavailable from API" });
+    }
+    const finalData = Array.isArray(maxPainData) ? maxPainData[0] : maxPainData;
+    // --- END OF YOUR LOGIC ---
+
+    const payload = {
+      data: finalData,
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
+
+    // 4. Cache the successful payload
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Fetch Error for ${symbol}/${exchange}:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed and no cached data available." });
+  }
+}
  
 
-      case "max-pain": {
-        const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
-        const response = await axios.get(url, { headers });
-        
-        console.log("DEBUG: Max Pain raw response:", response.data);
-        
-        // CoinGlass returns data directly, not nested
-        const maxPainData = response.data?.data || response.data;
-        
-        if (!maxPainData) {
-          throw new Error("Max Pain data unavailable");
-        }
-        
-        // If it's an array, take the first item, otherwise use as is
-        const finalData = Array.isArray(maxPainData) ? maxPainData[0] : maxPainData;
-        
-        console.log("DEBUG: Final Max Pain data:", finalData);
-        
-        return res.json({ data: finalData });
-      }
+
 
 
 case "open-interest": {
