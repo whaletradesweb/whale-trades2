@@ -2147,83 +2147,161 @@ case "coins-flow-sankey": {
 
 case "discord-feed": {
   console.log("DEBUG: Requesting Discord messages from external service...");
-  
-  // The Discord service URL - replace with your actual deployed URL
+
   const DISCORD_SERVICE_URL = process.env.DISCORD_SERVICE_URL || "https://discord-monitor.azurewebsites.net";
-  const limit = Math.min(parseInt(req.query.limit || "50"), 100);
-  
+  const limit = Math.min(parseInt(req.query.limit || "50", 10), 100);
+
+  // Short cache to smooth bursts; also keep a last-known-good
+  const TTL = 45;
+  const cacheKey    = `ext:discord-feed:limit=${limit}`;
+  const lastGoodKey = `last:discord-feed:limit=${limit}`;
+
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: discord-feed → cache-hit (${limit})`);
+    return res.json(cached);
+  }
+
   try {
     const discordUrl = `${DISCORD_SERVICE_URL}/messages`;
-    const response = await axios.get(discordUrl, {
+    const response = await axiosWithBackoff(() => axios.get(discordUrl, {
       timeout: 15000,
-      validateStatus: function (status) {
-        return status < 500;
-      },
-      params: {
-        limit: limit
-      }
-    });
+      validateStatus: s => s < 500,
+      params: { limit }
+    }));
 
     if (response.status === 404) {
       return res.status(404).json({
-        error: 'Discord service not found',
-        message: 'Discord monitoring service is not available at the configured URL.'
+        error: "Discord service not found",
+        message: "Discord monitoring service is not available at the configured URL."
       });
     }
-
     if (response.status === 503) {
+      // Try last-known-good on service hiccup
+      const last = await kv.get(lastGoodKey);
+      if (last) return res.json(last);
       return res.status(503).json({
-        error: 'Discord service unavailable',
-        message: 'Discord monitoring service is temporarily unavailable.'
+        error: "Discord service unavailable",
+        message: "Discord monitoring service is temporarily unavailable."
       });
     }
-
-    if (response.status !== 200) {
+    if (response.status !== 200 || !Array.isArray(response.data)) {
       return res.status(response.status).json({
-        error: 'Discord service error',
+        error: "Discord service error",
         message: `Discord service returned status ${response.status}`
       });
     }
 
-    const messages = response.data || [];
-    
-    // Validate and format the messages
-    const processedMessages = Array.isArray(messages) ? messages.map(msg => ({
-      author: msg.author || 'Unknown',
-      content: msg.content || '',
-      images: Array.isArray(msg.images) ? msg.images : [],
-      timestamp: msg.timestamp,
-      // Add any additional processing if needed
-      formatted_time: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : null
-    })) : [];
+    const messages = response.data;
 
-    console.log(`DEBUG: Processed ${processedMessages.length} Discord messages`);
+    // --- Image extraction helpers ---
+    const isHttp = (u) => typeof u === "string" && /^https?:\/\//i.test(u);
+    const toHttps = (u) => typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
+    const clean = (u) => {
+      try { return encodeURI(toHttps(u)); } catch { return null; }
+    };
+    const dedupe = (arr) => Array.from(new Set(arr.filter(Boolean)));
 
-    return res.json({
-      success: true,
-      data: processedMessages,
-      lastUpdated: new Date().toISOString(),
-      totalMessages: processedMessages.length,
-      source: 'discord_monitor_service'
+    const fromAttachments = (atts = []) =>
+      atts.map(a => a?.url || a?.proxy_url).filter(isHttp);
+
+    const fromEmbeds = (embeds = []) => {
+      const out = [];
+      for (const e of embeds) {
+        if (e?.image?.url) out.push(e.image.url);
+        if (e?.thumbnail?.url) out.push(e.thumbnail.url);
+      }
+      return out.filter(isHttp);
+    };
+
+    const fromContent = (txt = "") => {
+      const out = [];
+      const urlRe = /(https?:\/\/[^\s)>\]]+\.(?:png|jpe?g|gif|webp))(?:\?[^\s)]*)?/ig;
+      let m;
+      while ((m = urlRe.exec(txt))) out.push(m[1]);
+      return out;
+    };
+
+    const resolveAttachmentScheme = (urls, attachments = []) => {
+      if (!Array.isArray(urls) || !urls.length) return [];
+      const mapByName = new Map(
+        attachments.map(a => [String(a?.filename || "").toLowerCase(), a?.url || a?.proxy_url || ""])
+      );
+      return urls.map(u => {
+        if (typeof u !== "string") return null;
+        if (!u.startsWith("attachment://")) return u;
+        const name = u.slice("attachment://".length).toLowerCase();
+        return mapByName.get(name) || null;
+      }).filter(Boolean);
+    };
+
+    // --- Normalize each message and extract all possible images ---
+    const processed = messages.map((msg) => {
+      const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+      const embeds      = Array.isArray(msg.embeds) ? msg.embeds : [];
+
+      // Start with provided images (if any)
+      let imgs = Array.isArray(msg.images) ? msg.images.slice() : [];
+
+      // Add attachments/embeds/content URLs
+      imgs = imgs.concat(fromAttachments(attachments));
+      imgs = imgs.concat(fromEmbeds(embeds));
+      imgs = imgs.concat(fromContent(msg.content || ""));
+
+      // Resolve attachment:// scheme against attachments
+      imgs = resolveAttachmentScheme(imgs, attachments);
+
+      // Normalize, https, encode, and dedupe
+      imgs = dedupe(imgs.map(clean));
+
+      return {
+        id: msg.id || null,
+        author: msg.author || "Unknown",
+        content: msg.content || "",
+        images: imgs,
+        avatar: msg.author_avatar || null,
+        timestamp: msg.timestamp || null,
+        formatted_time: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : null
+      };
     });
+
+    console.log(`DEBUG: Processed ${processed.length} Discord messages`);
+
+    const payload = {
+      success: true,
+      data: processed,
+      lastUpdated: new Date().toISOString(),
+      totalMessages: processed.length,
+      source: "discord_monitor_service",
+      method: "live-fetch"
+    };
+
+    // Cache success
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 600 }); // keep a 10-min safety net
+
+    return res.json(payload);
 
   } catch (err) {
     console.error("[discord-feed] Error:", err.message);
-    
-    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+
+    // Serve last-known-good if we have it
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+
+    if (err.code === "ENOTFOUND" || err.code === "ECONNREFUSED") {
       return res.status(503).json({
         error: "Discord service connection failed",
         message: "Unable to connect to Discord monitoring service. Please try again later."
       });
     }
-    
-    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+    if (err.code === "ECONNABORTED" || (err.message || "").includes("timeout")) {
       return res.status(504).json({
         error: "Request timeout",
         message: "Discord service request timed out. Please try again."
       });
     }
-    
     return res.status(500).json({
       error: "Discord feed failed",
       message: err.message,
@@ -2232,6 +2310,7 @@ case "discord-feed": {
     });
   }
 }
+
 
 
         
