@@ -1368,65 +1368,109 @@ case "bull-market-peak-indicators": {
 
 
 case "volume-total": {
-  const TTL = 60;
+  const TTL = 60; // short-term cache
   const cacheKey = "cg:volume-total";
   const lastGoodKey = "last:volume-total";
 
-  const cachedData = await kv.get(cacheKey);
-  if (cachedData) {
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) {
     console.log(`DEBUG [${type}]: Returning main cached data.`);
-    return res.json(cachedData);
+    return res.json(cached);
   }
 
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.json({ total_volume_24h: 0, total_formatted: "$0", method: "guarded-fallback" });
+    // fully-shaped guarded fallback
+    return res.json({
+      total_volume_24h: 0,
+      total_formatted: "$0",
+      percent_change_24h: 0,
+      coins_count: 0,
+      coins_with_volume: 0,
+      top_coins: [],
+      last_updated: new Date().toISOString(),
+      method: "guarded-fallback"
+    });
   }
 
+  // 3) Live fetch
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
+
     const fmtUSD = (v) => {
-        const n = Math.abs(v);
-        if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-        if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-        if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-        return `$${Math.round(v).toLocaleString()}`;
+      const n = Math.abs(Number(v) || 0);
+      if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+      if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+      if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+      if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+      return `$${Math.round(v).toLocaleString()}`;
     };
 
-    let allCoins = [];
-    let page = 1;
     const PER_PAGE = 200;
-    for (;;) {
+    const MAX_PAGES = 25; // hard guard to avoid infinite loops
+    let page = 1;
+    let allCoins = [];
+
+    for (; page <= MAX_PAGES; page++) {
       const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
-      const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 15000, params: { per_page: PER_PAGE, page } }));
-      if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed on page ${page}: ${response.status}`);
-      
-      const rows = response.data?.data || [];
+      const resp = await axiosWithBackoff(() =>
+        axios.get(url, {
+          headers,
+          timeout: 15000,
+          validateStatus: s => s < 500,
+          params: { per_page: PER_PAGE, page }
+        })
+      );
+
+      if (resp.status !== 200 || resp.data?.code !== "0" || !Array.isArray(resp.data?.data)) {
+        throw new Error(`Upstream failed on page ${page}: HTTP ${resp.status} code=${resp.data?.code} msg=${resp.data?.msg || resp.data?.message || "unknown"}`);
+      }
+
+      const rows = resp.data.data;
       if (!rows.length) break;
+
       allCoins = allCoins.concat(rows);
-      if (rows.length < PER_PAGE) break;
-      page++;
+      if (rows.length < PER_PAGE) break; // no more pages
     }
 
+    // Compute totals & weighted change
     let totalVolume24h = 0;
     let totalWeightedChange = 0;
     let coinsWithVolume = 0;
-    const coinData = allCoins.map(coin => {
-        const longVolume = coin.long_volume_usd_24h || 0;
-        const shortVolume = coin.short_volume_usd_24h || 0;
-        const coinTotal = longVolume + shortVolume;
-        const changePercent = coin.volume_change_percent_24h || 0;
-        if (coinTotal > 0) {
-            totalVolume24h += coinTotal;
-            coinsWithVolume++;
-            if (changePercent !== 0) totalWeightedChange += coinTotal * changePercent;
+
+    const coinData = allCoins.map((coin) => {
+      const longVol  = Number(coin.long_volume_usd_24h  || 0);
+      const shortVol = Number(coin.short_volume_usd_24h || 0);
+      const coinTotal = longVol + shortVol;
+      const changePct = Number(coin.volume_change_percent_24h || 0);
+
+      if (coinTotal > 0) {
+        totalVolume24h += coinTotal;
+        coinsWithVolume++;
+        if (Number.isFinite(changePct) && changePct !== 0) {
+          totalWeightedChange += coinTotal * changePct;
         }
-        return { symbol: coin.symbol, volume_usd_24h: coinTotal, change_percent: changePercent };
+      }
+
+      return {
+        symbol: coin.symbol,
+        volume_usd_24h: coinTotal,
+        change_percent: Number.isFinite(changePct) ? changePct : 0
+      };
     });
-    const overallChangePercent = totalVolume24h > 0 ? totalWeightedChange / totalVolume24h : 0;
-    const topCoins = coinData.filter(c => c.volume_usd_24h > 0).sort((a, b) => b.volume_usd_24h - a.volume_usd_24h).slice(0, 50);
+
+    const overallChangePercent = totalVolume24h > 0
+      ? (totalWeightedChange / totalVolume24h)
+      : 0;
+
+    const topCoins = coinData
+      .filter(c => c.volume_usd_24h > 0)
+      .sort((a, b) => b.volume_usd_24h - a.volume_usd_24h)
+      .slice(0, 50);
 
     const payload = {
       total_volume_24h: totalVolume24h,
@@ -1439,17 +1483,32 @@ case "volume-total": {
       method: "live-fetch"
     };
 
+    // 4) Cache success in both stores
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
+
     return res.json(payload);
 
   } catch (error) {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+
+    return res.status(500).json({
+      error: "API fetch failed",
+      message: error.message,
+      total_volume_24h: 0,
+      total_formatted: "$0",
+      percent_change_24h: 0,
+      coins_count: 0,
+      coins_with_volume: 0,
+      top_coins: [],
+      last_updated: new Date().toISOString(),
+      method: "live-error"
+    });
   }
 }
+
 
 
 
