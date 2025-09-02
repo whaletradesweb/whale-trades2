@@ -2150,10 +2150,12 @@ case "discord-feed": {
   console.log("DEBUG: Requesting Discord messages from external service...");
   
   const DISCORD_SERVICE_URL = process.env.DISCORD_SERVICE_URL || "https://discord-monitor.azurewebsites.net";
-  const limit = Math.min(parseInt(req.query.limit || "50" ), 100);
+  const limit = Math.min(parseInt(req.query.limit || "50"), 100);
   
   try {
     const discordUrl = `${DISCORD_SERVICE_URL}/messages`;
+    console.log("DEBUG: Fetching from:", discordUrl, "with limit:", limit);
+    
     const response = await axios.get(discordUrl, {
       timeout: 15000,
       validateStatus: (status) => status < 500,
@@ -2168,56 +2170,68 @@ case "discord-feed": {
     }
 
     const messages = response.data || [];
+    console.log(`DEBUG: Raw response contains ${Array.isArray(messages) ? messages.length : 'non-array'} messages`);
     
-    // **MODIFIED PART: Correctly process messages to extract images**
-    const processedMessages = Array.isArray(messages) ? messages.map(msg => {
-      const images = [];
-      // 1. Check attachments for images
-      if (Array.isArray(msg.attachments)) {
-        msg.attachments.forEach(att => {
-          if (att.url && att.content_type?.startsWith('image/')) {
-            images.push(att.url);
-          }
-        });
-      }
-      // 2. Check embeds for images
-      if (Array.isArray(msg.embeds)) {
-        msg.embeds.forEach(embed => {
-          if (embed.image && embed.image.url) {
-            images.push(embed.image.url);
-          }
-          if (embed.thumbnail && embed.thumbnail.url) {
-            images.push(embed.thumbnail.url);
-          }
-        });
-      }
+    // Log first message structure for debugging
+    if (Array.isArray(messages) && messages.length > 0) {
+      console.log("DEBUG: First message structure:", JSON.stringify(messages[0], null, 2));
+    }
+    
+    // **SIMPLIFIED PROCESSING: Use the images array directly since your service provides it**
+    const processedMessages = Array.isArray(messages) ? messages.map((msg, index) => {
+      console.log(`DEBUG: Processing message ${index}:`, {
+        author: msg.author,
+        hasContent: !!msg.content,
+        imagesProvided: Array.isArray(msg.images) ? msg.images.length : 'not array',
+        timestamp: msg.timestamp
+      });
+
+      // Your Discord service already provides cleaned images array - just use it!
+      const images = Array.isArray(msg.images) ? msg.images.filter(img => 
+        typeof img === 'string' && img.trim() && img.startsWith('http')
+      ) : [];
+      
+      console.log(`DEBUG: Message ${index} - Using ${images.length} images directly from service:`, images);
       
       return {
-        author: msg.author?.username || 'Unknown',
+        id: msg.id,
+        author: msg.author || 'Unknown',
         content: msg.content || '',
-        images: images, // Use the extracted images
+        images: images, // Use the images array directly from your service
         timestamp: msg.timestamp,
-        formatted_time: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : null
+        formatted_time: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : null,
+        author_avatar: msg.author_avatar || null // Include avatar if provided
       };
     }) : [];
-
-    console.log(`DEBUG: Processed ${processedMessages.length} Discord messages`);
+    
+    const totalImages = processedMessages.reduce((sum, msg) => sum + msg.images.length, 0);
+    const messagesWithImages = processedMessages.filter(msg => msg.images.length > 0).length;
+    
+    console.log(`DEBUG: Final processing results:`, {
+      totalMessages: processedMessages.length,
+      totalImages,
+      messagesWithImages
+    });
 
     return res.json({
       success: true,
       data: processedMessages,
       lastUpdated: new Date().toISOString(),
       totalMessages: processedMessages.length,
+      totalImages,
+      messagesWithImages,
       source: 'discord_monitor_service'
     });
-
+    
   } catch (err) {
     console.error("[discord-feed] Error:", err.message);
-    // ... (error handling remains the same)
+    console.error("[discord-feed] Stack:", err.stack);
+    
     return res.status(500).json({
       error: "Discord feed failed",
       message: err.message,
-      data: []
+      data: [],
+      lastUpdated: new Date().toISOString()
     });
   }
 }
