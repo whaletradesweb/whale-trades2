@@ -52,37 +52,76 @@ module.exports = async (req, res) => {
 
  case "altcoin-season": {
   const TTL = 300;
-  const cacheKey = "cg:altcoin-season";
-  const lastGoodKey = "last:altcoin-season";
+  const cacheKey   = "cg:altcoin-season";
+  const lastGoodKey= "last:altcoin-season";
 
-  const cachedData = await kv.get(cacheKey);
-  if (cachedData) return res.json(cachedData);
+  // 1) Fast lane
+  const cached = await kv.get(cacheKey);
+  if (cached) return res.json(cached);
 
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.json({ success: false, data: [], message: "Guarded: Rate limit active" });
+    // fully-shaped guarded fallback
+    return res.json({
+      success: true,
+      data: [],
+      lastUpdated: new Date().toISOString(),
+      method: "guarded-fallback",
+      message: "Guarded: Rate limit active"
+    });
   }
 
+  // 3) Live fetch
   try {
     const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
-    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
-    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
-    
-    const raw = response.data.data || [];
-    const altcoinData = raw.map(d => ({ timestamp: d.timestamp, altcoin_index: d.altcoin_index, altcoin_marketcap: d.altcoin_marketcap || 0 })).sort((a, b) => a.timestamp - b.timestamp);
-    const payload = { success: true, data: altcoinData, lastUpdated: new Date().toISOString() };
+    const resp = await axiosWithBackoff(() =>
+      axios.get(url, { headers, timeout: 10000, validateStatus: s => s < 500 })
+    );
 
+    if (resp.status !== 200 || resp.data?.code !== "0" || !Array.isArray(resp.data?.data)) {
+      throw new Error(`Upstream failed: HTTP ${resp.status} code=${resp.data?.code} msg=${resp.data?.msg || resp.data?.message || "unknown"}`);
+    }
+
+    const raw = resp.data.data;
+    const altcoinData = raw
+      .map(d => ({
+        timestamp: Number(d.timestamp) || 0,
+        altcoin_index: Number(d.altcoin_index) || 0,
+        altcoin_marketcap: Number(d.altcoin_marketcap || 0)
+      }))
+      .filter(r => r.timestamp > 0)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    const payload = {
+      success: true,
+      data: altcoinData,
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
+
+    // 4) Cache both
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
+
     return res.json(payload);
+
   } catch (error) {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
-    return res.status(500).json({ error: "API fetch failed", message: error.message });
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "API fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
   }
 }
+
 
 
 case "etf-flows": {
