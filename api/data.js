@@ -132,54 +132,92 @@ case "etf-flows": {
   }
 }
 
-        
-      case "liquidations-total": {
-        const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list", { headers });
-        const coins = response.data?.data || [];
-        
-        const total24h = coins.reduce((sum, c) => sum + (c.liquidation_usd_24h || 0), 0);
-        
-        const now = Date.now();
-        let percentChange = 0;
-        
-        // Get previous value from KV store for percent change calculation
-        const previousTotal = await kv.get("liquidations:previous_total");
-        const previousTimestamp = await kv.get("liquidations:timestamp");
-        
-        if (previousTotal !== null && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
-          percentChange = ((total24h - previousTotal) / previousTotal) * 100;
-          console.log(`[Liquidations API] Calculated % change: ${percentChange.toFixed(2)}%`);
-        } else {
-          await kv.set("liquidations:previous_total", total24h);
-          await kv.set("liquidations:timestamp", now);
-          console.log(`[Liquidations API] New baseline stored: ${total24h.toFixed(2)}`);
-        }
-        
-        return res.json({
-          total_liquidations_24h: total24h,
-          percent_change_24h: percentChange,
-          baseline_timestamp: previousTimestamp ? new Date(previousTimestamp).toUTCString() : new Date(now).toUTCString()
-        });
-      }
 
-      case "liquidations-debug": {
-        if (action === "reset") {
-          await kv.del("liquidations:previous_total");
-          await kv.del("liquidations:timestamp");
-          return res.json({ message: "✅ Baseline reset successfully" });
-        }
 
-        const previousTotal = await kv.get("liquidations:previous_total");
-        const previousTimestamp = await kv.get("liquidations:timestamp");
+case "liquidations-total": {
+  const TTL = 60; // Cache for 60 seconds
+  const cacheKey = "cg:liquidations-total";
+  const lastGoodKey = "last:liquidations-total";
 
-        return res.json({
-          previous_total: previousTotal || "Not set",
-          previous_timestamp: previousTimestamp 
-            ? new Date(previousTimestamp).toUTCString() 
-            : "Not set"
-        });
-      }
+  // 1. Check for fresh data in the main cache
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: Returning main cached data.`);
+    return res.json(cachedData);
+  }
 
+  // 2. If no cache, check rate limit
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // Fallback with a neutral structure
+    return res.json({
+      total_liquidations_24h: 0,
+      percent_change_24h: 0,
+      baseline_timestamp: new Date().toUTCString(),
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3. If allowed, fetch fresh data
+  try {
+    console.log(`DEBUG [${type}]: Fetching fresh data.`);
+    
+    // --- YOUR ORIGINAL, WORKING LOGIC STARTS HERE ---
+    const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/coin-list";
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
+
+    if (response.status !== 200 || !Array.isArray(response.data?.data)) {
+      throw new Error(`Upstream failed: ${response.status}`);
+    }
+    
+    const coins = response.data.data || [];
+    const total24h = coins.reduce((sum, c) => sum + (c.liquidation_usd_24h || 0), 0);
+    
+    const now = Date.now();
+    let percentChange = 0;
+    
+    const previousTotal = await kv.get("liquidations:previous_total");
+    const previousTimestamp = await kv.get("liquidations:timestamp");
+    
+    if (previousTotal !== null && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
+      percentChange = ((total24h - previousTotal) / previousTotal) * 100;
+    } else {
+      await kv.set("liquidations:previous_total", total24h);
+      await kv.set("liquidations:timestamp", now);
+    }
+    // --- YOUR ORIGINAL, WORKING LOGIC ENDS HERE ---
+
+    const payload = {
+      total_liquidations_24h: total24h,
+      percent_change_24h: percentChange,
+      baseline_timestamp: previousTimestamp ? new Date(previousTimestamp).toUTCString() : new Date(now).toUTCString(),
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
+
+    // 4. Cache the successful payload
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({
+      error: "API fetch failed",
+      message: error.message,
+      total_liquidations_24h: 0,
+      percent_change_24h: 0
+    });
+  }
+}
+
+        
+ 
 
 case "liquidations-table": {
   const TTL = 60;
