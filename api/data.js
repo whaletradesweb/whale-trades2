@@ -50,106 +50,86 @@ module.exports = async (req, res) => {
         });
       }
 
-  case "altcoin-season": {
-  const TTL = 300; // Cache for 5 minutes
-  const out = await cacheGetSet("altcoin-season", {}, TTL, async () => {
-    if (!(await allow("cg:GLOBAL", 250))) {
-      const last = await kv.get("last:altcoin-season");
-      if (last) return last;
-      return { success: false, data: [], message: "Guarded: Rate limit active" };
-    }
+ case "altcoin-season": {
+  const TTL = 300;
+  const cacheKey = "cg:altcoin-season";
+  const lastGoodKey = "last:altcoin-season";
 
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) return res.json(cachedData);
+
+  if (!(await allow("cg:GLOBAL", 250))) {
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({ success: false, data: [], message: "Guarded: Rate limit active" });
+  }
+
+  try {
     const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
-    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 10000 }));
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
     
-    if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`Altcoin Season upstream failed: HTTP ${response.status} - ${response.data?.message}`);
-    }
-
     const raw = response.data.data || [];
-    const altcoinData = raw.map(d => ({
-      timestamp: d.timestamp,
-      altcoin_index: d.altcoin_index,
-      altcoin_marketcap: d.altcoin_marketcap || 0
-    })).sort((a, b) => a.timestamp - b.timestamp);
+    const altcoinData = raw.map(d => ({ timestamp: d.timestamp, altcoin_index: d.altcoin_index, altcoin_marketcap: d.altcoin_marketcap || 0 })).sort((a, b) => a.timestamp - b.timestamp);
+    const payload = { success: true, data: altcoinData, lastUpdated: new Date().toISOString() };
 
-    const payload = { 
-      success: true,
-      data: altcoinData,
-      lastUpdated: new Date().toISOString(),
-      dataPoints: altcoinData.length
-    };
-    await kv.set("last:altcoin-season", payload, { ex: 3600 }); // Keep last good for 1 hour
-    return payload;
-  });
-  return res.json(out);
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    return res.json(payload);
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
 
 
-
 case "etf-flows": {
-  // Determine the asset from the symbol query param, defaulting to BTC.
   const asset = (req.query.symbol || "BTC").toLowerCase();
-  if (asset !== 'bitcoin' && asset !== 'ethereum' && asset !== 'btc' && asset !== 'eth') {
-    return res.status(400).json({ error: "Invalid symbol. Use 'BTC' or 'ETH'." });
-  }
   const assetName = asset.startsWith('btc') ? 'bitcoin' : 'ethereum';
+  const TTL = 300;
+  const cacheKey = `cg:etf-flows:${assetName}`;
+  const lastGoodKey = `last:etf-flows:${assetName}`;
 
-  const TTL = 300; // Cache ETF data for 5 minutes.
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) return res.json(cachedData);
 
-  // The cache key will now be unique for each asset.
-  const out = await cacheGetSet(`etf-flows:${assetName}`, {}, TTL, async () => {
-    // Check the global rate limit.
-    if (!(await allow("cg:GLOBAL", 250))) {
-      const last = await kv.get(`last:etf-flows:${assetName}`);
-      if (last) return last;
-      return { daily: [], weekly: [], message: "Guarded: Rate limit active" };
-    }
+  if (!(await allow("cg:GLOBAL", 250))) {
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({ daily: [], weekly: [], message: "Guarded: Rate limit active" });
+  }
 
-    // Dynamically build the URL based on the asset.
+  try {
     const url = `https://open-api-v4.coinglass.com/api/etf/${assetName}/flow-history`;
-    console.log(`DEBUG: Fetching ETF flows from: ${url}` );
-    
-    const response = await axiosWithBackoff(() => axios.get(url, { headers }));
-
-    if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`ETF ${assetName} Flows upstream failed: HTTP ${response.status}`);
-    }
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers }));
+    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
 
     const rawData = response.data?.data || [];
-    
-    // The rest of your processing logic remains the same.
-    const daily = rawData.map(d => ({
-      date: new Date(d.timestamp).toISOString().split("T")[0],
-      totalFlow: d.flow_usd,
-      price: d.price_usd,
-      etfs: d.etf_flows.map(etf => ({ ticker: etf.etf_ticker, flow: etf.flow_usd }))
-    }));
-
+    const daily = rawData.map(d => ({ date: new Date(d.timestamp).toISOString().split("T")[0], totalFlow: d.flow_usd, price: d.price_usd, etfs: d.etf_flows.map(etf => ({ ticker: etf.etf_ticker, flow: etf.flow_usd })) }));
     const weekly = [];
     for (let i = 0; i < daily.length; i += 7) {
       const chunk = daily.slice(i, i + 7);
-      if (chunk.length > 0) { // Handle cases with less than 7 days of data gracefully
+      if (chunk.length > 0) {
         const totalFlow = chunk.reduce((sum, d) => sum + d.totalFlow, 0);
         const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
         const etfMap = {};
         chunk.forEach(day => day.etfs.forEach(e => { etfMap[e.ticker] = (etfMap[e.ticker] || 0) + e.flow; }));
-        weekly.push({
-          weekStart: chunk[0].date,
-          weekEnd: chunk[chunk.length - 1].date,
-          totalFlow,
-          avgPrice: parseFloat(avgPrice.toFixed(2)),
-          etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow }))
-        });
+        weekly.push({ weekStart: chunk[0].date, weekEnd: chunk[chunk.length - 1].date, totalFlow, avgPrice: parseFloat(avgPrice.toFixed(2)), etfs: Object.entries(etfMap).map(([ticker, flow]) => ({ ticker, flow })) });
       }
     }
-    
     const payload = { daily, weekly, lastUpdated: new Date().toISOString() };
-    await kv.set(`last:etf-flows:${assetName}`, payload, { ex: 3600 });
-    return payload;
-  });
 
-  return res.json(out);
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    return res.json(payload);
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
 
         
@@ -202,187 +182,154 @@ case "etf-flows": {
 
 
 case "liquidations-table": {
-  console.log("DEBUG: Using exchange-list endpoint for liquidations (hardened)…");
+  const TTL = 60;
+  const cacheKey = "cg:liquidations-table";
+  const lastGoodKey = "last:liquidations-table";
 
-  const TTL = 60; // cache this rollup for 60s site-wide
-  const timeframes = ["1h", "4h", "12h", "24h"];
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: Returning main cached data.`);
+    return res.json(cachedData);
+  }
 
-  // helper — keep your formatter
-  const fmtUSD = (v) => {
-    const n = Math.abs(v);
-    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
-    return `$${v.toFixed(2)}`;
-  };
-
-  const out = await cacheGetSet("liquidations-table", {}, TTL, async () => {
-    // soft per-minute guard for this fan-out
-    if (!(await allow("cg:GLOBAL", 250))) { // Using the SAME global key
-      const last = await kv.get("last:liquidations-table");
-      return (
-        last || {
-          success: true,
-          "1H-Total": "$0",
-          "1H-Total-Long": "$0",
-          "1H-Total-Short": "$0",
-          "4H-Total": "$0",
-          "4H-Total-Long": "$0",
-          "4H-Total-Short": "$0",
-          "12H-Total": "$0",
-          "12H-Total-Long": "$0",
-          "12H-Total-Short": "$0",
-          "24H-Total": "$0",
-          "24H-Total-Long": "$0",
-          "24H-Total-Short": "$0",
-          nested_data: {},
-          lastUpdated: new Date().toISOString(),
-          method: "guarded-return"
-        }
-      );
-    }
-
-    // === upstream fan-out with 429 backoff ===
-    const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list";
-    const requests = timeframes.map((range) =>
-      axiosWithBackoff(() =>
-        axios.get(url, {
-          headers,
-          timeout: 15000,
-          params: { range },
-          validateStatus: (s) => s < 500
-        })
-      )
-    );
-
-    const responses = await Promise.all(requests);
-
-    // aggregate per timeframe
-    const results = {};
-    timeframes.forEach((timeframe, idx) => {
-      const response = responses[idx];
-
-      if (response.status !== 200 || response.data?.code !== "0") {
-        console.warn(`Failed to fetch ${timeframe} liquidations:`, response.status, response.data?.msg);
-        results[timeframe] = {
-          total: "$0",
-          long: "$0",
-          short: "$0",
-          error: response.data?.msg || `HTTP ${response.status}`
-        };
-        return;
-      }
-
-      const data = response.data?.data || [];
-      const all = data.find((row) => row.exchange === "All");
-
-      if (all) {
-        results[timeframe] = {
-          total: fmtUSD(all.liquidation_usd || 0),
-          long: fmtUSD(all.longLiquidation_usd || 0),
-          short: fmtUSD(all.shortLiquidation_usd || 0),
-          raw: {
-            total: all.liquidation_usd || 0,
-            long: all.longLiquidation_usd || 0,
-            short: all.shortLiquidation_usd || 0
-          }
-        };
-      } else {
-        const totalLiq = data.reduce((s, r) => s + (r.liquidation_usd || 0), 0);
-        const totalLong = data.reduce((s, r) => s + (r.longLiquidation_usd || 0), 0);
-        const totalShort = data.reduce((s, r) => s + (r.shortLiquidation_usd || 0), 0);
-        results[timeframe] = {
-          total: fmtUSD(totalLiq),
-          long: fmtUSD(totalLong),
-          short: fmtUSD(totalShort),
-          raw: { total: totalLiq, long: totalLong, short: totalShort }
-        };
-      }
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    // Fallback if no last good data
+    const fallback = {};
+    ['1h', '4h', '12h', '24h'].forEach(tf => {
+        const U = tf.toUpperCase();
+        fallback[`${U}-Total`] = "$0";
+        fallback[`${U}-Total-Long`] = "$0";
+        fallback[`${U}-Total-Short`] = "$0";
     });
+    return res.json({ success: true, ...fallback, method: "guarded-fallback" });
+  }
 
-    // Webflow-ready flat keys (unchanged from your current response shape)
-    const webflowFormatted = {};
-    timeframes.forEach((tf) => {
-      const U = tf.toUpperCase();
-      if (results[tf] && !results[tf].error) {
-        webflowFormatted[`${U}-Total`] = results[tf].total;
-        webflowFormatted[`${U}-Total-Long`] = results[tf].long;
-        webflowFormatted[`${U}-Total-Short`] = results[tf].short;
-      } else {
-        webflowFormatted[`${U}-Total`] = "$0";
-        webflowFormatted[`${U}-Total-Long`] = "$0";
-        webflowFormatted[`${U}-Total-Short`] = "$0";
-      }
-    });
-
-    const finalResponse = {
-      success: true,
-      ...webflowFormatted,
-      nested_data: results,
-      lastUpdated: new Date().toISOString(),
-      method: "exchange-list-aggregated",
-      api_calls_used: timeframes.length
+  try {
+    console.log(`DEBUG [${type}]: Fetching fresh data.`);
+    const timeframes = ["1h", "4h", "12h", "24h"];
+    const fmtUSD = (v) => {
+        const n = Math.abs(v);
+        if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+        if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+        if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+        if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+        return `$${v.toFixed(2)}`;
     };
 
-    // store a “last known good” snapshot for guard fallback
-    await kv.set("last:liquidations-table", finalResponse, { ex: 3600 });
-    return finalResponse;
-  });
+    const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list";
+    const requests = timeframes.map((range ) =>
+      axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000, params: { range } }))
+    );
+    const responses = await Promise.all(requests);
 
-  return res.json(out);
+    const results = {};
+    timeframes.forEach((timeframe, idx) => {
+        const response = responses[idx];
+        if (response.status !== 200 || response.data?.code !== "0") {
+            results[timeframe] = { error: `HTTP ${response.status}` }; return;
+        }
+        const data = response.data?.data || [];
+        const all = data.find((row) => row.exchange === "All");
+        if (all) {
+            results[timeframe] = { total: fmtUSD(all.liquidation_usd || 0), long: fmtUSD(all.longLiquidation_usd || 0), short: fmtUSD(all.shortLiquidation_usd || 0) };
+        } else {
+            results[timeframe] = { total: "$0", long: "$0", short: "$0" };
+        }
+    });
+
+    const webflowFormatted = {};
+    timeframes.forEach(tf => {
+        const U = tf.toUpperCase();
+        if (results[tf] && !results[tf].error) {
+            webflowFormatted[`${U}-Total`] = results[tf].total;
+            webflowFormatted[`${U}-Total-Long`] = results[tf].long;
+            webflowFormatted[`${U}-Total-Short`] = results[tf].short;
+        } else {
+            webflowFormatted[`${U}-Total`] = "$0"; webflowFormatted[`${U}-Total-Long`] = "$0"; webflowFormatted[`${U}-Total-Short`] = "$0";
+        }
+    });
+
+    const payload = { success: true, ...webflowFormatted, lastUpdated: new Date().toISOString(), method: "live-fetch" };
+
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
 
 
 
+
 case "long-short": {
-  const TTL = 60; // Cache for 60 seconds
+  const TTL = 60;
+  const cacheKey = "cg:long-short";
+  const lastGoodKey = "last:long-short";
 
-  const out = await cacheGetSet("long-short", {}, TTL, async () => {
-    // 1. Check the global rate limit first.
-    if (!(await allow("cg:GLOBAL", 250))) {
-      const last = await kv.get("last:long-short");
-      if (last) return last; // Return last known good data if available
-      // Return an empty fallback if no last-good data exists
-      return { long_pct: "0.00", short_pct: "0.00", differential: "0.00", average_ratio: "0.0000", sampled_coins: [] };
-    }
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) {
+    console.log(`DEBUG [${type}]: Returning main cached data.`);
+    return res.json(cachedData);
+  }
 
-    // 2. If allowed, proceed to fetch data.
-    const response = await axiosWithBackoff(() => axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers, timeout: 15000, validateStatus: s => s < 500 } ));
-    
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({ long_pct: "0.00", short_pct: "0.00", differential: "0.00", method: "guarded-fallback" });
+  }
+
+  try {
+    console.log(`DEBUG [${type}]: Fetching fresh data.`);
+    const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 15000 }));
+
     if (response.status !== 200 || !Array.isArray(response.data?.data)) {
-      throw new Error(`long-short upstream failed: HTTP ${response.status}`);
-    }
-    
-    const coins = response.data.data;
-    const top10 = coins.filter(c => c.long_short_ratio_24h != null).sort((a,b) => b.market_cap_usd - a.market_cap_usd).slice(0,10);
-    
-    if (!top10.length) {
-      // This can happen if API returns no coins with the ratio field.
-      // Return a neutral payload instead of throwing an error.
-      return { long_pct: "0.00", short_pct: "0.00", differential: "0.00", average_ratio: "0.0000", sampled_coins: [] };
+      throw new Error(`Upstream failed: HTTP ${response.status}`);
     }
 
-    const avgRatio = top10.reduce((s,c) => s + c.long_short_ratio_24h, 0) / top10.length;
+    const coins = response.data.data;
+    const top10 = coins.filter(c => c.long_short_ratio_24h != null).sort((a, b) => b.market_cap_usd - a.market_cap_usd).slice(0, 10);
+
+    if (!top10.length) {
+      return res.json({ long_pct: "0.00", short_pct: "0.00", differential: "0.00", method: "no-valid-ratios" });
+    }
+
+    const avgRatio = top10.reduce((s, c) => s + c.long_short_ratio_24h, 0) / top10.length;
     const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
     const avgShortPct = 100 - avgLongPct;
     const differential = Math.abs(avgLongPct - avgShortPct);
-    
+
     const payload = {
       long_pct: avgLongPct.toFixed(2),
       short_pct: avgShortPct.toFixed(2),
       differential: differential.toFixed(2),
       average_ratio: avgRatio.toFixed(4),
-      sampled_coins: top10.map(c => ({ symbol:c.symbol, market_cap_usd:c.market_cap_usd, long_short_ratio_24h:c.long_short_ratio_24h }))
+      sampled_coins: top10.map(c => ({ symbol: c.symbol, market_cap_usd: c.market_cap_usd, long_short_ratio_24h: c.long_short_ratio_24h })),
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
     };
 
-    // 3. Store this successful payload as the "last known good" for the guard.
-    await kv.set("last:long-short", payload, { ex: 3600 });
-    
-    return payload;
-  });
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
 
-  return res.json(out);
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
 
 
@@ -501,64 +448,50 @@ case "open-interest": {
 
 case "rsi-heatmap": {
   const { interval = "1h" } = req.query;
-  const validIntervals = ["15m", "1h", "4h", "8h", "12h", "1d", "1w"];
-  if (!validIntervals.includes(interval)) {
-    return res.status(400).json({ error: "Invalid interval" });
+  const TTL = 120;
+  const cacheKey = `cg:rsi-heatmap:${interval}`;
+  const lastGoodKey = `last:rsi-heatmap:${interval}`;
+
+  const cachedData = await kv.get(cacheKey);
+  if (cachedData) return res.json(cachedData);
+
+  if (!(await allow("cg:GLOBAL", 250))) {
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({ success: false, data: [], statistics: {}, message: "Guarded: Rate limit active" });
   }
 
-  const TTL = 120; // Cache for 2 minutes
-  // Add the interval to the cache key to store 1h, 4h, etc., separately
-  const out = await cacheGetSet(`rsi-heatmap:${interval}`, {}, TTL, async () => {
-    if (!(await allow("cg:GLOBAL", 250))) {
-      const last = await kv.get(`last:rsi-heatmap:${interval}`);
-      if (last) return last;
-      return { success: false, data: [], statistics: {}, message: "Guarded: Rate limit active" };
-    }
-
+  try {
     const url = "https://open-api-v4.coinglass.com/api/futures/rsi/list";
-    const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 10000 }));
-
-    if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`RSI Heatmap upstream failed: HTTP ${response.status} - ${response.data?.message}`);
-    }
+    const response = await axiosWithBackoff(( ) => axios.get(url, { headers, timeout: 10000 }));
+    if (response.status !== 200 || response.data?.code !== "0") throw new Error(`Upstream failed: ${response.status}`);
     
     const rawData = response.data.data || [];
-    if (!Array.isArray(rawData) || rawData.length === 0) {
-      return { success: true, data: [], statistics: {}, message: "No data available" };
-    }
+    if (!Array.isArray(rawData) || rawData.length === 0) return { success: true, data: [], statistics: {}, message: "No data available" };
 
-    // Your existing processing logic is great, no changes needed here
+    // Your full processing logic
     const intervalMap = {"15m":"15m","1h":"1h","4h":"4h","8h":"4h","12h":"12h","1d":"24h","1w":"1w"};
     const mappedInterval = intervalMap[interval] || "1h";
     const processedData = rawData.map(coin => {
       const rsiData = {"15m":coin.rsi_15m,"1h":coin.rsi_1h,"4h":coin.rsi_4h,"12h":coin.rsi_12h,"24h":coin.rsi_24h,"1w":coin.rsi_1w};
       const priceChangeData = {"15m":coin.price_change_percent_15m||0,"1h":coin.price_change_percent_1h||0,"4h":coin.price_change_percent_4h||0,"12h":coin.price_change_percent_12h||0,"24h":coin.price_change_percent_24h||0,"1w":coin.price_change_percent_1w||0};
-      return {
-        symbol: coin.symbol || 'UNKNOWN', current_price: coin.current_price || 0, rsi: rsiData,
-        price_change_percent: priceChangeData, current_rsi: rsiData[mappedInterval],
-        current_price_change: priceChangeData[mappedInterval]
-      };
+      return { symbol: coin.symbol || 'UNKNOWN', current_price: coin.current_price || 0, rsi: rsiData, price_change_percent: priceChangeData, current_rsi: rsiData[mappedInterval], current_price_change: priceChangeData[mappedInterval] };
     }).filter(c => c.current_rsi != null).sort((a, b) => b.current_price - a.current_price).slice(0, 150);
-    
     const rsiValues = processedData.map(c => c.current_rsi);
     const overbought = rsiValues.filter(r => r >= 70).length;
     const oversold = rsiValues.filter(r => r <= 30).length;
-    const stats = {
-      total_coins: processedData.length, overbought_count: overbought, oversold_count: oversold,
-      neutral_count: rsiValues.length - overbought - oversold,
-      overbought_percent: ((overbought / rsiValues.length) * 100).toFixed(1),
-      oversold_percent: ((oversold / rsiValues.length) * 100).toFixed(1),
-      average_rsi: (rsiValues.reduce((s, r) => s + r, 0) / rsiValues.length).toFixed(2)
-    };
+    const stats = { total_coins: processedData.length, overbought_count: overbought, oversold_count: oversold, neutral_count: rsiValues.length - overbought - oversold, overbought_percent: ((overbought / rsiValues.length) * 100).toFixed(1), oversold_percent: ((oversold / rsiValues.length) * 100).toFixed(1), average_rsi: (rsiValues.reduce((s, r) => s + r, 0) / rsiValues.length).toFixed(2) };
+    const payload = { success: true, data: processedData, interval: interval, statistics: stats, lastUpdated: new Date().toISOString() };
 
-    const payload = { 
-      success: true, data: processedData, interval: interval, statistics: stats,
-      lastUpdated: new Date().toISOString()
-    };
-    await kv.set(`last:rsi-heatmap:${interval}`, payload, { ex: 3600 });
-    return payload;
-  });
-  return res.json(out);
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 3600 });
+    return res.json(payload);
+  } catch (error) {
+    console.error(`[${type}] Fetch Error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.status(500).json({ error: "API fetch failed", message: error.message });
+  }
 }
 
 
