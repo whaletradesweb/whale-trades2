@@ -377,26 +377,55 @@ case "liquidations-table": {
 
 
 case "long-short": {
-  const out = await cacheGetSet("cg:GLOBAL", 250))) {
-    const response = await axiosWithBackoff(() => axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers, timeout: 15000, validateStatus: s => s < 500 }));
-    if (response.status !== 200 || !Array.isArray(response.data?.data)) throw new Error(`long-short upstream failed: HTTP ${response.status}`);
+  const TTL = 60; // Cache for 60 seconds
+
+  const out = await cacheGetSet("long-short", {}, TTL, async () => {
+    // 1. Check the global rate limit first.
+    if (!(await allow("cg:GLOBAL", 250))) {
+      const last = await kv.get("last:long-short");
+      if (last) return last; // Return last known good data if available
+      // Return an empty fallback if no last-good data exists
+      return { long_pct: "0.00", short_pct: "0.00", differential: "0.00", average_ratio: "0.0000", sampled_coins: [] };
+    }
+
+    // 2. If allowed, proceed to fetch data.
+    const response = await axiosWithBackoff(() => axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers, timeout: 15000, validateStatus: s => s < 500 } ));
+    
+    if (response.status !== 200 || !Array.isArray(response.data?.data)) {
+      throw new Error(`long-short upstream failed: HTTP ${response.status}`);
+    }
+    
     const coins = response.data.data;
-    const top10 = coins.filter(c => c.long_short_ratio_24h != null).sort((a,b)=>b.market_cap_usd - a.market_cap_usd).slice(0,10);
-    if (!top10.length) throw new Error("No valid long/short ratios found for top coins");
-    const avgRatio = top10.reduce((s,c)=>s + c.long_short_ratio_24h,0) / top10.length;
+    const top10 = coins.filter(c => c.long_short_ratio_24h != null).sort((a,b) => b.market_cap_usd - a.market_cap_usd).slice(0,10);
+    
+    if (!top10.length) {
+      // This can happen if API returns no coins with the ratio field.
+      // Return a neutral payload instead of throwing an error.
+      return { long_pct: "0.00", short_pct: "0.00", differential: "0.00", average_ratio: "0.0000", sampled_coins: [] };
+    }
+
+    const avgRatio = top10.reduce((s,c) => s + c.long_short_ratio_24h, 0) / top10.length;
     const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
     const avgShortPct = 100 - avgLongPct;
     const differential = Math.abs(avgLongPct - avgShortPct);
-    return {
+    
+    const payload = {
       long_pct: avgLongPct.toFixed(2),
       short_pct: avgShortPct.toFixed(2),
       differential: differential.toFixed(2),
       average_ratio: avgRatio.toFixed(4),
       sampled_coins: top10.map(c => ({ symbol:c.symbol, market_cap_usd:c.market_cap_usd, long_short_ratio_24h:c.long_short_ratio_24h }))
     };
+
+    // 3. Store this successful payload as the "last known good" for the guard.
+    await kv.set("last:long-short", payload, { ex: 3600 });
+    
+    return payload;
   });
+
   return res.json(out);
 }
+
 
 
  
