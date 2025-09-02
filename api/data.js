@@ -1,7 +1,7 @@
 const axios = require("axios");
 const { kv } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
-const { cacheGetSet, allow, axiosWithBackoff } = require("./_lib/cacheAndLimit");
+const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
 
 
 module.exports = async (req, res) => {
