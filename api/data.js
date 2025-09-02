@@ -242,101 +242,121 @@ case "etf-eth-flows": {
       }
 
 
-// ... inside your switch (type) statement ...
-
 case "liquidations-table": {
-  console.log("DEBUG: Using exchange-list endpoint for liquidations...");
+  console.log("DEBUG: Using exchange-list endpoint for liquidations (hardened)…");
 
-  // --> Caching: Define a unique key for this data in Vercel KV.
-  const cacheKey = "cache:liquidations-table";
-  
-  try {
-    // --> Caching: Try to get the data from the cache first.
-    const cachedData = await kv.get(cacheKey);
-    if (cachedData) {
-      console.log("DEBUG: Returning cached liquidations data.");
-      // Add a header to easily see that the response was cached.
-      res.setHeader('X-Vercel-Cache', 'HIT');
-      return res.json(cachedData);
+  const TTL = 60; // cache this rollup for 60s site-wide
+  const timeframes = ["1h", "4h", "12h", "24h"];
+
+  // helper — keep your formatter
+  const fmtUSD = (v) => {
+    const n = Math.abs(v);
+    if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
+    if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
+    if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
+    return `$${v.toFixed(2)}`;
+  };
+
+  const out = await cacheGetSet("liquidations-table", {}, TTL, async () => {
+    // soft per-minute guard for this fan-out
+    if (!(await allow("cg:liquidations-table", 120))) {
+      const last = await kv.get("last:liquidations-table");
+      return (
+        last || {
+          success: true,
+          "1H-Total": "$0",
+          "1H-Total-Long": "$0",
+          "1H-Total-Short": "$0",
+          "4H-Total": "$0",
+          "4H-Total-Long": "$0",
+          "4H-Total-Short": "$0",
+          "12H-Total": "$0",
+          "12H-Total-Long": "$0",
+          "12H-Total-Short": "$0",
+          "24H-Total": "$0",
+          "24H-Total-Long": "$0",
+          "24H-Total-Short": "$0",
+          nested_data: {},
+          lastUpdated: new Date().toISOString(),
+          method: "guarded-return"
+        }
+      );
     }
-    console.log("DEBUG: No cache found. Fetching fresh liquidations data.");
-    res.setHeader('X-Vercel-Cache', 'MISS');
 
-    const timeframes = ['1h', '4h', '12h', '24h'];
-    const results = {};
-
-    const fmtUSD = (v) => {
-      const n = Math.abs(v);
-      if (n >= 1e12) return `$${(v/1e12).toFixed(2)}T`;
-      if (n >= 1e9)  return `$${(v/1e9 ).toFixed(2)}B`;
-      if (n >= 1e6)  return `$${(v/1e6 ).toFixed(2)}M`;
-      if (n >= 1e3)  return `$${(v/1e3 ).toFixed(2)}K`;
-      return `$${v.toFixed(2)}`;
-    };
-
-    const requests = timeframes.map(range =>
-      axios.get("https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list", {
-        headers,
-        timeout: 10000,
-        params: { range },
-        validateStatus: s => s < 500
-      } )
+    // === upstream fan-out with 429 backoff ===
+    const url = "https://open-api-v4.coinglass.com/api/futures/liquidation/exchange-list";
+    const requests = timeframes.map((range) =>
+      axiosWithBackoff(() =>
+        axios.get(url, {
+          headers,
+          timeout: 15000,
+          params: { range },
+          validateStatus: (s) => s < 500
+        })
+      )
     );
 
     const responses = await Promise.all(requests);
 
-    timeframes.forEach((timeframe, index) => {
-      const response = responses[index];
-      
+    // aggregate per timeframe
+    const results = {};
+    timeframes.forEach((timeframe, idx) => {
+      const response = responses[idx];
+
       if (response.status !== 200 || response.data?.code !== "0") {
         console.warn(`Failed to fetch ${timeframe} liquidations:`, response.status, response.data?.msg);
         results[timeframe] = {
-          total: "$0", long: "$0", short: "$0",
+          total: "$0",
+          long: "$0",
+          short: "$0",
           error: response.data?.msg || `HTTP ${response.status}`
         };
         return;
       }
 
-      const data = response.data.data || [];
-      const allExchanges = data.find(item => item.exchange === "All");
-      
-      if (allExchanges) {
+      const data = response.data?.data || [];
+      const all = data.find((row) => row.exchange === "All");
+
+      if (all) {
         results[timeframe] = {
-          total: fmtUSD(allExchanges.liquidation_usd || 0),
-          long: fmtUSD(allExchanges.longLiquidation_usd || 0),
-          short: fmtUSD(allExchanges.shortLiquidation_usd || 0),
+          total: fmtUSD(all.liquidation_usd || 0),
+          long: fmtUSD(all.longLiquidation_usd || 0),
+          short: fmtUSD(all.shortLiquidation_usd || 0),
           raw: {
-            total: allExchanges.liquidation_usd || 0,
-            long: allExchanges.longLiquidation_usd || 0,
-            short: allExchanges.shortLiquidation_usd || 0
+            total: all.liquidation_usd || 0,
+            long: all.longLiquidation_usd || 0,
+            short: all.shortLiquidation_usd || 0
           }
         };
       } else {
-        const totalLiq = data.reduce((sum, item) => sum + (item.liquidation_usd || 0), 0);
-        const totalLong = data.reduce((sum, item) => sum + (item.longLiquidation_usd || 0), 0);
-        const totalShort = data.reduce((sum, item) => sum + (item.shortLiquidation_usd || 0), 0);
-        
+        const totalLiq = data.reduce((s, r) => s + (r.liquidation_usd || 0), 0);
+        const totalLong = data.reduce((s, r) => s + (r.longLiquidation_usd || 0), 0);
+        const totalShort = data.reduce((s, r) => s + (r.shortLiquidation_usd || 0), 0);
         results[timeframe] = {
-          total: fmtUSD(totalLiq), long: fmtUSD(totalLong), short: fmtUSD(totalShort),
+          total: fmtUSD(totalLiq),
+          long: fmtUSD(totalLong),
+          short: fmtUSD(totalShort),
           raw: { total: totalLiq, long: totalLong, short: totalShort }
         };
       }
     });
 
+    // Webflow-ready flat keys (unchanged from your current response shape)
     const webflowFormatted = {};
-    timeframes.forEach(tf => {
-      const tfUpper = tf.toUpperCase();
+    timeframes.forEach((tf) => {
+      const U = tf.toUpperCase();
       if (results[tf] && !results[tf].error) {
-        webflowFormatted[`${tfUpper}-Total`] = results[tf].total;
-        webflowFormatted[`${tfUpper}-Total-Long`] = results[tf].long;
-        webflowFormatted[`${tfUpper}-Total-Short`] = results[tf].short;
+        webflowFormatted[`${U}-Total`] = results[tf].total;
+        webflowFormatted[`${U}-Total-Long`] = results[tf].long;
+        webflowFormatted[`${U}-Total-Short`] = results[tf].short;
       } else {
-        webflowFormatted[`${tfUpper}-Total`] = "$0";
-        webflowFormatted[`${tfUpper}-Total-Long`] = "$0";
-        webflowFormatted[`${tfUpper}-Total-Short`] = "$0";
+        webflowFormatted[`${U}-Total`] = "$0";
+        webflowFormatted[`${U}-Total-Long`] = "$0";
+        webflowFormatted[`${U}-Total-Short`] = "$0";
       }
     });
-    
+
     const finalResponse = {
       success: true,
       ...webflowFormatted,
@@ -346,67 +366,40 @@ case "liquidations-table": {
       api_calls_used: timeframes.length
     };
 
-    // --> Caching: Save the fresh data to the cache before returning it.
-    // `ex: 300` sets the cache to expire in 300 seconds (5 minutes).
-    await kv.set(cacheKey, finalResponse, { ex: 300 });
-    
-    console.log("DEBUG: Liquidations data fetched and cached successfully.");
-    return res.json(finalResponse);
-
-  } catch (err) {
-    console.error("[liquidations-table] Error:", err.message);
-    
-    const fallbackResults = {};
-    ['1h', '4h', '12h', '24h'].forEach(tf => {
-      const tfUpper = tf.toUpperCase();
-      fallbackResults[`${tfUpper}-Total`] = "$0";
-      fallbackResults[`${tfUpper}-Total-Long`] = "$0";
-      fallbackResults[`${tfUpper}-Total-Short`] = "$0";
-    });
-    
-    return res.status(500).json({
-      success: false,
-      ...fallbackResults,
-      error: "Liquidations API failed",
-      message: err.message,
-      lastUpdated: new Date().toISOString()
-    });
-  }
-}
-
-
-
-
-  case "long-short": {
-  const response = await axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers });
-  const coins = response.data?.data || [];
-  if (!Array.isArray(coins) || coins.length === 0) {
-    throw new Error("No market data received from Coinglass");
-  }
-  const top10 = coins
-    .filter(c => c.long_short_ratio_24h != null)
-    .sort((a, b) => b.market_cap_usd - a.market_cap_usd)
-    .slice(0, 10);
-  if (top10.length === 0) throw new Error("No valid long/short ratios found for top coins");
-  const avgRatio = top10.reduce((sum, coin) => sum + coin.long_short_ratio_24h, 0) / top10.length;
-  const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
-  const avgShortPct = 100 - avgLongPct;
-  
-  // Calculate the differential (skew)
-  const differential = Math.abs(avgLongPct - avgShortPct);
-  
-  return res.json({
-    long_pct: avgLongPct.toFixed(2),
-    short_pct: avgShortPct.toFixed(2),
-    differential: differential.toFixed(2), // New field
-    average_ratio: avgRatio.toFixed(4),
-    sampled_coins: top10.map(c => ({
-      symbol: c.symbol,
-      market_cap_usd: c.market_cap_usd,
-      long_short_ratio_24h: c.long_short_ratio_24h
-    }))
+    // store a “last known good” snapshot for guard fallback
+    await kv.set("last:liquidations-table", finalResponse, { ex: 3600 });
+    return finalResponse;
   });
+
+  return res.json(out);
 }
+
+
+
+case "long-short": {
+  const out = await cacheGetSet("long-short", {}, 60, async () => {
+    const response = await axiosWithBackoff(() => axios.get("https://open-api-v4.coinglass.com/api/futures/coins-markets", { headers, timeout: 15000, validateStatus: s => s < 500 }));
+    if (response.status !== 200 || !Array.isArray(response.data?.data)) throw new Error(`long-short upstream failed: HTTP ${response.status}`);
+    const coins = response.data.data;
+    const top10 = coins.filter(c => c.long_short_ratio_24h != null).sort((a,b)=>b.market_cap_usd - a.market_cap_usd).slice(0,10);
+    if (!top10.length) throw new Error("No valid long/short ratios found for top coins");
+    const avgRatio = top10.reduce((s,c)=>s + c.long_short_ratio_24h,0) / top10.length;
+    const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
+    const avgShortPct = 100 - avgLongPct;
+    const differential = Math.abs(avgLongPct - avgShortPct);
+    return {
+      long_pct: avgLongPct.toFixed(2),
+      short_pct: avgShortPct.toFixed(2),
+      differential: differential.toFixed(2),
+      average_ratio: avgRatio.toFixed(4),
+      sampled_coins: top10.map(c => ({ symbol:c.symbol, market_cap_usd:c.market_cap_usd, long_short_ratio_24h:c.long_short_ratio_24h }))
+    };
+  });
+  return res.json(out);
+}
+
+
+ 
 
       case "max-pain": {
         const url = `https://open-api-v4.coinglass.com/api/option/max-pain?symbol=${symbol}&exchange=${exchange}`;
