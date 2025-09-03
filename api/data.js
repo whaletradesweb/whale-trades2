@@ -338,7 +338,7 @@ case "liquidations-total": {
  
 
 case "liquidations-table": {
-  const TTL = 60;
+  const TTL = 180;
   const cacheKey = "cg:liquidations-table";
   const lastGoodKey = "last:liquidations-table";
 
@@ -665,7 +665,7 @@ case "max-pain": {
 
 
 case "open-interest": {
-  const TTL = 60; // Main cache TTL: 60 seconds
+  const TTL = 120; // Main cache TTL: 60 seconds
   const cacheKey = "cg:open-interest";
   const lastGoodKey = "last:open-interest";
 
@@ -1636,7 +1636,7 @@ case "bull-market-peak-indicators": {
 
 
 case "volume-total": {
-  const TTL = 60; // short-term cache
+  const TTL = 300; // short-term cache
   const cacheKey = "cg:volume-total";
   const lastGoodKey = "last:volume-total";
 
