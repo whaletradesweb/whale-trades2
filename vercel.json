@@ -1,3 +1,11 @@
 {
-  "version": 2
+  "version": 2,
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "whaletrades.io" }],
+      "destination": "https://www.whaletrades.io/$1",
+      "permanent": true
+    }
+  ]
 }
