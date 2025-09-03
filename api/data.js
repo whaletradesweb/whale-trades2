@@ -3,6 +3,36 @@ const { kv } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
 
+// --- GLOBAL GUARD to prevent 5xx from bypassing CDN cache ---
+const GUARDED_SMAXAGE = 30;
+function setEdgeCache(res, ttlSeconds) {
+  const v = `public, s-maxage=${ttlSeconds}, stale-while-revalidate=300`;
+  res.setHeader('Cache-Control', v);
+  res.setHeader('CDN-Cache-Control', v);
+}
+const _status = res.status.bind(res);
+res.status = (code) => {
+  if (typeof code === 'number' && code >= 500) {
+    setEdgeCache(res, GUARDED_SMAXAGE);
+    return _status(200);
+  }
+  return _status(code);
+};
+const _json = res.json.bind(res);
+res.json = (body) => {
+  try {
+    if (body && typeof body === 'object') {
+      const isDegraded =
+        ('error' in body) ||
+        body?.method === 'live-error' ||
+        body?.method === 'guarded-fallback' ||
+        body?.success === false;
+      if (isDegraded) setEdgeCache(res, GUARDED_SMAXAGE);
+    }
+  } catch {}
+  return _json(body);
+};
+// --- END GLOBAL GUARD ---
 
 module.exports = async (req, res) => {
   // Enhanced CORS headers for better compatibility
