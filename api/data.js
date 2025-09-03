@@ -7,19 +7,17 @@ module.exports = async (req, res) => {
   // --- CORS (open to all origins) ---
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Vary", "Origin");
-
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-
   const reqHeaders = req.headers["access-control-request-headers"];
   res.setHeader(
     "Access-Control-Allow-Headers",
     reqHeaders ? String(reqHeaders) : "Content-Type, Authorization, X-Requested-With, Accept, Origin"
   );
-
   res.setHeader("Access-Control-Allow-Credentials", "false");
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
-}
+
+
   // preflight
   if (req.method === "OPTIONS") {
     res.status(204).end();
