@@ -4,33 +4,42 @@ const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
 
 module.exports = async (req, res) => {
-  // Enhanced CORS headers for better compatibility
-  const allowedOrigins = [
-    'https://www.whaletrades.io',
-    'https://whaletrades.io'
-  ];
-  const origin = req.headers.origin;
-  
-  // Always set a CORS header
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    // Fallback to www version when origin is missing/invalid
-    res.setHeader('Access-Control-Allow-Origin', 'https://www.whaletrades.io');
+  // --- CORS (hardened) ---
+  const ALLOWED_ORIGINS = new Set([
+    "https://www.whaletrades.io",
+    "https://whaletrades.io",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+  ]);
+
+  const origin = req.headers.origin || "";
+
+  // make CDN caches vary by Origin
+  res.setHeader("Vary", "Origin");
+
+  // echo the exact allowed origin (no hard-coded fallback)
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-  res.setHeader('Access-Control-Allow-Credentials', 'false');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
+
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+
+  const reqHeaders = req.headers["access-control-request-headers"];
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    reqHeaders ? String(reqHeaders) : "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+  );
+
+  res.setHeader("Access-Control-Allow-Credentials", "false");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+
+  // preflight
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
     return;
   }
-  
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
