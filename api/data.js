@@ -4,23 +4,9 @@ const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
 
 module.exports = async (req, res) => {
-  // --- CORS (hardened) ---
-  const ALLOWED_ORIGINS = new Set([
-    "https://www.whaletrades.io",
-    "https://whaletrades.io",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
-  ]);
-
-  const origin = req.headers.origin || "";
-
-  // make CDN caches vary by Origin
+  // --- CORS (open to all origins) ---
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Vary", "Origin");
-
-  // echo the exact allowed origin (no hard-coded fallback)
-  if (ALLOWED_ORIGINS.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
 
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
 
@@ -33,7 +19,7 @@ module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Credentials", "false");
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
-
+}
   // preflight
   if (req.method === "OPTIONS") {
     res.status(204).end();
