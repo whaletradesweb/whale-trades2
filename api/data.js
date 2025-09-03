@@ -10,8 +10,13 @@ module.exports = async (req, res) => {
     'https://whaletrades.io'
   ];
   const origin = req.headers.origin;
+  
+  // Always set a CORS header
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    // Fallback to www version when origin is missing/invalid
+    res.setHeader('Access-Control-Allow-Origin', 'https://www.whaletrades.io');
   }
   
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
