@@ -3,10 +3,17 @@ const { kv } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
 
-
 module.exports = async (req, res) => {
   // Enhanced CORS headers for better compatibility
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.whaletrades.io');
+  const allowedOrigins = [
+    'https://www.whaletrades.io',
+    'https://whaletrades.io'
+  ];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
