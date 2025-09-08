@@ -4,28 +4,34 @@ const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
 
 module.exports = async (req, res) => {
-  // --- CORS (open to all origins) ---
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  const reqHeaders = req.headers["access-control-request-headers"];
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    reqHeaders ? String(reqHeaders) : "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-  );
-  res.setHeader("Access-Control-Allow-Credentials", "false");
-  res.setHeader("Access-Control-Max-Age", "86400");
-  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+  // --- ENHANCED CORS SETUP (place this at the very beginning) ---
+  try {
+    // Set CORS headers immediately
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "false");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Vary", "Origin");
 
+    // Handle preflight requests
+    if (req.method === "OPTIONS") {
+      console.log("DEBUG: Handling OPTIONS preflight request");
+      res.status(200).end();
+      return;
+    }
 
-  // preflight
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+    if (req.method !== 'GET') {
+      console.log("DEBUG: Non-GET method:", req.method);
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    console.log("DEBUG: Processing request for type:", req.query.type);
+
+  } catch (corsError) {
+    console.error("CORS Setup Error:", corsError);
+    return res.status(500).json({ error: "CORS setup failed" });
   }
 
   const { type, symbol = "BTC", exchange = "Binance", action, interval = "1h", limit = "100" } = req.query;
