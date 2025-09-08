@@ -56,7 +56,8 @@ module.exports = async (req, res) => {
         });
       }
 
-case "altcoin-season": {
+
+ case "altcoin-season": {
   const TTL = 300;
   const cacheKey   = "cg:altcoin-season";
   const lastGoodKey= "last:altcoin-season";
@@ -65,12 +66,11 @@ case "altcoin-season": {
   const cached = await kv.get(cacheKey);
   if (cached) return res.json(cached);
 
-  // 2) TEMPORARILY BYPASS RATE LIMITING FOR DEBUGGING
-  // Comment out this rate limiting check temporarily:
-  /*
+  // 2) Traffic cop
   if (!(await allow("cg:GLOBAL", 250))) {
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
+    // fully-shaped guarded fallback
     return res.json({
       success: true,
       data: [],
@@ -79,18 +79,13 @@ case "altcoin-season": {
       message: "Guarded: Rate limit active"
     });
   }
-  */
 
   // 3) Live fetch
   try {
-    console.log("DEBUG: Attempting altcoin-season fetch...");
     const url = "https://open-api-v4.coinglass.com/api/index/altcoin-season";
     const resp = await axiosWithBackoff(() =>
       axios.get(url, { headers, timeout: 10000, validateStatus: s => s < 500 })
     );
-
-    console.log("DEBUG: Response status:", resp.status);
-    console.log("DEBUG: Response data code:", resp.data?.code);
 
     if (resp.status !== 200 || resp.data?.code !== "0" || !Array.isArray(resp.data?.data)) {
       throw new Error(`Upstream failed: HTTP ${resp.status} code=${resp.data?.code} msg=${resp.data?.msg || resp.data?.message || "unknown"}`);
@@ -117,11 +112,10 @@ case "altcoin-season": {
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 });
 
-    console.log("DEBUG: Successfully returning altcoin data");
     return res.json(payload);
 
   } catch (error) {
-    console.error(`[altcoin-season] Fetch Error:`, error.message);
+    console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
     return res.status(500).json({
