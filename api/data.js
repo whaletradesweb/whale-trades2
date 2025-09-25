@@ -58,7 +58,7 @@ module.exports = async (req, res) => {
 
 
  case "altcoin-season": {
-  const TTL = 300;
+  const TTL = 600;
   const cacheKey   = "cg:altcoin-season";
   const lastGoodKey= "last:altcoin-season";
 
@@ -135,7 +135,7 @@ case "etf-flows": {
   const asset = String(req.query.symbol || "BTC").toLowerCase();
   const assetName = asset.includes("eth") ? "ethereum" : "bitcoin";
 
-  const TTL = 300;
+  const TTL = 600;
   const cacheKey    = `cg:etf-flows:${assetName}`;
   const lastGoodKey = `last:etf-flows:${assetName}`;
 
@@ -464,7 +464,7 @@ case "liquidations-table": {
 
 
 case "long-short": {
-  const TTL = 60;
+  const TTL = 600;
   const cacheKey = "cg:long-short";
   const lastGoodKey = "last:long-short";
 
@@ -531,7 +531,7 @@ case "long-short": {
 case "max-pain": {
   const { symbol = "BTC", exchange = "Binance" } = req.query;
 
-  const TTL = 180; // 3 min
+  const TTL = 600; // 10 min
   const cacheKey = `cg:max-pain:${symbol}:${exchange}`;
   const lastGoodKey = `last:max-pain:${symbol}:${exchange}`;
 
@@ -664,7 +664,7 @@ case "max-pain": {
 
 
 case "open-interest": {
-  const TTL = 120; // Main cache TTL: 60 seconds
+  const TTL = 600; // Main cache TTL: 10 mins
   const cacheKey = "cg:open-interest";
   const lastGoodKey = "last:open-interest";
 
@@ -753,7 +753,7 @@ case "open-interest": {
 
 case "rsi-heatmap": {
   const { interval = "1h" } = req.query;
-  const TTL = 120;
+  const TTL = 600;
   const cacheKey   = `cg:rsi-heatmap:${interval}`;
   const lastGoodKey= `last:rsi-heatmap:${interval}`;
 
@@ -917,7 +917,7 @@ case "rsi-heatmap": {
 
 
 case "crypto-ticker": {
-  const TTL = 60;
+  const TTL = 600;
   const cacheKey   = "cg:crypto-ticker";
   const lastGoodKey= "last:crypto-ticker";
 
@@ -1102,7 +1102,7 @@ case "hyperliquid-long-short": {
   // Optional: &top=20
   const top = Math.max(1, Math.min(parseInt(req.query.top || "20", 10) || 20, 100));
 
-  const TTL = 120; // short-term cache
+  const TTL = 600; // short-term cache
   const cacheKey    = `cg:hyperliquid-long-short:top=${top}`;
   const lastGoodKey = `last:hyperliquid-long-short:top=${top}`;
 
@@ -1309,7 +1309,7 @@ case "hyperliquid-whale-position": {
   const top = Math.max(1, Math.min(parseInt(req.query.top || "0", 10) || 0, 500)); // 0 = no cap
 
   // --- Cache keys (fast-lane + safety-net) ---
-  const TTL = 120; // 2 min fast cache
+  const TTL = 600; // 10 min fast cache
   const cacheKey    = `cg:hyperliquid-whale-position:top=${top}`;
   const lastGoodKey = `last:hyperliquid-whale-position:top=${top}`;
 
@@ -1405,7 +1405,7 @@ case "hyperliquid-whale-alert": {
   const top = Math.max(0, Math.min(parseInt(req.query.top || "0", 10) || 0, 500));
 
   // --- Cache keys (fast-lane + safety-net) ---
-  const TTL = 120; // 2 min fast cache
+  const TTL = 600; // 10 min fast cache
   const cacheKey    = `cg:hyperliquid-whale-alert:top=${top}`;
   const lastGoodKey = `last:hyperliquid-whale-alert:top=${top}`;
 
@@ -1504,7 +1504,7 @@ case "hyperliquid-whale-alert": {
 
 
 case "bull-market-peak-indicators": {
-  const TTL = 300; // 5 min
+  const TTL = 600; // 10 min
   const cacheKey = "cg:bull-market-peak-indicators";
   const lastGoodKey = "last:bull-market-peak-indicators";
 
@@ -1635,7 +1635,7 @@ case "bull-market-peak-indicators": {
 
 
 case "volume-total": {
-  const TTL = 300; // short-term cache
+  const TTL = 600; // 10 min short-term cache
   const cacheKey = "cg:volume-total";
   const lastGoodKey = "last:volume-total";
 
@@ -1870,7 +1870,7 @@ case "market-sentiment-flow": {
   }
 
   // --- Cache + Safety-net keys ---
-  const TTL = 120; // 2 minutes fast-lane cache
+  const TTL = 600; // 10 minutes fast-lane cache
   const cacheKey   = `cg:market-sentiment-flow:${basis}:${interval}:limit=${safeLimit}`;
   const lastGoodKey= `last:market-sentiment-flow:${basis}:${interval}:limit=${safeLimit}`;
 
@@ -2051,7 +2051,7 @@ case "coins-flow-sankey": {
   const flowField = `volume_flow_usd_${tfMap[tf]}`;
 
   // --- Cache keys (fast-lane + safety-net) ---
-  const TTL = 120; // 2 min fast cache
+  const TTL = 600; // 10 min fast cache
   const cacheKey    = `cg:coins-flow-sankey:tf=${tf}:top=${safeTop}:per=${safePerPage}`;
   const lastGoodKey = `last:coins-flow-sankey:tf=${tf}:top=${safeTop}:per=${safePerPage}`;
 
