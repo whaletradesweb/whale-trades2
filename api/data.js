@@ -2243,14 +2243,15 @@ case "discord-feed": {
 }
 
 
+// In your API handler case for "price-history":
 case "price-history": {
   const { 
     symbol = "BTCUSDT", 
     exchange = "Binance", 
-    interval = "1w", // Changed default to weekly
+    interval = "1w", 
     start_time, 
     end_time,
-    limit = "1000" // Use maximum limit
+    limit = "1000"
   } = req.query;
 
   // Validate required parameters
@@ -2261,19 +2262,19 @@ case "price-history": {
     });
   }
 
-  const TTL = 3600; // Cache for 1 hour since historical data doesn't change
+  const TTL = 3600; // Cache for 1 hour
   const cacheKey = `cg:price-history:${symbol}:${exchange}:${interval}:${start_time}:${end_time}:${limit}`;
   const lastGoodKey = `last:price-history:${symbol}:${exchange}:${interval}`;
 
-  // 1) Fast lane
+  // 1) Fast lane - cached data
   const cached = await kv.get(cacheKey);
   if (cached) {
     console.log(`DEBUG [${type}]: Returning cached price history for ${symbol}`);
     return res.json(cached);
   }
 
-  // 2) Traffic cop
-  if (!(await allow("cg:GLOBAL", 250))) {
+  // 2) Traffic cop - rate limit check
+  if (!(await allow("cg:GLOBAL", 300))) {  // Updated to 300/min for Standard plan
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
@@ -2288,7 +2289,7 @@ case "price-history": {
     });
   }
 
-  // 3) Live fetch
+  // 3) Live fetch with API key in headers
   try {
     console.log(`DEBUG [${type}]: Fetching price history for ${symbol} from ${start_time} to ${end_time} (${interval} interval)`);
     
@@ -2302,9 +2303,11 @@ case "price-history": {
       limit
     };
 
+    // Your existing headers (add CG_API_KEY if not present)
+    // Example: const headers = { 'CG-API-KEY': process.env.CG_API_KEY, accept: 'application/json' };
     const response = await axiosWithBackoff(() =>
       axios.get(url, { 
-        headers, 
+        headers,  // Includes your CG-API-KEY for Standard plan auth
         params,
         timeout: 15000, 
         validateStatus: s => s < 500 
@@ -2316,28 +2319,28 @@ case "price-history": {
     if (response.status === 401) {
       return res.status(401).json({
         error: 'API Authentication Failed',
-        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+        message: 'Invalid API key. Check your CoinGlass Standard plan key in env vars.'
       });
     }
     
     if (response.status === 403) {
       return res.status(403).json({
         error: 'API Access Forbidden',
-        message: 'Your API plan does not include access to this endpoint. Upgrade to Pro plan or higher.'
+        message: 'Standard plan required for this endpoint. Verify subscription.'
       });
     }
     
     if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || "unknown"}`);
     }
 
     const rawData = response.data.data || [];
     
     if (!Array.isArray(rawData)) {
-      throw new Error("Invalid data format received from CoinGlass API");
+      throw new Error("Invalid data format from CoinGlass API");
     }
 
-    // Process and normalize the price data
+    // Process and normalize (your existing code)
     const priceData = rawData.map(candle => ({
       timestamp: Number(candle.time),
       date: new Date(Number(candle.time)).toISOString().split('T')[0],
@@ -2367,7 +2370,7 @@ case "price-history": {
 
     // 4) Cache both
     await kv.set(cacheKey, payload, { ex: TTL });
-    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
+    await kv.set(lastGoodKey, payload, { ex: 7200 });
 
     return res.json(payload);
 
