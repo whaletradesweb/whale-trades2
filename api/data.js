@@ -2247,10 +2247,10 @@ case "price-history": {
   const { 
     symbol = "BTCUSDT", 
     exchange = "Binance", 
-    interval = "1d", 
+    interval = "1w", // Changed default to weekly
     start_time, 
     end_time,
-    limit = "1000" 
+    limit = "1000" // Use maximum limit
   } = req.query;
 
   // Validate required parameters
@@ -2290,7 +2290,7 @@ case "price-history": {
 
   // 3) Live fetch
   try {
-    console.log(`DEBUG [${type}]: Fetching price history for ${symbol} from ${start_time} to ${end_time}`);
+    console.log(`DEBUG [${type}]: Fetching price history for ${symbol} from ${start_time} to ${end_time} (${interval} interval)`);
     
     const url = "https://open-api-v4.coinglass.com/api/futures/price/history";
     const params = {
