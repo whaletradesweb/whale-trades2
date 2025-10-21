@@ -2243,15 +2243,14 @@ case "discord-feed": {
 }
 
 
-// In your API handler case for "price-history":
-case "price-history": {
+case "spot-price-history": {
   const { 
     symbol = "BTCUSDT", 
     exchange = "Binance", 
-    interval = "1w", 
+    interval = "1w", // Weekly for longer history
     start_time, 
     end_time,
-    limit = "1000"
+    limit = "1000" 
   } = req.query;
 
   // Validate required parameters
@@ -2263,18 +2262,18 @@ case "price-history": {
   }
 
   const TTL = 3600; // Cache for 1 hour
-  const cacheKey = `cg:price-history:${symbol}:${exchange}:${interval}:${start_time}:${end_time}:${limit}`;
-  const lastGoodKey = `last:price-history:${symbol}:${exchange}:${interval}`;
+  const cacheKey = `cg:spot-price-history:${symbol}:${exchange}:${interval}:${start_time}:${end_time}:${limit}`;
+  const lastGoodKey = `last:spot-price-history:${symbol}:${exchange}:${interval}`;
 
-  // 1) Fast lane - cached data
+  // 1) Fast lane
   const cached = await kv.get(cacheKey);
   if (cached) {
-    console.log(`DEBUG [${type}]: Returning cached price history for ${symbol}`);
+    console.log(`DEBUG [${type}]: Returning cached spot price history for ${symbol}`);
     return res.json(cached);
   }
 
-  // 2) Traffic cop - rate limit check
-  if (!(await allow("cg:GLOBAL", 300))) {  // Updated to 300/min for Standard plan
+  // 2) Traffic cop
+  if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}`);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
@@ -2289,11 +2288,11 @@ case "price-history": {
     });
   }
 
-  // 3) Live fetch with API key in headers
+  // 3) Live fetch
   try {
-    console.log(`DEBUG [${type}]: Fetching price history for ${symbol} from ${start_time} to ${end_time} (${interval} interval)`);
+    console.log(`DEBUG [${type}]: Fetching SPOT price history for ${symbol} from ${start_time} to ${end_time} (${interval} interval)`);
     
-    const url = "https://open-api-v4.coinglass.com/api/futures/price/history";
+    const url = "https://open-api-v4.coinglass.com/api/spot/price/history";
     const params = {
       exchange,
       symbol,
@@ -2303,44 +2302,42 @@ case "price-history": {
       limit
     };
 
-    // Your existing headers (add CG_API_KEY if not present)
-    // Example: const headers = { 'CG-API-KEY': process.env.CG_API_KEY, accept: 'application/json' };
     const response = await axiosWithBackoff(() =>
       axios.get(url, { 
-        headers,  // Includes your CG-API-KEY for Standard plan auth
+        headers, 
         params,
         timeout: 15000, 
         validateStatus: s => s < 500 
       })
     );
 
-    console.log("DEBUG: Price History Response Status:", response.status);
+    console.log("DEBUG: Spot Price History Response Status:", response.status);
 
     if (response.status === 401) {
       return res.status(401).json({
         error: 'API Authentication Failed',
-        message: 'Invalid API key. Check your CoinGlass Standard plan key in env vars.'
+        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
       });
     }
     
     if (response.status === 403) {
       return res.status(403).json({
         error: 'API Access Forbidden',
-        message: 'Standard plan required for this endpoint. Verify subscription.'
+        message: 'Your API plan does not include access to this endpoint. Upgrade to Pro plan or higher.'
       });
     }
     
     if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || "unknown"}`);
+      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
     }
 
     const rawData = response.data.data || [];
     
     if (!Array.isArray(rawData)) {
-      throw new Error("Invalid data format from CoinGlass API");
+      throw new Error("Invalid data format received from CoinGlass Spot API");
     }
 
-    // Process and normalize (your existing code)
+    // Process and normalize the SPOT price data
     const priceData = rawData.map(candle => ({
       timestamp: Number(candle.time),
       date: new Date(Number(candle.time)).toISOString().split('T')[0],
@@ -2364,18 +2361,19 @@ case "price-history": {
         start: priceData.length > 0 ? priceData[0].date : null,
         end: priceData.length > 0 ? priceData[priceData.length - 1].date : null
       },
+      data_source: "coinglass_spot_api",
       lastUpdated: new Date().toISOString(),
       method: "live-fetch"
     };
 
     // 4) Cache both
     await kv.set(cacheKey, payload, { ex: TTL });
-    await kv.set(lastGoodKey, payload, { ex: 7200 });
+    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
 
     return res.json(payload);
 
   } catch (error) {
-    console.error(`[${type}] Fetch Error for ${symbol}:`, error.message);
+    console.error(`[${type}] Spot Price Fetch Error for ${symbol}:`, error.message);
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
     
@@ -2385,15 +2383,13 @@ case "price-history": {
       symbol,
       exchange,
       interval,
-      error: "Price history fetch failed",
+      error: "Spot price history fetch failed",
       message: error.message,
       lastUpdated: new Date().toISOString(),
       method: "live-error"
     });
   }
 }
-
-
 
 
 
