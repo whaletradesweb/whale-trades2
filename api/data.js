@@ -2161,6 +2161,13 @@ case "discord-feed": {
   // Get optional timestamp filters from query params
   const startTimestamp = req.query.start_timestamp ? parseInt(req.query.start_timestamp) : null;
   const endTimestamp = req.query.end_timestamp ? parseInt(req.query.end_timestamp) : null;
+
+  // ADD THIS DEBUG SECTION HERE:
+if (startTimestamp && endTimestamp) {
+  console.log(`DEBUG: Filtering parameters:`);
+  console.log(`  Start timestamp: ${startTimestamp} = ${new Date(startTimestamp).toISOString()}`);
+  console.log(`  End timestamp: ${endTimestamp} = ${new Date(endTimestamp).toISOString()}`);
+}
   
   try {
     const discordUrl = `${DISCORD_SERVICE_URL}/messages`;
@@ -2211,16 +2218,26 @@ case "discord-feed": {
       };
     }) : [];
     
-    // Apply timestamp filtering if provided
-    let filteredMessages = processedMessages;
-    if (startTimestamp && endTimestamp) {
-      filteredMessages = processedMessages.filter(msg => {
-        if (!msg.timestamp) return false;
-        const msgTime = new Date(msg.timestamp).getTime();
-        return msgTime >= startTimestamp && msgTime <= endTimestamp;
-      });
-      console.log(`DEBUG: Filtered from ${processedMessages.length} to ${filteredMessages.length} messages`);
+   // Apply timestamp filtering if provided
+let filteredMessages = processedMessages;
+if (startTimestamp && endTimestamp) {
+  // Check first few messages before filtering
+  console.log(`DEBUG: Sample message timestamps:`);
+  processedMessages.slice(0, 3).forEach((msg, i) => {
+    if (msg.timestamp) {
+      const msgTime = new Date(msg.timestamp).getTime();
+      console.log(`  Message ${i}: ${msg.timestamp} = ${msgTime} (${new Date(msgTime).toISOString()})`);
+      console.log(`    Passes filter: ${msgTime >= startTimestamp && msgTime <= endTimestamp}`);
     }
+  });
+  
+  filteredMessages = processedMessages.filter(msg => {
+    if (!msg.timestamp) return false;
+    const msgTime = new Date(msg.timestamp).getTime();
+    return msgTime >= startTimestamp && msgTime <= endTimestamp;
+  });
+  console.log(`DEBUG: Filtered from ${processedMessages.length} to ${filteredMessages.length} messages`);
+}
     
     const totalImages = filteredMessages.reduce((sum, msg) => sum + msg.images.length, 0);
     const messagesWithImages = filteredMessages.filter(msg => msg.images.length > 0).length;
