@@ -2158,6 +2158,10 @@ case "discord-feed": {
   const DISCORD_SERVICE_URL = process.env.DISCORD_SERVICE_URL || "https://discord-monitor.azurewebsites.net";
   const limit = Math.min(parseInt(req.query.limit || "50"), 100);
   
+  // Get optional timestamp filters from query params
+  const startTimestamp = req.query.start_timestamp ? parseInt(req.query.start_timestamp) : null;
+  const endTimestamp = req.query.end_timestamp ? parseInt(req.query.end_timestamp) : null;
+  
   try {
     const discordUrl = `${DISCORD_SERVICE_URL}/messages`;
     console.log("DEBUG: Fetching from:", discordUrl, "with limit:", limit);
@@ -2167,14 +2171,12 @@ case "discord-feed": {
       validateStatus: (status) => status < 500,
       params: { limit: limit }
     });
-
     if (response.status !== 200) {
       return res.status(response.status).json({
         error: 'Discord service error',
         message: `Discord service returned status ${response.status}`
       });
     }
-
     const messages = response.data || [];
     console.log(`DEBUG: Raw response contains ${Array.isArray(messages) ? messages.length : 'non-array'} messages`);
     
@@ -2191,7 +2193,6 @@ case "discord-feed": {
         imagesProvided: Array.isArray(msg.images) ? msg.images.length : 'not array',
         timestamp: msg.timestamp
       });
-
       // Your Discord service already provides cleaned images array - just use it!
       const images = Array.isArray(msg.images) ? msg.images.filter(img => 
         typeof img === 'string' && img.trim() && img.startsWith('http')
@@ -2210,20 +2211,30 @@ case "discord-feed": {
       };
     }) : [];
     
-    const totalImages = processedMessages.reduce((sum, msg) => sum + msg.images.length, 0);
-    const messagesWithImages = processedMessages.filter(msg => msg.images.length > 0).length;
+    // Apply timestamp filtering if provided
+    let filteredMessages = processedMessages;
+    if (startTimestamp && endTimestamp) {
+      filteredMessages = processedMessages.filter(msg => {
+        if (!msg.timestamp) return false;
+        const msgTime = new Date(msg.timestamp).getTime();
+        return msgTime >= startTimestamp && msgTime <= endTimestamp;
+      });
+      console.log(`DEBUG: Filtered from ${processedMessages.length} to ${filteredMessages.length} messages`);
+    }
+    
+    const totalImages = filteredMessages.reduce((sum, msg) => sum + msg.images.length, 0);
+    const messagesWithImages = filteredMessages.filter(msg => msg.images.length > 0).length;
     
     console.log(`DEBUG: Final processing results:`, {
-      totalMessages: processedMessages.length,
+      totalMessages: filteredMessages.length,
       totalImages,
       messagesWithImages
     });
-
     return res.json({
       success: true,
-      data: processedMessages,
+      data: filteredMessages,
       lastUpdated: new Date().toISOString(),
-      totalMessages: processedMessages.length,
+      totalMessages: filteredMessages.length,
       totalImages,
       messagesWithImages,
       source: 'discord_monitor_service'
