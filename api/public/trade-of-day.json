@@ -1,11 +1,11 @@
 {
-  "author": "loading...",
-  "profit_percentage": 0,
-  "symbol": "",
-  "position_type": "",
-  "position_emoji": "",
-  "leverage": "",
-  "summary": "",
-  "image_url": "",
-  "updated_at": "2025-01-01T00:00:00Z"
+  "author": "slavic8105",
+  "profit_percentage": 609.51,
+  "symbol": "PUMPUST",
+  "position_type": "LONG",
+  "position_emoji": "📈",
+  "leverage": "75x",
+  "summary": "The highest profit trade recorded was a 609.51% gain on PUMPUST with a 75x leverage.",
+  "image_url": "https://cdn.discordapp.com/attachments/1164102219998695445/1431677398558179419/pump._long_scalp._b_5._.jpeg?ex=68ff9a7b&is=68fe48fb&hm=952139d9fd0fa747dbc0cb49290af520ea1be8a48485f817dfb24d4bf08f1624&",
+  "updated_at": "2025-10-26T21:20:14.158Z"
 }
