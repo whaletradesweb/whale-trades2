@@ -1,11 +1,11 @@
 {
   "author": "slavic8105",
-  "profit_percentage": 623.85,
-  "symbol": "ENSOUSDT",
-  "position_type": "LONG",
-  "position_emoji": "📈",
+  "profit_percentage": 910.06,
+  "symbol": "LAUST",
+  "position_type": "SHORT",
+  "position_emoji": "📉",
   "leverage": "75x",
-  "summary": "The highest profit trade recorded was a 623.85% gain on ENSOUSDT with a 75x leverage.",
-  "image_url": "https://cdn.discordapp.com/attachments/1164102219998695445/1432261388717264897/enso_b5__.jpeg?ex=6901119d&is=68ffc01d&hm=d7e20b7d9c887031f9468da61d7b0d11dfe056b8d3fed04c7b38e8e3c681ba71&",
-  "updated_at": "2025-10-28T07:01:03.871Z"
+  "summary": "The highest profit trade recorded was a 910.06% gain on LAUST with a 75x leverage.",
+  "image_url": "https://cdn.discordapp.com/attachments/1164102219998695445/1432623862402777198/LA_SHORT__B2._.jpeg?ex=69026331&is=690111b1&hm=7b1cbc1c88606012cc71b41fdfaeffb8cb5c4616a26db1e19110e444d5e3d82a&",
+  "updated_at": "2025-10-29T07:01:20.123Z"
 }
