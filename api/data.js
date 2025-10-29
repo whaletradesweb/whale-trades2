@@ -667,14 +667,14 @@ case "open-interest": {
   const TTL = 600; // Main cache TTL: 10 mins
   const cacheKey = "cg:open-interest";
   const lastGoodKey = "last:open-interest";
-
+  
   // 1. Check for fresh data in the main cache
   const cachedData = await kv.get(cacheKey);
   if (cachedData) {
     console.log(`DEBUG [${type}]: Returning main cached data.`);
     return res.json(cachedData);
   }
-
+  
   // 2. If no cache, check rate limit
   if (!(await allow("cg:GLOBAL", 250))) {
     console.log(`DEBUG [${type}]: Rate limit active. Serving last known good.`);
@@ -682,64 +682,74 @@ case "open-interest": {
     if (last) return res.json(last);
     // Fallback if there's no "last good" data
     return res.json({
-        total_open_interest_usd: 0, avg_open_interest_change_percent_24h: 0,
-        weighted_open_interest_change_percent_24h: 0, baseline_change_percent_since_last_fetch: 0,
-        coin_count: 0, baseline_timestamp: new Date().toUTCString(), method: "guarded-fallback"
+        total_open_interest_usd: 0, 
+        avg_open_interest_change_percent_24h: 0,
+        weighted_open_interest_change_percent_24h: 0, 
+        baseline_change_percent_since_last_fetch: 0,
+        coin_count: 0, 
+        baseline_timestamp: new Date().toUTCString(), 
+        method: "guarded-fallback"
     });
   }
-
+  
   // 3. If allowed, fetch fresh data
   try {
     console.log(`DEBUG [${type}]: Fetching fresh data.`);
     const url = "https://open-api-v4.coinglass.com/api/futures/coins-markets";
     const response = await axiosWithBackoff(() => axios.get(url, { headers, timeout: 15000 }));
-
+    
     if (response.status !== 200 || !Array.isArray(response.data?.data)) {
       throw new Error(`Upstream failed: HTTP ${response.status}`);
     }
-
+    
     // --- YOUR CRITICAL PROCESSING LOGIC ---
     const coins = response.data.data;
     const totalOpenInterest = coins.reduce((sum, c) => sum + (c.open_interest_usd || 0), 0);
     const pctList = coins.map(c => c.open_interest_change_percent_24h).filter(v => typeof v === "number" && Number.isFinite(v));
     const avgChangePct = pctList.length ? (pctList.reduce((a, b) => a + b, 0) / pctList.length) : 0;
+    
     let wNum = 0, wDen = 0;
     for (const c of coins) {
       const oi = c.open_interest_usd || 0;
       const pct = c.open_interest_change_percent_24h;
-      if (oi > 0 && Number.isFinite(pct)) { wNum += oi * pct; wDen += oi; }
+      if (oi > 0 && Number.isFinite(pct)) { 
+        wNum += oi * pct; 
+        wDen += oi; 
+      }
     }
     const weightedAvgChangePct = wDen ? (wNum / wDen) : 0;
+    
     const now = Date.now();
     let previousOI = await kv.get("open_interest:previous_total");
     let previousTs = await kv.get("open_interest:timestamp");
     let baselineChangePct = 0;
+    
     if (previousOI && previousTs && (now - previousTs) < 24 * 60 * 60 * 1000) {
       baselineChangePct = ((totalOpenInterest - previousOI) / previousOI) * 100;
-    } else {
-      await kv.set("open_interest:previous_total", totalOpenInterest);
-      await kv.set("open_interest:timestamp", now);
-      previousTs = now;
     }
+    
+    // Always update the baseline for the next calculation
+    await kv.set("open_interest:previous_total", totalOpenInterest);
+    await kv.set("open_interest:timestamp", now);
     // --- END OF YOUR LOGIC ---
-
+    
     const payload = {
       total_open_interest_usd: totalOpenInterest,
       avg_open_interest_change_percent_24h: avgChangePct,
       weighted_open_interest_change_percent_24h: weightedAvgChangePct,
       baseline_change_percent_since_last_fetch: baselineChangePct,
       coin_count: coins.length,
-      baseline_timestamp: new Date(previousTs).toUTCString(),
+      baseline_timestamp: new Date(now).toUTCString(),
       lastUpdated: new Date().toISOString(),
       method: "live-fetch"
     };
-
+    
     // 4. Cache the successful payload
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 3600 }); // last good has a longer TTL
-
+    
     return res.json(payload);
-
+    
   } catch (error) {
     console.error(`[${type}] Fetch Error:`, error.message);
     const last = await kv.get(lastGoodKey);
