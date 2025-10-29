@@ -711,17 +711,22 @@ case "open-interest": {
     }
     const weightedAvgChangePct = wDen ? (wNum / wDen) : 0;
     const now = Date.now();
-    let previousOI = await kv.get("open_interest:previous_total");
-    let previousTs = await kv.get("open_interest:timestamp");
-    let baselineChangePct = 0;
-    if (previousOI && previousTs && (now - previousTs) < 24 * 60 * 60 * 1000) {
-      baselineChangePct = ((totalOpenInterest - previousOI) / previousOI) * 100;
-    } else {
-      await kv.set("open_interest:previous_total", totalOpenInterest);
-      await kv.set("open_interest:timestamp", now);
-      previousTs = now;
-    }
-    // --- END OF YOUR LOGIC ---
+    // Load or update KV baseline for % change
+let previousOI = await kv.get("open_interest:previous_total");
+let previousTimestamp = await kv.get("open_interest:timestamp");
+const now = Date.now();
+let percentChange = 0;
+
+if (previousOI && previousTimestamp && (now - previousTimestamp) < 24 * 60 * 60 * 1000) {
+  percentChange = ((totalOpenInterest - previousOI) / previousOI) * 100;
+  console.log(`[Open Interest] % Change: ${percentChange.toFixed(2)}%`);
+} else {
+  console.log(`[Open Interest] New baseline stored: ${totalOpenInterest.toFixed(2)}`);
+}
+
+// Always update the baseline for the next calculation
+await kv.set("open_interest:previous_total", totalOpenInterest);
+await kv.set("open_interest:timestamp", now);
 
     const payload = {
       total_open_interest_usd: totalOpenInterest,
