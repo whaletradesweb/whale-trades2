@@ -2280,7 +2280,70 @@ case "spot-price-history": {
 }
 
 
+// Simplified trade-of-day endpoint for data.js
+// Add this case to your switch statement
 
+case "trade-of-day": {
+  // Simple rate limiting to prevent abuse
+  if (!(await allow("github:trade-of-day", 100))) {
+    return res.json({
+      success: false,
+      error: "Rate limit exceeded",
+      lastUpdated: new Date().toISOString()
+    });
+  }
+
+  try {
+    console.log(`[trade-of-day] Fetching from GitHub`);
+    
+    const githubUrl = "https://raw.githubusercontent.com/whaletradesweb/whale-trades2/main/api/public/trade-of-day.json";
+    const response = await axiosWithBackoff(() =>
+      axios.get(githubUrl, { 
+        timeout: 8000,
+        validateStatus: s => s < 500,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'User-Agent': 'WhaleTradesAPI/1.0'
+        }
+      })
+    );
+
+    if (response.status !== 200) {
+      throw new Error(`GitHub fetch failed: HTTP ${response.status}`);
+    }
+
+    const tradeData = response.data;
+    
+    // Validate the data structure
+    if (!tradeData || typeof tradeData !== 'object') {
+      throw new Error('Invalid trade data format');
+    }
+
+    // Return the data directly from GitHub
+    return res.json({
+      success: true,
+      data: tradeData,
+      lastUpdated: new Date().toISOString(),
+      method: "github-direct",
+      source: "github-file"
+    });
+
+  } catch (error) {
+    console.error("[trade-of-day] Error:", error.message);
+    
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch trade of the day",
+      message: error.message,
+      lastUpdated: new Date().toISOString()
+    });
+  }
+}
+
+
+
+
+        
 
         
       default:
