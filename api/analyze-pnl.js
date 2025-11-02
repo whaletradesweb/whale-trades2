@@ -1,4 +1,4 @@
-
+// Fixed analyze-pnl.js for Vercel serverless function
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const PROMPT = `You are a trading analyst. Extract the MOST PROFITABLE closed trade from each image.
