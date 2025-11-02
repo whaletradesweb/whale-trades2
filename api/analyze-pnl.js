@@ -1,4 +1,4 @@
-// Fixed analyze-pnl.js for Vercel serverless function
+// Robust analyze-pnl.js with better error handling
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const PROMPT = `You are a trading analyst. Analyze each image and extract ANY trading information you can find.
@@ -50,93 +50,158 @@ export default async function handler(req, res) {
       });
     }
 
-    const { images } = req.body;
-    console.log('DEBUG: Received images:', JSON.stringify(images, null, 2));
-    console.log('DEBUG: Images type:', typeof images);
-    console.log('DEBUG: Images array?', Array.isArray(images));
-    console.log('DEBUG: Images length:', images?.length);
+    // Get and validate images array
+    let { images } = req.body;
     
-    if (!images?.length) {
-      return res.status(400).json({ error: "No images provided" });
+    console.log('DEBUG: Raw req.body:', JSON.stringify(req.body, null, 2));
+    console.log('DEBUG: Images received:', JSON.stringify(images, null, 2));
+    console.log('DEBUG: Images type:', typeof images);
+    console.log('DEBUG: Images is array:', Array.isArray(images));
+    
+    // Handle different input formats
+    if (!images) {
+      return res.status(400).json({ error: "No images field in request body" });
     }
+    
+    // Convert to array if it's not already
+    if (!Array.isArray(images)) {
+      if (typeof images === 'string') {
+        // If it's a single string, make it an array
+        images = [images];
+      } else {
+        return res.status(400).json({ error: "Images must be an array or string" });
+      }
+    }
+    
+    if (images.length === 0) {
+      return res.status(400).json({ error: "Images array is empty" });
+    }
+
+    console.log(`DEBUG: Processing ${images.length} images`);
 
     // Dynamic import for OpenAI (required for Vercel serverless)
     const { OpenAI } = await import('openai');
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-    const batches = [];
-    for (let i = 0; i < images.length; i += 10) {
-      batches.push(images.slice(i, i + 10));
-    }
-
+    // Process in smaller batches to avoid errors
+    const batchSize = 5; // Reduced from 10
     const results = [];
-    for (const batch of batches) {
+    
+    for (let i = 0; i < images.length; i += batchSize) {
+      const batch = images.slice(i, i + batchSize);
+      
+      console.log(`DEBUG: Processing batch ${Math.floor(i/batchSize) + 1}, ${batch.length} images`);
+      console.log(`DEBUG: Batch content:`, JSON.stringify(batch, null, 2));
+      
+      // Ensure batch is an array and has valid items
+      if (!Array.isArray(batch)) {
+        console.error('ERROR: Batch is not an array:', batch);
+        continue;
+      }
+      
       try {
+        // Build the content array safely
+        const content = [{ type: "text", text: PROMPT }];
+        
+        // Add each image safely
+        for (const img of batch) {
+          let imageUrl;
+          
+          if (typeof img === 'string') {
+            imageUrl = img;
+          } else if (img && typeof img === 'object') {
+            imageUrl = img.url || img.imageUrl || img.href || String(img);
+          } else {
+            console.warn('Skipping invalid image:', img);
+            continue;
+          }
+          
+          if (imageUrl && typeof imageUrl === 'string') {
+            content.push({
+              type: "image_url",
+              image_url: { url: imageUrl }
+            });
+          }
+        }
+        
+        console.log(`DEBUG: Sending ${content.length - 1} images to OpenAI`);
+        
         const response = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
             role: "user",
-            content: [
-              { type: "text", text: PROMPT },
-              ...batch.map(img => ({
-                type: "image_url", 
-                image_url: { 
-                  url: typeof img === 'string' ? img : (img.url || img.imageUrl || img)
-                }
-              }))
-            ]
+            content: content
           }],
           max_tokens: 1500
         });
 
-        const content = response.choices[0].message.content;
+        const responseContent = response.choices[0].message.content;
+        console.log(`DEBUG: GPT response:`, responseContent);
+        
         let parsed = [];
-        try { parsed = JSON.parse(content); } catch {}
-        if (!Array.isArray(parsed)) parsed = [parsed];
+        try { 
+          parsed = JSON.parse(responseContent); 
+        } catch (parseError) {
+          console.log("DEBUG: Failed to parse GPT response as JSON:", parseError);
+          continue;
+        }
+        
+        if (!Array.isArray(parsed)) {
+          parsed = [parsed];
+        }
 
-        parsed.forEach((t, i) => {
-          // Include ALL trades for debugging, not just profitable ones
-          if (t && (t.profit_percent !== undefined || t.image_type)) {
-            const imgData = batch[i];
+        // Process results
+        parsed.forEach((trade, index) => {
+          if (trade && typeof trade === 'object') {
+            const imgData = batch[index];
             results.push({
-              profit_percent: t.profit_percent || 0,
-              symbol: t.symbol || "UNKNOWN",
-              direction: t.direction || "UNKNOWN",
-              leverage: t.leverage || null,
-              author: t.author || (typeof imgData === 'object' ? imgData.author : "unknown"),
-              url: typeof imgData === 'string' ? imgData : (imgData.url || imgData.imageUrl),
-              image_type: t.image_type || "unknown",
-              description: t.description || "no description"
+              profit_percent: trade.profit_percent || 0,
+              symbol: trade.symbol || "UNKNOWN",
+              direction: trade.direction || "UNKNOWN",
+              leverage: trade.leverage || null,
+              author: trade.author || (typeof imgData === 'object' ? imgData.author : "unknown"),
+              url: typeof imgData === 'string' ? imgData : (imgData?.url || imgData?.imageUrl || "unknown"),
+              image_type: trade.image_type || "unknown",
+              description: trade.description || "no description"
             });
           }
         });
-      } catch (e) {
-        console.error("GPT batch failed:", e);
+        
+      } catch (batchError) {
+        console.error("DEBUG: GPT batch failed:", batchError);
       }
     }
 
-    const best = results.length > 0
-      ? results.reduce((a, b) => a.profit_percent > b.profit_percent ? a : b)
+    // Find best trade (most profitable)
+    const profitableTrades = results.filter(t => t.profit_percent > 0);
+    const best = profitableTrades.length > 0
+      ? profitableTrades.reduce((a, b) => a.profit_percent > b.profit_percent ? a : b)
       : null;
+
+    console.log(`DEBUG: Analysis complete. Found ${results.length} total results, ${profitableTrades.length} profitable`);
+
+    // Calculate statistics
+    const imageTypes = results.reduce((acc, t) => {
+      acc[t.image_type] = (acc[t.image_type] || 0) + 1;
+      return acc;
+    }, {});
 
     res.json({
       success: true,
       best_trade: best,
       total_processed: images.length,
       valid_trades: results.length,
-      sample_results: results.slice(0, 5), // Show first 5 results for debugging
-      profitable_trades: results.filter(t => t.profit_percent > 0).length,
-      image_types: results.reduce((acc, t) => {
-        acc[t.image_type] = (acc[t.image_type] || 0) + 1;
-        return acc;
-      }, {})
+      profitable_trades: profitableTrades.length,
+      sample_results: results.slice(0, 5),
+      image_types: imageTypes
     });
 
   } catch (error) {
     console.error("Analysis failed:", error);
     res.status(500).json({ 
       error: "Analysis failed", 
-      message: error.message 
+      message: error.message,
+      stack: error.stack
     });
   }
 }
