@@ -2021,13 +2021,15 @@ case "discord-feed": {
   // Get optional timestamp filters from query params
   const startTimestamp = req.query.start_timestamp ? parseInt(req.query.start_timestamp) : null;
   const endTimestamp = req.query.end_timestamp ? parseInt(req.query.end_timestamp) : null;
+  const hours = req.query.hours ? parseInt(req.query.hours) : null; // ← ONLY FOR ZAP
 
-  // ADD THIS DEBUG SECTION HERE:
-if (startTimestamp && endTimestamp) {
-  console.log(`DEBUG: Filtering parameters:`);
-  console.log(`  Start timestamp: ${startTimestamp} = ${new Date(startTimestamp).toISOString()}`);
-  console.log(`  End timestamp: ${endTimestamp} = ${new Date(endTimestamp).toISOString()}`);
-}
+  // Debug logs
+  if (startTimestamp && endTimestamp) {
+    console.log(`DEBUG: Filtering by start/end timestamp`);
+  }
+  if (hours) {
+    console.log(`DEBUG: ZAP requesting last ${hours} hours only`);
+  }
   
   try {
     const discordUrl = `${DISCORD_SERVICE_URL}/messages`;
@@ -2052,61 +2054,57 @@ if (startTimestamp && endTimestamp) {
       console.log("DEBUG: First message structure:", JSON.stringify(messages[0], null, 2));
     }
     
-    // **SIMPLIFIED PROCESSING: Use the images array directly since your service provides it**
+    // **SIMPLIFIED PROCESSING: Use the images array directly**
     const processedMessages = Array.isArray(messages) ? messages.map((msg, index) => {
-      console.log(`DEBUG: Processing message ${index}:`, {
-        author: msg.author,
-        hasContent: !!msg.content,
-        imagesProvided: Array.isArray(msg.images) ? msg.images.length : 'not array',
-        timestamp: msg.timestamp
-      });
-      // Your Discord service already provides cleaned images array - just use it!
       const images = Array.isArray(msg.images) ? msg.images.filter(img => 
         typeof img === 'string' && img.trim() && img.startsWith('http')
       ) : [];
-      
-      console.log(`DEBUG: Message ${index} - Using ${images.length} images directly from service:`, images);
       
       return {
         id: msg.id,
         author: msg.author || 'Unknown',
         content: msg.content || '',
-        images: images, // Use the images array directly from your service
+        images: images,
         timestamp: msg.timestamp,
         formatted_time: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : null,
-        author_avatar: msg.author_avatar || null // Include avatar if provided
+        author_avatar: msg.author_avatar || null
       };
     }) : [];
     
-   // Apply timestamp filtering if provided
-let filteredMessages = processedMessages;
-if (startTimestamp && endTimestamp) {
-  // Check first few messages before filtering
-  console.log(`DEBUG: Sample message timestamps:`);
-  processedMessages.slice(0, 3).forEach((msg, i) => {
-    if (msg.timestamp) {
-      const msgTime = new Date(msg.timestamp).getTime();
-      console.log(`  Message ${i}: ${msg.timestamp} = ${msgTime} (${new Date(msgTime).toISOString()})`);
-      console.log(`    Passes filter: ${msgTime >= startTimestamp && msgTime <= endTimestamp}`);
+    // === APPLY FILTERING ===
+    let filteredMessages = processedMessages;
+
+    // ONLY apply hours filter IF ?hours= is in URL (i.e. from Zap)
+    if (hours) {
+      const cutoff = Date.now() - hours * 60 * 60 * 1000;
+      filteredMessages = filteredMessages.filter(msg => {
+        if (!msg.timestamp) return false;
+        const msgTime = new Date(msg.timestamp).getTime();
+        return msgTime >= cutoff;
+      });
+      console.log(`DEBUG: Applied ?hours=${hours} → ${filteredMessages.length} messages`);
     }
-  });
-  
-  filteredMessages = processedMessages.filter(msg => {
-    if (!msg.timestamp) return false;
-    const msgTime = new Date(msg.timestamp).getTime();
-    return msgTime >= startTimestamp && msgTime <= endTimestamp;
-  });
-  console.log(`DEBUG: Filtered from ${processedMessages.length} to ${filteredMessages.length} messages`);
-}
+
+    // Apply start/end timestamp filtering (if used elsewhere)
+    if (startTimestamp && endTimestamp) {
+      filteredMessages = filteredMessages.filter(msg => {
+        if (!msg.timestamp) return false;
+        const msgTime = new Date(msg.timestamp).getTime();
+        return msgTime >= startTimestamp && msgTime <= endTimestamp;
+      });
+      console.log(`DEBUG: Applied start/end timestamp filter → ${filteredMessages.length} messages`);
+    }
     
     const totalImages = filteredMessages.reduce((sum, msg) => sum + msg.images.length, 0);
     const messagesWithImages = filteredMessages.filter(msg => msg.images.length > 0).length;
     
-    console.log(`DEBUG: Final processing results:`, {
+    console.log(`DEBUG: Final results:`, {
       totalMessages: filteredMessages.length,
       totalImages,
-      messagesWithImages
+      messagesWithImages,
+      hoursFilterApplied: !!hours
     });
+
     return res.json({
       success: true,
       data: filteredMessages,
@@ -2114,13 +2112,12 @@ if (startTimestamp && endTimestamp) {
       totalMessages: filteredMessages.length,
       totalImages,
       messagesWithImages,
-      source: 'discord_monitor_service'
+      source: 'discord_monitor_service',
+      hoursFilter: !!hours ? hours : null  // optional debug
     });
     
   } catch (err) {
     console.error("[discord-feed] Error:", err.message);
-    console.error("[discord-feed] Stack:", err.stack);
-    
     return res.status(500).json({
       error: "Discord feed failed",
       message: err.message,
