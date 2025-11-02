@@ -72,12 +72,24 @@ export default async function handler(req, res) {
           images = parsed.images;
           console.log('DEBUG: Parsed double-encoded JSON, found', images.length, 'images');
         } else {
-          // Single URL as string
-          images = [images];
+          // Check if it's a comma-separated string from Zapier
+          if (images.includes(',')) {
+            images = images.split(',').map(url => url.trim());
+            console.log('DEBUG: Split comma-separated string, found', images.length, 'images');
+          } else {
+            // Single URL as string
+            images = [images];
+          }
         }
       } catch (parseError) {
-        // Not valid JSON, treat as single URL
-        images = [images];
+        // Not valid JSON, check if it's comma-separated
+        if (images.includes(',')) {
+          images = images.split(',').map(url => url.trim());
+          console.log('DEBUG: Split comma-separated string, found', images.length, 'images');
+        } else {
+          // Single URL
+          images = [images];
+        }
       }
     }
     
