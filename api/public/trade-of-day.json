@@ -1,11 +1,10 @@
 {
   "author": "slavic8105",
-  "profit_percentage": 735.97,
-  "symbol": "BUST",
-  "position_type": "SHORT",
-  "position_emoji": "📉",
-  "leverage": "50x",
-  "summary": "The highest profit trade recorded was a 735.97% gain on BUST with a 50x leverage.",
-  "image_url": "https://cdn.discordapp.com/attachments/1164102219998695445/1434193896061014137/B._SHORT_2_CONT.._.jpeg?ex=69081966&is=6906c7e6&hm=d2897b3a70149bdef48a952acd81a20d6d5afd1641de706139a9ea6ca919b614&",
-  "updated_at": "2025-11-02T06:01:02.142Z"
+  "profit_percentage": "852.78",
+  "symbol": "AIAUSDT ",
+  "position_type": "LONG ",
+  "leverage": "50x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1434474235203682386/AIA._B3._COBT.jpeg?ex=690875bc&is=6907243c&hm=324605d4d2a0eb1c39db730dfec77871fd09a4dc0bb62a2ad3ae1d8f382f60ac&",
+  "summary": "A profitable long position on AIAUSDT with a 50x leverage, showing a profit of 852.78%. ",
+  "updated_at": " 2025-11-02T15:24:37.672Z"
 }
