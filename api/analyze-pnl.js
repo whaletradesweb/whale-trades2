@@ -165,9 +165,19 @@ export default async function handler(req, res) {
         
         let parsed = [];
         try { 
-          parsed = JSON.parse(responseContent); 
+          // Remove markdown code blocks if present
+          let cleanContent = responseContent.trim();
+          if (cleanContent.startsWith('```json')) {
+            cleanContent = cleanContent.replace(/```json\s*/, '').replace(/\s*```$/, '');
+          } else if (cleanContent.startsWith('```')) {
+            cleanContent = cleanContent.replace(/```\s*/, '').replace(/\s*```$/, '');
+          }
+          
+          parsed = JSON.parse(cleanContent); 
+          console.log(`DEBUG: Successfully parsed GPT response, found ${parsed.length} items`);
         } catch (parseError) {
           console.log("DEBUG: Failed to parse GPT response as JSON:", parseError);
+          console.log("DEBUG: Raw response:", responseContent);
           continue;
         }
         
