@@ -50,48 +50,70 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get and validate images array
-    let { images } = req.body;
+    // Get and validate images array and authors
+    let { images, authors } = req.body;
     
     console.log('DEBUG: Raw req.body:', JSON.stringify(req.body, null, 2));
     console.log('DEBUG: Images received:', JSON.stringify(images, null, 2));
+    console.log('DEBUG: Authors received:', JSON.stringify(authors, null, 2));
     console.log('DEBUG: Images type:', typeof images);
+    console.log('DEBUG: Authors type:', typeof authors);
     console.log('DEBUG: Images is array:', Array.isArray(images));
     
-    // Handle different input formats
+    // Handle different input formats for images
     if (!images) {
       return res.status(400).json({ error: "No images field in request body" });
     }
     
-    // Handle double-encoded JSON from Zapier
+    // Handle double-encoded JSON from Zapier for images
     if (typeof images === 'string') {
       try {
         const parsed = JSON.parse(images);
         if (parsed.images && Array.isArray(parsed.images)) {
-          // Zapier sent: {"images": "{\"images\": [\"url1\", \"url2\"]}"}
           images = parsed.images;
-          console.log('DEBUG: Parsed double-encoded JSON, found', images.length, 'images');
+          console.log('DEBUG: Parsed double-encoded JSON for images, found', images.length, 'images');
         } else {
           // Check if it's a comma-separated string from Zapier
           if (images.includes(',')) {
             images = images.split(',').map(url => url.trim());
-            console.log('DEBUG: Split comma-separated string, found', images.length, 'images');
+            console.log('DEBUG: Split comma-separated images string, found', images.length, 'images');
           } else {
-            // Single URL as string
             images = [images];
           }
         }
       } catch (parseError) {
-        // Not valid JSON, check if it's comma-separated
         if (images.includes(',')) {
           images = images.split(',').map(url => url.trim());
-          console.log('DEBUG: Split comma-separated string, found', images.length, 'images');
+          console.log('DEBUG: Split comma-separated images string, found', images.length, 'images');
         } else {
-          // Single URL
           images = [images];
         }
       }
     }
+    
+    // Handle authors field - should be comma-separated string matching images
+    let authorsArray = [];
+    if (authors) {
+      if (typeof authors === 'string') {
+        if (authors.includes(',')) {
+          authorsArray = authors.split(',').map(author => author.trim());
+          console.log('DEBUG: Split comma-separated authors string, found', authorsArray.length, 'authors');
+        } else {
+          authorsArray = [authors.trim()];
+        }
+      } else if (Array.isArray(authors)) {
+        authorsArray = authors;
+      }
+    }
+    
+    // Ensure we have the same number of authors as images
+    while (authorsArray.length < images.length) {
+      authorsArray.push('unknown');
+    }
+    
+    console.log('DEBUG: Final images array length:', images.length);
+    console.log('DEBUG: Final authors array length:', authorsArray.length);
+    console.log('DEBUG: Authors mapping:', authorsArray);
     
     // Convert to array if it's not already
     if (!Array.isArray(images)) {
@@ -111,12 +133,15 @@ export default async function handler(req, res) {
     // Process in smaller batches to avoid errors
     const batchSize = 5; // Reduced from 10
     const results = [];
+    let imageIndex = 0; // Track overall image index for author mapping
     
     for (let i = 0; i < images.length; i += batchSize) {
       const batch = images.slice(i, i + batchSize);
+      const batchAuthors = authorsArray.slice(i, i + batchSize); // Get corresponding authors
       
       console.log(`DEBUG: Processing batch ${Math.floor(i/batchSize) + 1}, ${batch.length} images`);
       console.log(`DEBUG: Batch content:`, JSON.stringify(batch, null, 2));
+      console.log(`DEBUG: Batch authors:`, JSON.stringify(batchAuthors, null, 2));
       
       // Ensure batch is an array and has valid items
       if (!Array.isArray(batch)) {
@@ -185,16 +210,22 @@ export default async function handler(req, res) {
           parsed = [parsed];
         }
 
-        // Process results
-        parsed.forEach((trade, index) => {
+        // Process results and map authors correctly by batch index
+        parsed.forEach((trade, batchIndex) => {
           if (trade && typeof trade === 'object') {
-            const imgData = batch[index];
+            const imgData = batch[batchIndex];
+            
+            // Get the correct author for this image using batch index
+            const authorName = batchAuthors[batchIndex] || "unknown";
+            
+            console.log(`DEBUG: Mapping image ${batchIndex} to author: ${authorName}`);
+            
             results.push({
               profit_percent: trade.profit_percent || 0,
               symbol: trade.symbol || "UNKNOWN",
               direction: trade.direction || "UNKNOWN",
               leverage: trade.leverage || null,
-              author: trade.author || (typeof imgData === 'object' ? imgData.author : "unknown"),
+              author: authorName, // Use the correctly mapped author
               url: typeof imgData === 'string' ? imgData : (imgData?.url || imgData?.imageUrl || "unknown"),
               image_type: trade.image_type || "unknown",
               description: trade.description || "no description"
