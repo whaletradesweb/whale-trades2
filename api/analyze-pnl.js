@@ -51,6 +51,11 @@ export default async function handler(req, res) {
     }
 
     const { images } = req.body;
+    console.log('DEBUG: Received images:', JSON.stringify(images, null, 2));
+    console.log('DEBUG: Images type:', typeof images);
+    console.log('DEBUG: Images array?', Array.isArray(images));
+    console.log('DEBUG: Images length:', images?.length);
+    
     if (!images?.length) {
       return res.status(400).json({ error: "No images provided" });
     }
@@ -73,11 +78,11 @@ export default async function handler(req, res) {
             role: "user",
             content: [
               { type: "text", text: PROMPT },
-              ...batch.map(img => ({ 
+              ...batch.map(img => ({
                 type: "image_url", 
                 image_url: { 
-                  url: typeof img === 'string' ? img : (img.url || img.imageUrl)
-                } 
+                  url: typeof img === 'string' ? img : (img.url || img.imageUrl || img)
+                }
               }))
             ]
           }],
