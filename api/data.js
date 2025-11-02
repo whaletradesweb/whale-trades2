@@ -2277,9 +2277,6 @@ case "spot-price-history": {
 }
 
 
-// Simplified trade-of-day endpoint for data.js
-// Add this case to your switch statement
-
 case "trade-of-day": {
   // Simple rate limiting to prevent abuse
   if (!(await allow("github:trade-of-day", 100))) {
@@ -2289,7 +2286,6 @@ case "trade-of-day": {
       lastUpdated: new Date().toISOString()
     });
   }
-
   try {
     console.log(`[trade-of-day] Fetching from GitHub`);
     
@@ -2304,18 +2300,15 @@ case "trade-of-day": {
         }
       })
     );
-
     if (response.status !== 200) {
       throw new Error(`GitHub fetch failed: HTTP ${response.status}`);
     }
-
     const tradeData = response.data;
     
     // Validate the data structure
     if (!tradeData || typeof tradeData !== 'object') {
       throw new Error('Invalid trade data format');
     }
-
     // Return the data directly from GitHub
     return res.json({
       success: true,
@@ -2324,7 +2317,6 @@ case "trade-of-day": {
       method: "github-direct",
       source: "github-file"
     });
-
   } catch (error) {
     console.error("[trade-of-day] Error:", error.message);
     
