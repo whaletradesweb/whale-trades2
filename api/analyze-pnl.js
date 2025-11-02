@@ -63,14 +63,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No images field in request body" });
     }
     
+    // Handle double-encoded JSON from Zapier
+    if (typeof images === 'string') {
+      try {
+        const parsed = JSON.parse(images);
+        if (parsed.images && Array.isArray(parsed.images)) {
+          // Zapier sent: {"images": "{\"images\": [\"url1\", \"url2\"]}"}
+          images = parsed.images;
+          console.log('DEBUG: Parsed double-encoded JSON, found', images.length, 'images');
+        } else {
+          // Single URL as string
+          images = [images];
+        }
+      } catch (parseError) {
+        // Not valid JSON, treat as single URL
+        images = [images];
+      }
+    }
+    
     // Convert to array if it's not already
     if (!Array.isArray(images)) {
-      if (typeof images === 'string') {
-        // If it's a single string, make it an array
-        images = [images];
-      } else {
-        return res.status(400).json({ error: "Images must be an array or string" });
-      }
+      images = [images];
     }
     
     if (images.length === 0) {
