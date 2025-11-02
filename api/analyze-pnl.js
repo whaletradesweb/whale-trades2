@@ -152,7 +152,7 @@ export default async function handler(req, res) {
         console.log(`DEBUG: Sending ${content.length - 1} images to OpenAI`);
         
         const response = await openai.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-4o-mini",
           messages: [{
             role: "user",
             content: content
