@@ -1,10 +1,10 @@
 {
   "author": "slavic8105",
-  "profit_percentage": "11763.55",
-  "symbol": "BTCUSDT ",
+  "profit_percentage": "11236.48",
+  "symbol": "ALPINEUSDT ",
   "position_type": "SHORT ",
-  "leverage": "100.0X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1434889778981109902/BTC_SHORT._BB_3B._.jpeg?ex=690aa17e&is=69094ffe&hm=18a53d00a8210ad0998309f6fdacd4d735947d119ded30479a64b1df781f9f7d&",
-  "summary": "Unrealized profit of +11,763.55 USDT for a short position on BTCUSDT. ",
-  "updated_at": " 2025-11-04T06:01:46.394Z"
+  "leverage": "Cross 10.0X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1435160092482863154/aLPINE_pl_.jpeg?ex=690b9d3e&is=690a4bbe&hm=8713bddc603a41c9c596a258281680d647e1d7e67aab970e8d961d79a009ecd9&",
+  "summary": "Screenshot displaying a short position on ALPINEUSDT with an unrealized P&L of approximately +31,336.32 USD (11236.48%). ",
+  "updated_at": " 2025-11-05T06:01:45.518Z"
 }
