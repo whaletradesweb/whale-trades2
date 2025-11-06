@@ -1,10 +1,10 @@
 {
   "author": "slavic8105",
-  "profit_percentage": "11236.48",
-  "symbol": "ALPINEUSDT ",
+  "profit_percentage": "16883.41",
+  "symbol": "MMTUSDT ",
   "position_type": "SHORT ",
-  "leverage": "Cross 10.0X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1435160092482863154/aLPINE_pl_.jpeg?ex=690b9d3e&is=690a4bbe&hm=8713bddc603a41c9c596a258281680d647e1d7e67aab970e8d961d79a009ecd9&",
-  "summary": "Screenshot displaying a short position on ALPINEUSDT with an unrealized P&L of approximately +31,336.32 USD (11236.48%). ",
-  "updated_at": " 2025-11-05T06:01:45.518Z"
+  "leverage": "15x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1435578169792135258/MMT_SHORT_._BB2_.jpeg?ex=690d229b&is=690bd11b&hm=8e2a00fcebe183688b334e287d6554b92de6c25f646784e9aaf341cb2ad3bc7e&",
+  "summary": "A profit of +16883.41% on a short trade for MMTUSDT with an entry price of 10.51804 and last traded price of 0.85862. ",
+  "updated_at": " 2025-11-06T06:01:59.009Z"
 }
