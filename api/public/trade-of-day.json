@@ -1,10 +1,10 @@
 {
   "author": "slavic8105",
-  "profit_percentage": "3546.81",
-  "symbol": "ICPUSDT ",
+  "profit_percentage": "3415.79",
+  "symbol": "FILUSDT ",
   "position_type": "LONG ",
-  "leverage": "100X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1436051517030404271/BTC_SHORT_SCALP_2_PL._44444.jpeg?ex=690e32b2&is=690ce132&hm=48f396d5a25c19b6f7810518c5e787ac7a3c8390abdaeca5e4ad05939ae979cf&",
-  "summary": "A long position on ICPUSDT showing a profit of 3546.81%. ",
-  "updated_at": " 2025-11-07T06:01:48.795Z"
+  "leverage": "75x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1436672798193094727/fil_2_cont..._b3_.jpeg?ex=69111e0f&is=690fcc8f&hm=d81b515fcc5876146feec52bf8d053966aa4dd6f42acec50378165fdb242f66c&",
+  "summary": "Long position with a profit of 3415.79% on FILUSDT. ",
+  "updated_at": " 2025-11-09T06:01:10.440Z"
 }
