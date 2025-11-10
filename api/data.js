@@ -2362,6 +2362,167 @@ case "bitcoin-historical": {
 }
 
 
+case "bitcoin-latest-weekly": {
+  const TTL = 3600; // Cache for 1 hour
+  const cacheKey = "bitcoin-latest-weekly-data";
+  const lastGoodKey = "last:bitcoin-latest-weekly-data";
+
+  // 1) Fast lane - check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: Returning cached Bitcoin latest weekly data`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({
+      success: false,
+      data: null,
+      message: "Rate limit active and no cached data available",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch from CoinGlass
+  try {
+    console.log(`DEBUG [${type}]: Fetching latest Bitcoin weekly data from CoinGlass`);
+    
+    // Calculate timestamps for the last 2 weeks to ensure we get the most recent complete week
+    const now = Date.now();
+    const twoWeeksAgo = now - (14 * 24 * 60 * 60 * 1000);
+    
+    const url = "https://open-api-v4.coinglass.com/api/spot/price/history";
+    const params = {
+      exchange: "Binance",
+      symbol: "BTCUSDT",
+      interval: "1w", // Weekly data
+      start_time: twoWeeksAgo,
+      end_time: now,
+      limit: 10 // Just get the last few weeks
+    };
+    
+    const response = await axiosWithBackoff(() =>
+      axios.get(url, { 
+        headers,
+        params,
+        timeout: 15000, 
+        validateStatus: s => s < 500 
+      })
+    );
+
+    console.log("DEBUG: CoinGlass Response Status:", response.status);
+
+    if (response.status === 401) {
+      return res.status(401).json({
+        error: 'API Authentication Failed',
+        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+      });
+    }
+    
+    if (response.status === 403) {
+      return res.status(403).json({
+        error: 'API Access Forbidden',
+        message: 'Your API plan does not include access to this endpoint. Upgrade to Pro plan or higher.'
+      });
+    }
+    
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`CoinGlass API failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
+    }
+
+    const rawData = response.data.data || [];
+    
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      throw new Error("No weekly Bitcoin data received from CoinGlass");
+    }
+
+    console.log(`DEBUG [${type}]: Received ${rawData.length} weekly candles from CoinGlass`);
+
+    // Process the data and get the most recent complete week
+    const processedData = rawData
+      .map(candle => ({
+        timestamp: Number(candle.time),
+        date: new Date(Number(candle.time)).toISOString().split('T')[0], // YYYY-MM-DD format
+        open: Number(candle.open),
+        high: Number(candle.high),
+        low: Number(candle.low),
+        close: Number(candle.close),
+        volume_usd: Number(candle.volume_usd || 0)
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    // Get the most recent complete week
+    const latestWeek = processedData[processedData.length - 1];
+    
+    // Check if this is actually a new week compared to existing data
+    let isNewWeek = true;
+    try {
+      // Try to get existing Google Sheets data to compare
+      const existingDataResponse = await fetch(`${req.headers.host || 'whale-trades.vercel.app'}/api/data?type=bitcoin-historical`);
+      if (existingDataResponse.ok) {
+        const existingData = await existingDataResponse.json();
+        if (existingData.success && existingData.data && existingData.data.length > 0) {
+          const lastExistingWeek = existingData.data[existingData.data.length - 1];
+          console.log(`DEBUG: Comparing new week ${latestWeek.date} with existing ${lastExistingWeek.date}`);
+          
+          if (lastExistingWeek.date === latestWeek.date) {
+            isNewWeek = false;
+            console.log(`DEBUG: Week ${latestWeek.date} already exists in spreadsheet`);
+          }
+        }
+      }
+    } catch (compareError) {
+      console.log(`DEBUG: Could not compare with existing data: ${compareError.message}`);
+      // Continue anyway - let Zapier handle duplicates
+    }
+
+    const payload = {
+      success: true,
+      data: latestWeek,
+      is_new_week: isNewWeek,
+      total_weeks_fetched: processedData.length,
+      data_source: "coinglass_spot_api",
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch",
+      zapier_ready: {
+        // Format specifically for Zapier to easily add to Google Sheets
+        date: latestWeek.date,
+        open: latestWeek.open,
+        high: latestWeek.high,
+        low: latestWeek.low,
+        close: latestWeek.close,
+        volume_usd: latestWeek.volume_usd
+      }
+    };
+
+    // 4) Cache both
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
+
+    console.log(`DEBUG [${type}]: Successfully processed latest Bitcoin week: ${latestWeek.date} (${isNewWeek ? 'NEW' : 'EXISTS'})`);
+    
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Bitcoin latest weekly fetch error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: "Bitcoin latest weekly data fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
+  }
+}
+
         
 
         
