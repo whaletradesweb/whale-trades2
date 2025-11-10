@@ -2128,153 +2128,7 @@ case "discord-feed": {
 }
 
 
-case "spot-price-history": {
-  const { 
-    symbol = "BTCUSDT", 
-    exchange = "Binance", 
-    interval = "1w", // Weekly for longer history
-    start_time, 
-    end_time,
-    limit = "1000" 
-  } = req.query;
 
-  // Validate required parameters
-  if (!start_time || !end_time) {
-    return res.status(400).json({
-      error: "Missing required parameters",
-      message: "start_time and end_time are required (Unix timestamps in milliseconds)"
-    });
-  }
-
-  const TTL = 3600; // Cache for 1 hour
-  const cacheKey = `cg:spot-price-history:${symbol}:${exchange}:${interval}:${start_time}:${end_time}:${limit}`;
-  const lastGoodKey = `last:spot-price-history:${symbol}:${exchange}:${interval}`;
-
-  // 1) Fast lane
-  const cached = await kv.get(cacheKey);
-  if (cached) {
-    console.log(`DEBUG [${type}]: Returning cached spot price history for ${symbol}`);
-    return res.json(cached);
-  }
-
-  // 2) Traffic cop
-  if (!(await allow("cg:GLOBAL", 250))) {
-    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good for ${symbol}`);
-    const last = await kv.get(lastGoodKey);
-    if (last) return res.json(last);
-    return res.json({
-      success: false,
-      data: [],
-      symbol,
-      exchange,
-      interval,
-      message: "Rate limit active and no cached data available",
-      method: "guarded-fallback"
-    });
-  }
-
-  // 3) Live fetch
-  try {
-    console.log(`DEBUG [${type}]: Fetching SPOT price history for ${symbol} from ${start_time} to ${end_time} (${interval} interval)`);
-    
-    const url = "https://open-api-v4.coinglass.com/api/spot/price/history";
-    const params = {
-      exchange,
-      symbol,
-      interval,
-      start_time,
-      end_time,
-      limit
-    };
-
-    const response = await axiosWithBackoff(() =>
-      axios.get(url, { 
-        headers, 
-        params,
-        timeout: 15000, 
-        validateStatus: s => s < 500 
-      })
-    );
-
-    console.log("DEBUG: Spot Price History Response Status:", response.status);
-
-    if (response.status === 401) {
-      return res.status(401).json({
-        error: 'API Authentication Failed',
-        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
-      });
-    }
-    
-    if (response.status === 403) {
-      return res.status(403).json({
-        error: 'API Access Forbidden',
-        message: 'Your API plan does not include access to this endpoint. Upgrade to Pro plan or higher.'
-      });
-    }
-    
-    if (response.status !== 200 || response.data?.code !== "0") {
-      throw new Error(`Upstream failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
-    }
-
-    const rawData = response.data.data || [];
-    
-    if (!Array.isArray(rawData)) {
-      throw new Error("Invalid data format received from CoinGlass Spot API");
-    }
-
-    // Process and normalize the SPOT price data
-    const priceData = rawData.map(candle => ({
-      timestamp: Number(candle.time),
-      date: new Date(Number(candle.time)).toISOString().split('T')[0],
-      open: Number(candle.open),
-      high: Number(candle.high), 
-      low: Number(candle.low),
-      close: Number(candle.close),
-      volume_usd: Number(candle.volume_usd || 0)
-    })).sort((a, b) => a.timestamp - b.timestamp);
-
-    const payload = {
-      success: true,
-      data: priceData,
-      symbol,
-      exchange, 
-      interval,
-      start_time: Number(start_time),
-      end_time: Number(end_time),
-      total_candles: priceData.length,
-      date_range: {
-        start: priceData.length > 0 ? priceData[0].date : null,
-        end: priceData.length > 0 ? priceData[priceData.length - 1].date : null
-      },
-      data_source: "coinglass_spot_api",
-      lastUpdated: new Date().toISOString(),
-      method: "live-fetch"
-    };
-
-    // 4) Cache both
-    await kv.set(cacheKey, payload, { ex: TTL });
-    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
-
-    return res.json(payload);
-
-  } catch (error) {
-    console.error(`[${type}] Spot Price Fetch Error for ${symbol}:`, error.message);
-    const last = await kv.get(lastGoodKey);
-    if (last) return res.json(last);
-    
-    return res.status(500).json({
-      success: false,
-      data: [],
-      symbol,
-      exchange,
-      interval,
-      error: "Spot price history fetch failed",
-      message: error.message,
-      lastUpdated: new Date().toISOString(),
-      method: "live-error"
-    });
-  }
-}
 
 
 case "trade-of-day": {
@@ -2330,6 +2184,127 @@ case "trade-of-day": {
 }
 
 
+
+case "bitcoin-historical": {
+  const TTL = 3600; // Cache for 1 hour
+  const cacheKey = "bitcoin-historical-data";
+  const lastGoodKey = "last:bitcoin-historical-data";
+
+  // 1) Fast lane - check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: Returning cached Bitcoin historical data`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop
+  if (!(await allow("sheets:bitcoin", 50))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({
+      success: false,
+      data: [],
+      message: "Rate limit active and no cached data available",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch from Google Sheets
+  try {
+    console.log(`DEBUG [${type}]: Fetching Bitcoin historical data from Google Sheets`);
+    
+    // Google Sheets CSV export URL - replace with your sheet ID
+    const sheetId = "1lMeP05fHmddWZchyUhntLTQxQSTuyQGsmTX-YVZIKm8";
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+    
+    const response = await axiosWithBackoff(() =>
+      axios.get(csvUrl, { 
+        timeout: 10000,
+        validateStatus: s => s < 500,
+        headers: {
+          'User-Agent': 'WhaleTradesAPI/1.0'
+        }
+      })
+    );
+
+    if (response.status !== 200) {
+      throw new Error(`Google Sheets fetch failed: HTTP ${response.status}`);
+    }
+
+    // Parse CSV data
+    const csvData = response.data;
+    const lines = csvData.split('\n');
+    const headers = lines[0].split(',');
+    
+    // Process data starting from row 2 (skip header)
+    const historicalData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      const values = line.split(',');
+      if (values.length >= 5) {
+        const dateStr = values[0];
+        const open = parseFloat(values[1]);
+        const high = parseFloat(values[2]);
+        const low = parseFloat(values[3]);
+        const close = parseFloat(values[4]);
+        
+        // Convert date string to timestamp
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime()) || isNaN(close)) continue;
+        
+        historicalData.push({
+          date: dateStr,
+          timestamp: date.getTime(),
+          open: open,
+          high: high,
+          low: low,
+          close: close
+        });
+      }
+    }
+
+    // Sort by date ascending
+    historicalData.sort((a, b) => a.timestamp - b.timestamp);
+
+    const payload = {
+      success: true,
+      data: historicalData,
+      total_records: historicalData.length,
+      date_range: {
+        start: historicalData.length > 0 ? historicalData[0].date : null,
+        end: historicalData.length > 0 ? historicalData[historicalData.length - 1].date : null
+      },
+      current_price: historicalData.length > 0 ? historicalData[historicalData.length - 1].close : null,
+      data_source: "google_sheets",
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
+
+    // 4) Cache both
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
+
+    console.log(`DEBUG [${type}]: Successfully fetched ${historicalData.length} Bitcoin records`);
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Bitcoin historical fetch error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "Bitcoin historical data fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
+  }
+}
 
 
         
