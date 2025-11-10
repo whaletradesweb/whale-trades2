@@ -2214,46 +2214,84 @@ case "bitcoin-historical": {
   try {
     console.log(`DEBUG [${type}]: Fetching Bitcoin historical data from Google Sheets`);
     
-    // Google Sheets CSV export URL - replace with your sheet ID
-    const sheetId = "1lMeP05fHmddWZchyUhntLTQxQSTuyQGsmTX-YVZIKm8";
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+    // Use the published CSV URL from Google Sheets
+    const publishedCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8Dnmonp74LjnXvpyE9kPwkARq1NlaRF9XNAahuLuFkvo9bbHYPAwPKI21t_C5Xdi9tlZXHvQbDBTr/pub?gid=398063613&single=true&output=csv";
+    const csvUrls = [
+      publishedCsvUrl,
+      // Fallback URLs in case the published URL changes
+      "https://docs.google.com/spreadsheets/d/1lMeP05fHmddWZchyUhntLTQxQSTuyQGsmTX-YVZIKm8/export?format=csv&gid=0",
+      "https://docs.google.com/spreadsheets/d/1lMeP05fHmddWZchyUhntLTQxQSTuyQGsmTX-YVZIKm8/export?format=csv"
+    ];
     
-    const response = await axiosWithBackoff(() =>
-      axios.get(csvUrl, { 
-        timeout: 10000,
-        validateStatus: s => s < 500,
-        headers: {
-          'User-Agent': 'WhaleTradesAPI/1.0'
-        }
-      })
-    );
+    let response = null;
+    let csvData = null;
+    
+    // Try each URL format until one works
+    for (const csvUrl of csvUrls) {
+      try {
+        console.log(`DEBUG [${type}]: Trying URL: ${csvUrl}`);
+        
+        response = await axiosWithBackoff(() =>
+          axios.get(csvUrl, { 
+            timeout: 15000,
+            validateStatus: s => s < 500,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; WhaleTradesAPI/1.0)',
+              'Accept': 'text/csv,application/csv,text/plain,*/*'
+            },
+            maxRedirects: 5,
+            followRedirect: true
+          })
+        );
 
-    if (response.status !== 200) {
-      throw new Error(`Google Sheets fetch failed: HTTP ${response.status}`);
+        if (response.status === 200 && response.data && typeof response.data === 'string') {
+          csvData = response.data;
+          console.log(`DEBUG [${type}]: Successfully fetched from: ${csvUrl}`);
+          break;
+        } else {
+          console.log(`DEBUG [${type}]: Failed with status ${response.status} from: ${csvUrl}`);
+        }
+      } catch (urlError) {
+        console.log(`DEBUG [${type}]: URL ${csvUrl} failed: ${urlError.message}`);
+        continue;
+      }
+    }
+
+    if (!csvData) {
+      throw new Error(`All Google Sheets CSV URLs failed. Sheet may not be publicly accessible. Please share the sheet with "Anyone with the link can view"`);
     }
 
     // Parse CSV data
-    const csvData = response.data;
-    const lines = csvData.split('\n');
-    const headers = lines[0].split(',');
+    const lines = csvData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length < 2) {
+      throw new Error("CSV data appears to be empty or invalid");
+    }
+    
+    console.log(`DEBUG [${type}]: Processing ${lines.length} lines from CSV`);
     
     // Process data starting from row 2 (skip header)
     const historicalData = [];
     for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
+      const line = lines[i];
       if (!line) continue;
       
+      // Handle CSV parsing more carefully
       const values = line.split(',');
+      
       if (values.length >= 5) {
-        const dateStr = values[0];
-        const open = parseFloat(values[1]);
-        const high = parseFloat(values[2]);
-        const low = parseFloat(values[3]);
-        const close = parseFloat(values[4]);
+        const dateStr = values[0].replace(/"/g, '').trim();
+        const open = parseFloat(values[1].replace(/"/g, '').trim());
+        const high = parseFloat(values[2].replace(/"/g, '').trim());
+        const low = parseFloat(values[3].replace(/"/g, '').trim());
+        const close = parseFloat(values[4].replace(/"/g, '').trim());
         
         // Convert date string to timestamp
         const date = new Date(dateStr);
-        if (isNaN(date.getTime()) || isNaN(close)) continue;
+        if (isNaN(date.getTime()) || isNaN(close) || close <= 0) {
+          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: ${line}`);
+          continue;
+        }
         
         historicalData.push({
           date: dateStr,
@@ -2269,6 +2307,10 @@ case "bitcoin-historical": {
     // Sort by date ascending
     historicalData.sort((a, b) => a.timestamp - b.timestamp);
 
+    if (historicalData.length === 0) {
+      throw new Error("No valid Bitcoin price data found in the sheet");
+    }
+
     const payload = {
       success: true,
       data: historicalData,
@@ -2280,18 +2322,31 @@ case "bitcoin-historical": {
       current_price: historicalData.length > 0 ? historicalData[historicalData.length - 1].close : null,
       data_source: "google_sheets",
       lastUpdated: new Date().toISOString(),
-      method: "live-fetch"
+      method: "live-fetch",
+      csv_lines_processed: lines.length,
+      valid_records_found: historicalData.length
     };
 
     // 4) Cache both
     await kv.set(cacheKey, payload, { ex: TTL });
     await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
 
-    console.log(`DEBUG [${type}]: Successfully fetched ${historicalData.length} Bitcoin records`);
+    console.log(`DEBUG [${type}]: Successfully processed ${historicalData.length} Bitcoin records from ${lines.length} CSV lines`);
     return res.json(payload);
 
   } catch (error) {
     console.error(`[${type}] Bitcoin historical fetch error:`, error.message);
+    
+    // More specific error messages
+    let errorMessage = error.message;
+    if (error.message.includes("400")) {
+      errorMessage = "Google Sheet access denied. Please ensure the sheet is shared with 'Anyone with the link can view' permissions.";
+    } else if (error.message.includes("403")) {
+      errorMessage = "Google Sheet is private. Please share the sheet publicly or with 'Anyone with the link can view' permissions.";
+    } else if (error.message.includes("404")) {
+      errorMessage = "Google Sheet not found. Please check the sheet ID and ensure the sheet exists.";
+    }
+    
     const last = await kv.get(lastGoodKey);
     if (last) return res.json(last);
     
@@ -2299,7 +2354,7 @@ case "bitcoin-historical": {
       success: false,
       data: [],
       error: "Bitcoin historical data fetch failed",
-      message: error.message,
+      message: errorMessage,
       lastUpdated: new Date().toISOString(),
       method: "live-error"
     });
