@@ -2444,15 +2444,22 @@ case "bitcoin-latest-weekly": {
 
     // Process the data and get the most recent complete week
     const processedData = rawData
-      .map(candle => ({
-        timestamp: Number(candle.time),
-        date: new Date(Number(candle.time)).toISOString().split('T')[0], // YYYY-MM-DD format
-        open: Number(candle.open),
-        high: Number(candle.high),
-        low: Number(candle.low),
-        close: Number(candle.close),
-        volume_usd: Number(candle.volume_usd || 0)
-      }))
+      .map(candle => {
+        const date = new Date(Number(candle.time));
+        // Format date as MM/DD/YYYY to match Google Sheets format
+        const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
+        
+        return {
+          timestamp: Number(candle.time),
+          date: formattedDate, // Now in MM/DD/YYYY format
+          iso_date: date.toISOString().split('T')[0], // Keep ISO format for internal use
+          open: Number(candle.open),
+          high: Number(candle.high),
+          low: Number(candle.low),
+          close: Number(candle.close),
+          volume_usd: Number(candle.volume_usd || 0)
+        };
+      })
       .sort((a, b) => a.timestamp - b.timestamp);
 
     // Get the most recent complete week
@@ -2490,7 +2497,7 @@ case "bitcoin-latest-weekly": {
       method: "live-fetch",
       zapier_ready: {
         // Format specifically for Zapier to easily add to Google Sheets
-        date: latestWeek.date,
+        date: latestWeek.date, // Now in MM/DD/YYYY format
         open: latestWeek.open,
         high: latestWeek.high,
         low: latestWeek.low,
