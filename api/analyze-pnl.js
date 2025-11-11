@@ -239,7 +239,18 @@ export default async function handler(req, res) {
     }
 
     // Find best trade (most profitable)
-    const profitableTrades = results.filter(t => t.profit_percent > 0);
+    // Filter out profitable trades and exclude banned users
+const bannedUsers = ['slavic8105']; // Add users to exclude here
+const profitableTrades = results.filter(t => {
+  const hasValidProfit = t.profit_percent > 0;
+  const isNotBanned = !bannedUsers.includes(t.author?.toLowerCase());
+  
+  if (!isNotBanned) {
+    console.log(`DEBUG: Excluding trade from banned user: ${t.author}`);
+  }
+  
+  return hasValidProfit && isNotBanned;
+});
     const best = profitableTrades.length > 0
       ? profitableTrades.reduce((a, b) => a.profit_percent > b.profit_percent ? a : b)
       : null;
