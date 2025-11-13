@@ -1,10 +1,10 @@
 {
-  "author": "aiman02522",
-  "profit_percentage": "990.85",
-  "symbol": "STRKUSDT ",
+  "author": "lixils",
+  "profit_percentage": "681.25",
+  "symbol": "ELIZAOS USDT ",
   "position_type": "SHORT ",
-  "leverage": "50.0X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1437867402623979684/Screenshot_20251111_131124_Phemex.jpg?ex=6914cddf&is=69137c5f&hm=04dc004e26d938d424d3faac6979615731cfb53df74cc97a633faaba225526ad&",
-  "summary": "ROI of 990.85% with entry price of $0.1968 and current price of $0.1578. ",
-  "updated_at": " 2025-11-12T06:01:44.839Z"
+  "leverage": "25X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1438099797750972489/1762938452042.jpg?ex=69164f0e&is=6914fd8e&hm=7a926011870de981c99554c5199f13a08423e4e1757f27273f13b769c1df3afe&",
+  "summary": "Close short position for ELIZAOS USDT showing a profit of 681.25%. ",
+  "updated_at": " 2025-11-13T06:01:46.053Z"
 }
