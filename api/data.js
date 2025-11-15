@@ -2759,7 +2759,127 @@ case "market-cycle-roi": {
     });
   }
 }
-        
+
+
+// Add this case to your existing data.js file in GitHub
+
+case "funding-fear-correlation": {
+  console.log("DEBUG: Fetching funding and fear/greed correlation data...");
+  
+  try {
+    // Fetch both datasets in parallel
+    const [fundingResponse, fgResponse] = await Promise.all([
+      axios.get('https://whale-trades.vercel.app/api/btcusdt-funding', { 
+        headers,
+        timeout: 15000 
+      }),
+      axios.get('https://api.alternative.me/fng/?limit=10000&format=json', { 
+        timeout: 15000 
+      })
+    ]);
+    
+    // Process funding data
+    const fundingData = fundingResponse.data.map(item => ({
+      date: new Date(item.Time).toISOString().split('T')[0],
+      timestamp: new Date(item.Time).getTime(),
+      fundingRate: parseFloat(item['Funding Rate'].replace('%', ''))
+    }));
+    
+    // Process fear & greed data
+    const fearGreedData = fgResponse.data.data.map(item => ({
+      date: new Date(item.timestamp * 1000).toISOString().split('T')[0],
+      timestamp: item.timestamp * 1000,
+      value: parseInt(item.value),
+      classification: item.value_classification
+    }));
+    
+    // Create date maps for alignment
+    const fundingMap = new Map();
+    const fearGreedMap = new Map();
+    
+    fundingData.forEach(item => fundingMap.set(item.date, item));
+    fearGreedData.forEach(item => fearGreedMap.set(item.date, item));
+    
+    // Find common dates and create aligned dataset
+    const alignedData = [];
+    const commonDates = new Set();
+    
+    fundingMap.forEach((value, key) => {
+      if (fearGreedMap.has(key)) {
+        commonDates.add(key);
+      }
+    });
+    
+    // Create aligned arrays sorted by date
+    Array.from(commonDates).sort().forEach(dateKey => {
+      const fundingItem = fundingMap.get(dateKey);
+      const fgItem = fearGreedMap.get(dateKey);
+      
+      if (fundingItem && fgItem) {
+        alignedData.push({
+          date: dateKey,
+          timestamp: fundingItem.timestamp,
+          fundingRate: fundingItem.fundingRate,
+          fearGreedValue: fgItem.value,
+          fearGreedClass: fgItem.classification,
+          // Signal detection
+          isTopSignal: fundingItem.fundingRate > 0.1 && fgItem.value > 75,
+          isBottomSignal: fundingItem.fundingRate < -0.05 && fgItem.value < 25,
+          signalStrength: Math.abs(fundingItem.fundingRate) + Math.abs(fgItem.value - 50)
+        });
+      }
+    });
+    
+    // Calculate summary statistics
+    const currentFunding = alignedData[alignedData.length - 1]?.fundingRate || 0;
+    const currentFG = alignedData[alignedData.length - 1]?.fearGreedValue || 50;
+    
+    const topSignals = alignedData.filter(d => d.isTopSignal);
+    const bottomSignals = alignedData.filter(d => d.isBottomSignal);
+    
+    // Recent trend analysis (last 30 days)
+    const recentData = alignedData.slice(-30);
+    const avgRecentFunding = recentData.reduce((sum, d) => sum + d.fundingRate, 0) / recentData.length;
+    const avgRecentFG = recentData.reduce((sum, d) => sum + d.fearGreedValue, 0) / recentData.length;
+    
+    return res.json({
+      success: true,
+      data: alignedData,
+      summary: {
+        totalDataPoints: alignedData.length,
+        currentFundingRate: currentFunding,
+        currentFearGreed: currentFG,
+        currentSignal: alignedData[alignedData.length - 1]?.isTopSignal ? 'TOP_WARNING' :
+                      alignedData[alignedData.length - 1]?.isBottomSignal ? 'BOTTOM_SIGNAL' : 'NEUTRAL',
+        topSignalsDetected: topSignals.length,
+        bottomSignalsDetected: bottomSignals.length,
+        recentTrend: {
+          avgFunding30d: avgRecentFunding,
+          avgFearGreed30d: avgRecentFG,
+          trend: avgRecentFunding > 0.05 && avgRecentFG > 60 ? 'OVERHEATED' :
+                 avgRecentFunding < -0.02 && avgRecentFG < 40 ? 'OVERSOLD' : 'BALANCED'
+        }
+      },
+      signals: {
+        recentTopSignals: topSignals.slice(-5),
+        recentBottomSignals: bottomSignals.slice(-5)
+      },
+      lastUpdated: new Date().toISOString(),
+      dataRange: {
+        startDate: alignedData[0]?.date,
+        endDate: alignedData[alignedData.length - 1]?.date,
+        daysOfData: alignedData.length
+      }
+    });
+    
+  } catch (err) {
+    console.error("[funding-fear-correlation] Error:", err.message);
+    return res.status(500).json({ 
+      error: "Failed to fetch correlation data", 
+      message: err.message 
+    });
+  }
+}
 
         
       default:
