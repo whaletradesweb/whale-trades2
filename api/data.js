@@ -2530,6 +2530,8 @@ case "bitcoin-latest-weekly": {
   }
 }
 
+
+
 case "market-cycle-roi": {
   const TTL = 3600; // Cache for 1 hour
   const cacheKey = "market-cycle-roi-data";
@@ -2718,6 +2720,7 @@ case "market-cycle-roi": {
       success: true,
       cycles: validCycles,
       chartSeries,
+      debug_version: "v2.0-cycle-boundaries", // Added to verify new code is deployed
       statistics: {
         totalCycles: validCycles.length,
         totalDataPoints,
