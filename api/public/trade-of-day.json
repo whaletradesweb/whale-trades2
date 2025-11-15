@@ -1,10 +1,10 @@
 {
-  "author": "lixils",
-  "profit_percentage": "681.25",
-  "symbol": "ELIZAOS USDT ",
+  "author": "iain3802",
+  "profit_percentage": "565.74",
+  "symbol": "SOLUSDT ",
   "position_type": "SHORT ",
-  "leverage": "25X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1438099797750972489/1762938452042.jpg?ex=69164f0e&is=6914fd8e&hm=7a926011870de981c99554c5199f13a08423e4e1757f27273f13b769c1df3afe&",
-  "summary": "Close short position for ELIZAOS USDT showing a profit of 681.25%. ",
-  "updated_at": " 2025-11-13T06:01:46.053Z"
+  "leverage": "45X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1438906185410547774/share_pnl.png?ex=69193e10&is=6917ec90&hm=be482eff4375736d7fa212373d3d26775f6073e96fb4c25bc884e41de1646981&",
+  "summary": "Screenshot showing a profit of +565.74% for a short position on SOLUSDT at 45X leverage. ",
+  "updated_at": " 2025-11-15T06:01:17.956Z"
 }
