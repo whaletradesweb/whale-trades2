@@ -2761,7 +2761,6 @@ case "market-cycle-roi": {
 }
 
 
-// Add this case to your existing data.js file in GitHub
 
 case "funding-fear-correlation": {
   console.log("DEBUG: Fetching funding and fear/greed correlation data...");
@@ -2773,32 +2772,87 @@ case "funding-fear-correlation": {
         headers,
         timeout: 15000 
       }),
-      axios.get('https://api.alternative.me/fng/?limit=10000&format=json', { 
+      axios.get('https://api.alternative.me/fng/?limit=10000&format=csv', { 
         timeout: 15000 
       })
     ]);
     
-    // Process funding data
-    const fundingData = fundingResponse.data.map(item => ({
-      date: new Date(item.Time).toISOString().split('T')[0],
-      timestamp: new Date(item.Time).getTime(),
-      fundingRate: parseFloat(item['Funding Rate'].replace('%', ''))
-    }));
+    console.log("DEBUG: Funding response success:", fundingResponse.data.success);
+    console.log("DEBUG: Funding data count:", fundingResponse.data.count);
     
-    // Process fear & greed data
-    const fearGreedData = fgResponse.data.data.map(item => ({
-      date: new Date(item.timestamp * 1000).toISOString().split('T')[0],
-      timestamp: item.timestamp * 1000,
-      value: parseInt(item.value),
-      classification: item.value_classification
-    }));
+    // Process funding data from the correct structure
+    const fundingArray = fundingResponse.data.data || [];
+    
+    if (!Array.isArray(fundingArray) || fundingArray.length === 0) {
+      throw new Error("No funding data found in response");
+    }
+    
+    const fundingData = fundingArray.map(item => {
+      const timeField = item.Time;
+      const rateField = item['Funding Rate'];
+      
+      if (!timeField || !rateField) {
+        return null;
+      }
+      
+      // Parse the funding rate percentage
+      const rate = parseFloat(rateField.replace('%', ''));
+      
+      return {
+        date: new Date(timeField).toISOString().split('T')[0],
+        timestamp: new Date(timeField).getTime(),
+        fundingRate: rate
+      };
+    }).filter(item => item !== null);
+    
+    console.log(`DEBUG: Processed ${fundingData.length} funding records`);
+    
+    // Process Fear & Greed CSV data
+    const csvData = fgResponse.data.data;
+    console.log("DEBUG: F&G CSV sample:", csvData.substring(0, 200));
+    
+    // Parse CSV data (skip header line)
+    const csvLines = csvData.split('\n').filter(line => line.trim() && !line.startsWith('fng_value'));
+    
+    const fearGreedData = csvLines.map(line => {
+      const [date, value, classification] = line.split(',');
+      
+      if (!date || !value) {
+        return null;
+      }
+      
+      // Parse date from DD-MM-YYYY format
+      const [day, month, year] = date.split('-');
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      
+      return {
+        date: dateObj.toISOString().split('T')[0],
+        timestamp: dateObj.getTime(),
+        value: parseInt(value),
+        classification: classification
+      };
+    }).filter(item => item !== null && !isNaN(item.value));
+    
+    
+    console.log(`DEBUG: Processed ${fearGreedData.length} fear & greed records`);
     
     // Create date maps for alignment
     const fundingMap = new Map();
     const fearGreedMap = new Map();
     
-    fundingData.forEach(item => fundingMap.set(item.date, item));
-    fearGreedData.forEach(item => fearGreedMap.set(item.date, item));
+    fundingData.forEach(item => {
+      if (item && item.date && !isNaN(item.fundingRate)) {
+        fundingMap.set(item.date, item);
+      }
+    });
+    
+    fearGreedData.forEach(item => {
+      if (item && item.date && !isNaN(item.value)) {
+        fearGreedMap.set(item.date, item);
+      }
+    });
+    
+    console.log(`DEBUG: Funding map size: ${fundingMap.size}, F&G map size: ${fearGreedMap.size}`);
     
     // Find common dates and create aligned dataset
     const alignedData = [];
@@ -2809,6 +2863,8 @@ case "funding-fear-correlation": {
         commonDates.add(key);
       }
     });
+    
+    console.log(`DEBUG: Common dates found: ${commonDates.size}`);
     
     // Create aligned arrays sorted by date
     Array.from(commonDates).sort().forEach(dateKey => {
@@ -2830,6 +2886,12 @@ case "funding-fear-correlation": {
       }
     });
     
+    if (alignedData.length === 0) {
+      throw new Error("No aligned data found between funding and fear/greed datasets");
+    }
+    
+    console.log(`DEBUG: Final aligned data length: ${alignedData.length}`);
+    
     // Calculate summary statistics
     const currentFunding = alignedData[alignedData.length - 1]?.fundingRate || 0;
     const currentFG = alignedData[alignedData.length - 1]?.fearGreedValue || 50;
@@ -2839,8 +2901,10 @@ case "funding-fear-correlation": {
     
     // Recent trend analysis (last 30 days)
     const recentData = alignedData.slice(-30);
-    const avgRecentFunding = recentData.reduce((sum, d) => sum + d.fundingRate, 0) / recentData.length;
-    const avgRecentFG = recentData.reduce((sum, d) => sum + d.fearGreedValue, 0) / recentData.length;
+    const avgRecentFunding = recentData.length > 0 ? 
+      recentData.reduce((sum, d) => sum + d.fundingRate, 0) / recentData.length : 0;
+    const avgRecentFG = recentData.length > 0 ?
+      recentData.reduce((sum, d) => sum + d.fearGreedValue, 0) / recentData.length : 50;
     
     return res.json({
       success: true,
@@ -2874,9 +2938,11 @@ case "funding-fear-correlation": {
     
   } catch (err) {
     console.error("[funding-fear-correlation] Error:", err.message);
+    console.error("[funding-fear-correlation] Stack:", err.stack);
     return res.status(500).json({ 
       error: "Failed to fetch correlation data", 
-      message: err.message 
+      message: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 }
