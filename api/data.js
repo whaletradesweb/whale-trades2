@@ -2560,29 +2560,33 @@ case "market-cycle-roi": {
   try {
     console.log(`DEBUG [${type}]: Calculating Bitcoin Market Cycle ROI...`);
     
-    // Define market cycle bottoms 
+    // Define market cycle bottoms with END DATES to prevent data bleeding
     const marketCycles = [
       {
         name: "Cycle 1 (2011-2013)",
         bottomDate: "2011-11-18",
+        endDate: "2015-01-14", // End at next cycle bottom
         bottomPrice: 2.01,
         color: "#ff4e00"
       },
       {
         name: "Cycle 2 (2015-2017)", 
         bottomDate: "2015-01-14",
+        endDate: "2018-12-15", // End at next cycle bottom
         bottomPrice: 152,
         color: "#2ed573"
       },
       {
         name: "Cycle 3 (2018-2021)",
         bottomDate: "2018-12-15", 
+        endDate: "2022-11-21", // End at next cycle bottom
         bottomPrice: 3126,
         color: "#ffa502"
       },
       {
         name: "Cycle 4 (2022-Current)",
         bottomDate: "2022-11-21",
+        endDate: null, // Current cycle - no end date
         bottomPrice: 15479,
         color: "#a4b0be"
       }
@@ -2604,24 +2608,33 @@ case "market-cycle-roi": {
     const historicalData = historyResponse.data.data;
     console.log(`DEBUG [${type}]: Loaded ${historicalData.length} historical data points`);
 
-    // Process each cycle using only real historical data
+    // Process each cycle using only real historical data WITHIN CYCLE BOUNDARIES
     const cycleData = marketCycles.map(cycle => {
       const bottomDate = new Date(cycle.bottomDate);
+      const endDate = cycle.endDate ? new Date(cycle.endDate) : null;
       const roiData = [];
 
-      console.log(`DEBUG [${type}]: Processing ${cycle.name} from ${cycle.bottomDate}`);
+      console.log(`DEBUG [${type}]: Processing ${cycle.name} from ${cycle.bottomDate} to ${cycle.endDate || 'current'}`);
 
-      // Find data points after the cycle bottom
+      // Find data points within the cycle boundary
       const relevantData = historicalData.filter(point => {
         // Handle both DATE and date field formats
         const dateStr = point.DATE || point.date;
         if (!dateStr) return false;
         
         const pointDate = new Date(dateStr);
-        return pointDate >= bottomDate && !isNaN(pointDate.getTime());
+        if (isNaN(pointDate.getTime())) return false;
+        
+        // Must be after bottom date
+        if (pointDate < bottomDate) return false;
+        
+        // Must be before end date (if cycle has ended)
+        if (endDate && pointDate >= endDate) return false;
+        
+        return true;
       });
 
-      console.log(`DEBUG [${type}]: ${cycle.name} - Found ${relevantData.length} data points after bottom`);
+      console.log(`DEBUG [${type}]: ${cycle.name} - Found ${relevantData.length} data points within cycle boundaries`);
 
       // Calculate ROI for each day since bottom
       relevantData.forEach(point => {
@@ -2658,6 +2671,7 @@ case "market-cycle-roi": {
         color: cycle.color,
         bottomPrice: cycle.bottomPrice,
         bottomDate: cycle.bottomDate,
+        endDate: cycle.endDate,
         data: roiData,
         maxROI: roiData.length > 0 ? Math.max(...roiData.map(d => d.roi)) : 0,
         currentROI: roiData.length > 0 ? roiData[roiData.length - 1].roi : 0,
@@ -2701,7 +2715,8 @@ case "market-cycle-roi": {
           name: c.name,
           currentROI: c.currentROI?.toFixed(1) || "0",
           maxROI: c.maxROI?.toFixed(1) || "0",
-          totalDays: c.totalDays || 0
+          totalDays: c.totalDays || 0,
+          endDate: c.endDate || "ongoing"
         }))
       },
       lastUpdated: new Date().toISOString(),
