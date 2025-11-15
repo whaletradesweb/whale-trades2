@@ -2762,6 +2762,8 @@ case "market-cycle-roi": {
 
 
 
+// Add this case to your existing data.js file in GitHub
+
 case "funding-fear-correlation": {
   console.log("DEBUG: Fetching funding and fear/greed correlation data...");
   
@@ -2772,7 +2774,7 @@ case "funding-fear-correlation": {
         headers,
         timeout: 15000 
       }),
-      axios.get('https://api.alternative.me/fng/?limit=10000&format=csv', { 
+      axios.get('https://api.alternative.me/fng/?limit=10000', { 
         timeout: 15000 
       })
     ]);
@@ -2807,31 +2809,50 @@ case "funding-fear-correlation": {
     
     console.log(`DEBUG: Processed ${fundingData.length} funding records`);
     
-    // Process Fear & Greed CSV data
-    const csvData = fgResponse.data.data;
-    console.log("DEBUG: F&G CSV sample:", csvData.substring(0, 200));
+    // Process Fear & Greed JSON data  
+    console.log("DEBUG: F&G response structure:", typeof fgResponse.data);
     
-    // Parse CSV data (skip header line)
-    const csvLines = csvData.split('\n').filter(line => line.trim() && !line.startsWith('fng_value'));
+    if (!fgResponse.data || !fgResponse.data.data || !Array.isArray(fgResponse.data.data)) {
+      throw new Error(`Invalid Fear & Greed response format. Got: ${JSON.stringify(fgResponse.data).substring(0, 200)}`);
+    }
     
-    const fearGreedData = csvLines.map(line => {
-      const [date, value, classification] = line.split(',');
-      
-      if (!date || !value) {
+    const fgArray = fgResponse.data.data;
+    console.log("DEBUG: F&G array length:", fgArray.length);
+    console.log("DEBUG: Sample F&G item:", JSON.stringify(fgArray[0]));
+    
+    const fearGreedData = fgArray.map((item, index) => {
+      // Check for required fields
+      if (!item.timestamp || item.value === undefined || item.value === null) {
+        if (index < 5) console.warn(`DEBUG: Invalid F&G item ${index}:`, item);
         return null;
       }
       
-      // Parse date from DD-MM-YYYY format
-      const [day, month, year] = date.split('-');
-      const dateObj = new Date(`${year}-${month}-${day}`);
+      // Convert timestamp to date (API returns unix timestamp)
+      const dateObj = new Date(parseInt(item.timestamp) * 1000);
+      if (isNaN(dateObj.getTime())) {
+        if (index < 5) console.warn(`DEBUG: Invalid timestamp in item ${index}:`, item.timestamp);
+        return null;
+      }
+      
+      const numValue = parseInt(item.value);
+      if (isNaN(numValue)) {
+        if (index < 5) console.warn(`DEBUG: Invalid value in item ${index}:`, item.value);
+        return null;
+      }
       
       return {
         date: dateObj.toISOString().split('T')[0],
         timestamp: dateObj.getTime(),
-        value: parseInt(value),
-        classification: classification
+        value: numValue,
+        classification: item.value_classification || 'Unknown'
       };
-    }).filter(item => item !== null && !isNaN(item.value));
+    }).filter(item => item !== null);
+    
+    console.log(`DEBUG: Successfully processed ${fearGreedData.length} Fear & Greed records`);
+    if (fearGreedData.length > 0) {
+      console.log("DEBUG: First F&G record:", fearGreedData[0]);
+      console.log("DEBUG: Last F&G record:", fearGreedData[fearGreedData.length - 1]);
+    }
     
     
     console.log(`DEBUG: Processed ${fearGreedData.length} fear & greed records`);
