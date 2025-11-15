@@ -2530,6 +2530,206 @@ case "bitcoin-latest-weekly": {
   }
 }
 
+case "market-cycle-roi": {
+  const TTL = 3600; // Cache for 1 hour
+  const cacheKey = "market-cycle-roi-data";
+  const lastGoodKey = "last:market-cycle-roi-data";
+
+  // 1) Fast lane - check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: Returning cached market cycle ROI data`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({
+      success: false,
+      cycles: [],
+      chartSeries: [],
+      message: "Rate limit active and no cached data available",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch Bitcoin historical data
+  try {
+    console.log(`DEBUG [${type}]: Calculating Bitcoin Market Cycle ROI...`);
+    
+    // Define market cycle bottoms 
+    const marketCycles = [
+      {
+        name: "Cycle 1 (2011-2013)",
+        bottomDate: "2011-11-18",
+        bottomPrice: 2.01,
+        color: "#ff4e00"
+      },
+      {
+        name: "Cycle 2 (2015-2017)", 
+        bottomDate: "2015-01-14",
+        bottomPrice: 152,
+        color: "#2ed573"
+      },
+      {
+        name: "Cycle 3 (2018-2021)",
+        bottomDate: "2018-12-15", 
+        bottomPrice: 3126,
+        color: "#ffa502"
+      },
+      {
+        name: "Cycle 4 (2022-Current)",
+        bottomDate: "2022-11-21",
+        bottomPrice: 15479,
+        color: "#a4b0be"
+      }
+    ];
+
+    // Fetch Bitcoin historical data using internal call to avoid external dependency
+    const btcHistoryUrl = `${req.headers.host || 'whale-trades.vercel.app'}/api/data?type=bitcoin-historical`;
+    const historyResponse = await axiosWithBackoff(() =>
+      axios.get(`https://${btcHistoryUrl}`, {
+        timeout: 15000,
+        validateStatus: s => s < 500
+      })
+    );
+    
+    if (!historyResponse.data?.success || !Array.isArray(historyResponse.data?.data)) {
+      throw new Error("Failed to fetch Bitcoin historical data");
+    }
+
+    const historicalData = historyResponse.data.data;
+    console.log(`DEBUG [${type}]: Loaded ${historicalData.length} historical data points`);
+
+    // Process each cycle using only real historical data
+    const cycleData = marketCycles.map(cycle => {
+      const bottomDate = new Date(cycle.bottomDate);
+      const roiData = [];
+
+      console.log(`DEBUG [${type}]: Processing ${cycle.name} from ${cycle.bottomDate}`);
+
+      // Find data points after the cycle bottom
+      const relevantData = historicalData.filter(point => {
+        // Handle both DATE and date field formats
+        const dateStr = point.DATE || point.date;
+        if (!dateStr) return false;
+        
+        const pointDate = new Date(dateStr);
+        return pointDate >= bottomDate && !isNaN(pointDate.getTime());
+      });
+
+      console.log(`DEBUG [${type}]: ${cycle.name} - Found ${relevantData.length} data points after bottom`);
+
+      // Calculate ROI for each day since bottom
+      relevantData.forEach(point => {
+        const dateStr = point.DATE || point.date;
+        const pointDate = new Date(dateStr);
+        const daysSinceBottom = Math.floor((pointDate - bottomDate) / (1000 * 60 * 60 * 24));
+        
+        // Clean price data - handle both PRICE and price fields, remove quotes
+        let cleanPrice = point.PRICE || point.price || point.close;
+        if (typeof cleanPrice === 'string') {
+          cleanPrice = cleanPrice.replace(/['"]/g, '');
+        }
+        const price = parseFloat(cleanPrice);
+        
+        if (!isNaN(price) && price > 0 && daysSinceBottom >= 0) {
+          const roi = ((price - cycle.bottomPrice) / cycle.bottomPrice) * 100;
+          
+          roiData.push({
+            daysSinceBottom,
+            roi: Math.max(roi, -99), // Cap negative ROI at -99% for display
+            price,
+            date: dateStr
+          });
+        }
+      });
+
+      // Sort by days since bottom
+      roiData.sort((a, b) => a.daysSinceBottom - b.daysSinceBottom);
+
+      console.log(`DEBUG [${type}]: ${cycle.name} - Calculated ${roiData.length} ROI data points`);
+
+      return {
+        name: cycle.name,
+        color: cycle.color,
+        bottomPrice: cycle.bottomPrice,
+        bottomDate: cycle.bottomDate,
+        data: roiData,
+        maxROI: roiData.length > 0 ? Math.max(...roiData.map(d => d.roi)) : 0,
+        currentROI: roiData.length > 0 ? roiData[roiData.length - 1].roi : 0,
+        totalDays: roiData.length > 0 ? roiData[roiData.length - 1].daysSinceBottom : 0
+      };
+    });
+
+    // Filter out cycles with no data
+    const validCycles = cycleData.filter(cycle => cycle.data.length > 0);
+    
+    if (validCycles.length === 0) {
+      throw new Error("No valid cycle data found in historical data");
+    }
+
+    // Prepare chart data for ECharts
+    const chartSeries = validCycles.map(cycle => ({
+      name: cycle.name,
+      type: 'line',
+      data: cycle.data.map(point => [point.daysSinceBottom, Math.max(point.roi, 0.01)]), // Ensure positive for log scale
+      lineStyle: { color: cycle.color, width: 2 },
+      itemStyle: { color: cycle.color },
+      smooth: true
+    }));
+
+    const totalDataPoints = validCycles.reduce((sum, cycle) => sum + cycle.data.length, 0);
+
+    console.log(`DEBUG [${type}]: Successfully processed ${validCycles.length} cycles with ${totalDataPoints} total data points`);
+
+    const payload = {
+      success: true,
+      cycles: validCycles,
+      chartSeries,
+      statistics: {
+        totalCycles: validCycles.length,
+        totalDataPoints,
+        dataRange: {
+          start: historicalData.length > 0 ? (historicalData[0].DATE || historicalData[0].date) : null,
+          end: historicalData.length > 0 ? (historicalData[historicalData.length - 1].DATE || historicalData[historicalData.length - 1].date) : null
+        },
+        cyclesSummary: validCycles.map(c => ({
+          name: c.name,
+          currentROI: c.currentROI?.toFixed(1) || "0",
+          maxROI: c.maxROI?.toFixed(1) || "0",
+          totalDays: c.totalDays || 0
+        }))
+      },
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch"
+    };
+
+    // 4) Cache both
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
+
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Market cycle ROI calculation error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    
+    return res.status(500).json({
+      success: false,
+      cycles: [],
+      chartSeries: [],
+      error: "Market cycle ROI calculation failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
+  }
+}
         
 
         
