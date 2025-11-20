@@ -1,10 +1,10 @@
 {
   "author": "facesofdeff",
-  "profit_percentage": "791.22",
-  "symbol": "ETH/USDT ",
-  "position_type": "LONG ",
-  "leverage": "125X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1440282761452851283/1763371075492.jpg?ex=691e4019&is=691cee99&hm=52c520179dd76b3d21a0e7f8b15bc6303882776995552ecb5d3c0d69a635cf8f&",
-  "summary": "Long position on ETH/USDT with a profit of 791.22%. ",
-  "updated_at": " 2025-11-19T06:02:04.958Z"
+  "profit_percentage": "251.68",
+  "symbol": "MYX USDT ",
+  "position_type": "SHORT ",
+  "leverage": "25X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1440634215711641610/1763543659292.jpg?ex=691f876a&is=691e35ea&hm=b4c00554a3976e0153657e2d35fe137de1a212802996f6036fed568a19b0593a&",
+  "summary": "Closed short trade on MYX USDT with an average entry price and closed price, showing +251.68% ROI. ",
+  "updated_at": " 2025-11-20T06:01:46.220Z"
 }
