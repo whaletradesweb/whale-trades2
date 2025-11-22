@@ -3442,40 +3442,48 @@ case "gold-dca": {
       console.log(`DEBUG [${type}]: Calculating weekly aggregations from ${dailyData.length} daily records`);
       
       const weeklyData = [];
-      let currentWeek = null;
-      let weekData = [];
-
+      
+      // Group data by week (Sunday to Saturday)
+      const weekGroups = new Map();
+      
       for (const dayData of dailyData) {
         const date = new Date(dayData.timestamp);
-        const dayOfWeek = date.getDay(); // 0 = Sunday
         
-        // If it's Sunday or we don't have a current week, start a new week
-        if (dayOfWeek === 0 || !currentWeek) {
-          // Process previous week if we have data
-          if (weekData.length > 0) {
-            const weekRecord = calculateWeeklyAggregation(weekData, currentWeek);
-            if (weekRecord) {
-              weeklyData.push(weekRecord);
-            }
+        // Find the Sunday that starts this week
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysToSubtract = dayOfWeek; // Days back to Sunday
+        
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - daysToSubtract);
+        weekStart.setHours(0, 0, 0, 0); // Set to start of day
+        
+        // Use week start timestamp as the key
+        const weekKey = weekStart.getTime();
+        
+        if (!weekGroups.has(weekKey)) {
+          weekGroups.set(weekKey, {
+            weekStart: weekStart,
+            days: []
+          });
+        }
+        
+        weekGroups.get(weekKey).days.push(dayData);
+      }
+      
+      console.log(`DEBUG [${type}]: Found ${weekGroups.size} distinct weeks`);
+      
+      // Convert grouped data to weekly records
+      for (const [weekKey, weekGroup] of weekGroups) {
+        if (weekGroup.days.length > 0) {
+          const weekRecord = calculateWeeklyAggregation(weekGroup.days, weekGroup.weekStart);
+          if (weekRecord) {
+            weeklyData.push(weekRecord);
           }
-          
-          // Start new week
-          currentWeek = new Date(date);
-          currentWeek.setHours(0, 0, 0, 0); // Set to start of day
-          weekData = [dayData];
-        } else {
-          // Add to current week
-          weekData.push(dayData);
         }
       }
       
-      // Process the last week
-      if (weekData.length > 0 && currentWeek) {
-        const weekRecord = calculateWeeklyAggregation(weekData, currentWeek);
-        if (weekRecord) {
-          weeklyData.push(weekRecord);
-        }
-      }
+      // Sort weekly data by date
+      weeklyData.sort((a, b) => a.timestamp - b.timestamp);
       
       console.log(`DEBUG [${type}]: Generated ${weeklyData.length} weekly records from daily data`);
       finalData = weeklyData;
