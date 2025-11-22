@@ -2184,7 +2184,6 @@ case "trade-of-day": {
 }
 
 
-
 case "bitcoin-historical": {
   const TTL = 3600; // Cache for 1 hour
   const cacheKey = "bitcoin-historical-data";
@@ -2276,20 +2275,87 @@ case "bitcoin-historical": {
       const line = lines[i];
       if (!line) continue;
       
-      // Handle CSV parsing more carefully
-      const values = line.split(',');
+      // Enhanced CSV parsing to handle comma-separated numbers
+      // Split by comma but be smart about numbers with thousands separators
+      const values = [];
+      const parts = line.split(',');
+      
+      let currentValue = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < parts.length; j++) {
+        const part = parts[j];
+        
+        // Check if we're starting or ending quotes
+        if (part.includes('"')) {
+          inQuotes = !inQuotes;
+        }
+        
+        if (inQuotes) {
+          // If we're in quotes, keep building the current value
+          currentValue += (currentValue ? ',' : '') + part;
+        } else {
+          // Not in quotes - check if this looks like a continuation of a number
+          if (currentValue && /^\d+$/.test(currentValue) && /^\d{3}/.test(part)) {
+            // This looks like a thousands separator continuation
+            currentValue += part;
+          } else {
+            // This is a new field
+            if (currentValue) {
+              values.push(currentValue);
+            }
+            currentValue = part;
+          }
+        }
+      }
+      
+      // Don't forget the last value
+      if (currentValue) {
+        values.push(currentValue);
+      }
       
       if (values.length >= 5) {
         const dateStr = values[0].replace(/"/g, '').trim();
-        const open = parseFloat(values[1].replace(/"/g, '').trim());
-        const high = parseFloat(values[2].replace(/"/g, '').trim());
-        const low = parseFloat(values[3].replace(/"/g, '').trim());
-        const close = parseFloat(values[4].replace(/"/g, '').trim());
+        
+        // Clean and parse numbers - remove quotes and handle various number formats
+        const cleanNum = (str) => {
+          if (!str) return 0;
+          const cleaned = str.replace(/"/g, '').trim();
+          // Handle both comma as thousands separator and as decimal separator
+          if (cleaned.includes(',') && cleaned.includes('.')) {
+            // Assume comma is thousands separator: 123,456.78
+            return parseFloat(cleaned.replace(/,/g, ''));
+          } else if (cleaned.includes(',') && !cleaned.includes('.')) {
+            // Could be either thousands separator or decimal separator
+            const parts = cleaned.split(',');
+            if (parts[parts.length - 1].length <= 2) {
+              // Likely decimal separator: 123,45
+              return parseFloat(cleaned.replace(',', '.'));
+            } else {
+              // Likely thousands separator: 123,456
+              return parseFloat(cleaned.replace(/,/g, ''));
+            }
+          } else {
+            // No comma, parse normally
+            return parseFloat(cleaned);
+          }
+        };
+        
+        const open = cleanNum(values[1]);
+        const high = cleanNum(values[2]); 
+        const low = cleanNum(values[3]);
+        const close = cleanNum(values[4]);
         
         // Convert date string to timestamp
         const date = new Date(dateStr);
         if (isNaN(date.getTime()) || isNaN(close) || close <= 0) {
-          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: ${line}`);
+          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: date="${dateStr}", close="${close}" from line: ${line.substring(0, 100)}...`);
+          continue;
+        }
+        
+        // Validate that prices make sense (basic sanity check)
+        if (open < 0.01 || high < 0.01 || low < 0.01 || close < 0.01) {
+          console.log(`DEBUG [${type}]: Skipping row ${i} with invalid prices: O:${open} H:${high} L:${low} C:${close}`);
           continue;
         }
         
@@ -2301,6 +2367,8 @@ case "bitcoin-historical": {
           low: low,
           close: close
         });
+      } else {
+        console.log(`DEBUG [${type}]: Skipping malformed row ${i} (${values.length} columns): ${line.substring(0, 100)}...`);
       }
     }
 
