@@ -3372,6 +3372,37 @@ case "bitcoin-daily": {
   }
 }
 
+case "debug-bitcoin-csv": {
+  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8Dnmonp74LjnXvpyE9kPwkARq1NlaRF9XNAahuLuFkvo9bbHYPAwPKI21t_C5Xdi9tlZXHvQbDBTr/pub?output=csv";
+  
+  try {
+    const response = await axios.get(csvUrl, { 
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; WhaleTradesAPI/1.0)',
+        'Accept': 'text/csv,application/csv,text/plain,*/*'
+      }
+    });
+    
+    const lines = response.data.split('\n').slice(0, 5); // First 5 lines
+    const firstDataLine = lines[1] || '';
+    const parsedValues = firstDataLine.split(',');
+    
+    return res.json({
+      status: response.status,
+      total_lines: response.data.split('\n').length,
+      first_5_lines: lines,
+      first_data_parsed: parsedValues,
+      raw_first_line: firstDataLine
+    });
+  } catch (error) {
+    return res.json({
+      error: error.message,
+      status: error.response?.status || 'no_response'
+    });
+  }
+}
+        
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
