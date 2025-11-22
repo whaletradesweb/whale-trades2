@@ -3119,6 +3119,179 @@ case "bitcoin-daily-price": {
 }
 
 
+case "bitcoin-daily": {
+  const TTL = 3600; // Cache for 1 hour
+  const cacheKey = "bitcoin-daily-data";
+  const lastGoodKey = "last:bitcoin-daily-data";
+
+  // 1) Fast lane - check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: Returning cached Bitcoin daily data`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop
+  if (!(await allow("sheets:bitcoin-daily", 50))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({
+      success: false,
+      data: [],
+      message: "Rate limit active and no cached data available",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch from Google Sheets
+  try {
+    console.log(`DEBUG [${type}]: Fetching Bitcoin daily data from Google Sheets`);
+    
+    // Use the published CSV URL from Google Sheets for daily data
+    const publishedCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSzIZzdLBGrxBIDyI9Izd7YmW4bMLcMnHCC6kX5qYaDG-F9WJXyncRziBp4Jl7da6U2MCDB35MNJzfb/pub?output=csv";
+    const csvUrls = [
+      publishedCsvUrl,
+      // Fallback URLs in case the published URL changes
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSzIZzdLBGrxBIDyI9Izd7YmW4bMLcMnHCC6kX5qYaDG-F9WJXyncRziBp4Jl7da6U2MCDB35MNJzfb/pub?output=csv&gid=0"
+    ];
+    
+    let response = null;
+    let csvData = null;
+    
+    // Try each URL format until one works
+    for (const csvUrl of csvUrls) {
+      try {
+        console.log(`DEBUG [${type}]: Trying URL: ${csvUrl}`);
+        
+        response = await axiosWithBackoff(() =>
+          axios.get(csvUrl, { 
+            timeout: 15000,
+            validateStatus: s => s < 500,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; WhaleTradesAPI/1.0)',
+              'Accept': 'text/csv,application/csv,text/plain,*/*'
+            },
+            maxRedirects: 5,
+            followRedirect: true
+          })
+        );
+
+        if (response.status === 200 && response.data && typeof response.data === 'string') {
+          csvData = response.data;
+          console.log(`DEBUG [${type}]: Successfully fetched from: ${csvUrl}`);
+          break;
+        } else {
+          console.log(`DEBUG [${type}]: Failed with status ${response.status} from: ${csvUrl}`);
+        }
+      } catch (urlError) {
+        console.log(`DEBUG [${type}]: URL ${csvUrl} failed: ${urlError.message}`);
+        continue;
+      }
+    }
+
+    if (!csvData) {
+      throw new Error(`All Google Sheets CSV URLs failed. Sheet may not be publicly accessible. Please share the sheet with "Anyone with the link can view"`);
+    }
+
+    // Parse CSV data
+    const lines = csvData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length < 2) {
+      throw new Error("CSV data appears to be empty or invalid");
+    }
+    
+    console.log(`DEBUG [${type}]: Processing ${lines.length} lines from CSV`);
+    
+    // Process data starting from row 2 (skip header)
+    const dailyData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line) continue;
+      
+      // Handle CSV parsing more carefully
+      const values = line.split(',');
+      
+      if (values.length >= 5) {
+        const dateStr = values[0].replace(/"/g, '').trim();
+        const open = parseFloat(values[1].replace(/"/g, '').trim());
+        const high = parseFloat(values[2].replace(/"/g, '').trim());
+        const low = parseFloat(values[3].replace(/"/g, '').trim());
+        const close = parseFloat(values[4].replace(/"/g, '').trim());
+        
+        // Convert date string to timestamp
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime()) || isNaN(close) || close <= 0) {
+          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: ${line}`);
+          continue;
+        }
+        
+        dailyData.push({
+          date: dateStr,
+          timestamp: date.getTime(),
+          open: open,
+          high: high,
+          low: low,
+          close: close
+        });
+      }
+    }
+
+    // Sort by date ascending
+    dailyData.sort((a, b) => a.timestamp - b.timestamp);
+
+    if (dailyData.length === 0) {
+      throw new Error("No valid Bitcoin price data found in the sheet");
+    }
+
+    const payload = {
+      success: true,
+      data: dailyData,
+      total_records: dailyData.length,
+      date_range: {
+        start: dailyData.length > 0 ? dailyData[0].date : null,
+        end: dailyData.length > 0 ? dailyData[dailyData.length - 1].date : null
+      },
+      current_price: dailyData.length > 0 ? dailyData[dailyData.length - 1].close : null,
+      lastUpdated: new Date().toISOString(),
+      method: "live",
+      dataSource: "google_sheets_daily_csv"
+    };
+
+    console.log(`DEBUG [${type}]: Successfully processed ${dailyData.length} daily records`);
+
+    // 4) Cache it
+    await Promise.all([
+      kv.set(cacheKey, payload, { ex: TTL }),
+      kv.set(lastGoodKey, payload, { ex: TTL * 48 }) // Keep fallback longer
+    ]);
+
+    return res.json(payload);
+
+  } catch (err) {
+    console.error(`[${type}] Live fetch failed:`, err.message);
+
+    // 5) Fall back to last good
+    const last = await kv.get(lastGoodKey);
+    if (last) {
+      console.log(`DEBUG [${type}]: Serving last good data after error`);
+      return res.json({
+        ...last,
+        method: "fallback-after-error",
+        error_message: err.message
+      });
+    }
+
+    // 6) Final fallback
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "Failed to fetch Bitcoin daily data",
+      message: err.message,
+      method: "error-fallback"
+    });
+  }
+}
 
         
       default:
