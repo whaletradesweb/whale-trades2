@@ -2214,7 +2214,7 @@ case "bitcoin-historical": {
     console.log(`DEBUG [${type}]: Fetching Bitcoin historical data from Google Sheets`);
     
     // Use the published CSV URL from Google Sheets
-    const publishedCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8Dnmonp74LjnXvpyE9kPwkARq1NlaRF9XNAahuLuFkvo9bbHYPAwPKI21t_C5Xdi9tlZXHvQbDBTr/pub?gid=398063613&single=true&output=csv";
+    const publishedCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8Dnmonp74LjnXvpyE9kPwkARq1NlaRF9XNAahuLuFkvo9bbHYPAwPKI21t_C5Xdi9tlZXHvQbDBTr/pub?output=csv";
     const csvUrls = [
       publishedCsvUrl,
       // Fallback URLs in case the published URL changes
