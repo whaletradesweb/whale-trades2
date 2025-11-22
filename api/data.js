@@ -3664,6 +3664,297 @@ case "gold-dca": {
   }
 }
 
+
+
+case "sp500-dca": {
+  const TTL = 3600; // Cache for 1 hour
+  const { frequency = "daily" } = req.query; // daily or weekly
+  const cacheKey = `sp500-dca-data-${frequency}`;
+  const lastGoodKey = `last:sp500-dca-data-${frequency}`;
+
+  // 1) Fast lane - check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: Returning cached S&P 500 ${frequency} data`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop
+  if (!(await allow("sheets:sp500", 50))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({
+      success: false,
+      data: [],
+      message: "Rate limit active and no cached data available",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch from Google Sheets
+  try {
+    console.log(`DEBUG [${type}]: Fetching S&P 500 ${frequency} data from Google Sheets`);
+    
+    // S&P 500 historical data CSV URL
+    const publishedCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSc37k6RXeWR18_uqiYymbKa1uvBm39-u8Z9s-ck_H91p870XI4K97_M_zdIg6fWqqL5fapzpqr96oj/pub?output=csv";
+    const csvUrls = [
+      publishedCsvUrl,
+      // Fallback URLs if needed
+      `${publishedCsvUrl}&gid=0`
+    ];
+    
+    let response = null;
+    let csvData = null;
+    
+    // Try each URL format until one works
+    for (const csvUrl of csvUrls) {
+      try {
+        console.log(`DEBUG [${type}]: Trying URL: ${csvUrl}`);
+        
+        response = await axiosWithBackoff(() =>
+          axios.get(csvUrl, { 
+            timeout: 15000,
+            validateStatus: s => s < 500,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; WhaleTradesAPI/1.0)',
+              'Accept': 'text/csv,application/csv,text/plain,*/*'
+            },
+            maxRedirects: 5,
+            followRedirect: true
+          })
+        );
+
+        if (response.status === 200 && response.data && typeof response.data === 'string') {
+          csvData = response.data;
+          console.log(`DEBUG [${type}]: Successfully fetched from: ${csvUrl}`);
+          break;
+        } else {
+          console.log(`DEBUG [${type}]: Failed with status ${response.status} from: ${csvUrl}`);
+        }
+      } catch (urlError) {
+        console.log(`DEBUG [${type}]: URL ${csvUrl} failed: ${urlError.message}`);
+        continue;
+      }
+    }
+
+    if (!csvData) {
+      throw new Error(`All Google Sheets CSV URLs failed. Sheet may not be publicly accessible.`);
+    }
+
+    // Enhanced CSV parsing to handle quoted fields (learned from Bitcoin fix)
+    function parseCSVLine(line) {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else if (char !== '\r') {
+          current += char;
+        }
+      }
+      
+      result.push(current.trim());
+      return result;
+    }
+
+    // Parse CSV data (Date, Open, High, Low, Close format)
+    const lines = csvData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length < 2) {
+      throw new Error("CSV data appears to be empty or invalid");
+    }
+    
+    console.log(`DEBUG [${type}]: Processing ${lines.length} lines from S&P 500 CSV`);
+    
+    // Process daily data starting from row 2 (skip header)
+    const dailyData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line) continue;
+      
+      const values = parseCSVLine(line);
+      
+      if (values.length >= 5) {
+        const dateStr = values[0].replace(/"/g, '').trim();
+        
+        // Handle both European (comma) and US (period) decimal formats
+        const cleanNum = (str) => {
+          if (!str) return 0;
+          const cleaned = str.replace(/"/g, '').trim();
+          // Replace comma decimal separator with period
+          return parseFloat(cleaned.replace(',', '.'));
+        };
+        
+        const open = cleanNum(values[1]);
+        const high = cleanNum(values[2]); 
+        const low = cleanNum(values[3]);
+        const close = cleanNum(values[4]);
+        
+        // Convert date string to timestamp
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime()) || isNaN(close) || close <= 0) {
+          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: date="${dateStr}", close="${close}" from line: ${line.substring(0, 100)}...`);
+          continue;
+        }
+        
+        // Validate that prices make sense (basic sanity check for S&P 500 prices)
+        if (open < 10 || high < 10 || low < 10 || close < 10 || close > 50000) {
+          console.log(`DEBUG [${type}]: Skipping row ${i} with invalid S&P 500 prices: O:${open} H:${high} L:${low} C:${close}`);
+          continue;
+        }
+        
+        dailyData.push({
+          date: dateStr,
+          timestamp: date.getTime(),
+          open: open,
+          high: high,
+          low: low,
+          close: close,
+          dayOfWeek: date.getDay() // 0 = Sunday, 1 = Monday, etc.
+        });
+      } else {
+        console.log(`DEBUG [${type}]: Skipping malformed row ${i} (${values.length} columns): ${line.substring(0, 100)}...`);
+      }
+    }
+
+    // Sort by date ascending
+    dailyData.sort((a, b) => a.timestamp - b.timestamp);
+
+    if (dailyData.length === 0) {
+      throw new Error("No valid S&P 500 price data found in the sheet");
+    }
+
+    let finalData = dailyData;
+    let dataSource = "google_sheets_daily_csv";
+
+    // If weekly data is requested, calculate weekly aggregations (Sunday to Sunday)
+    if (frequency === "weekly") {
+      console.log(`DEBUG [${type}]: Calculating weekly aggregations from ${dailyData.length} daily records`);
+      
+      const weeklyData = [];
+      
+      // Group data by week (Sunday to Saturday)
+      const weekGroups = new Map();
+      
+      for (const dayData of dailyData) {
+        const date = new Date(dayData.timestamp);
+        
+        // Find the Sunday that starts this week
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysBackToSunday = dayOfWeek; // Sunday = 0 days back, Monday = 1 day back, etc.
+        
+        const weekStartSunday = new Date(date);
+        weekStartSunday.setDate(date.getDate() - daysBackToSunday);
+        weekStartSunday.setHours(0, 0, 0, 0);
+        
+        // Create a unique week key using YYYY-MM-DD format
+        const weekKey = weekStartSunday.toISOString().split('T')[0];
+        
+        if (!weekGroups.has(weekKey)) {
+          weekGroups.set(weekKey, {
+            weekStart: weekStartSunday,
+            days: []
+          });
+        }
+        
+        weekGroups.get(weekKey).days.push(dayData);
+      }
+      
+      console.log(`DEBUG [${type}]: Found ${weekGroups.size} distinct weeks`);
+      
+      // Convert grouped data to weekly records
+      for (const [weekKey, weekGroup] of weekGroups) {
+        if (weekGroup.days.length > 0) {
+          // Sort days chronologically within the week
+          weekGroup.days.sort((a, b) => a.timestamp - b.timestamp);
+          
+          const firstDay = weekGroup.days[0];
+          const lastDay = weekGroup.days[weekGroup.days.length - 1];
+          
+          // Weekly aggregation
+          const weekRecord = {
+            date: weekGroup.weekStart.toISOString().split('T')[0],
+            timestamp: weekGroup.weekStart.getTime(),
+            open: firstDay.open,   // First day's open (should be Sunday or first available day)
+            close: lastDay.close,  // Last day's close (should be Saturday or last available day)
+            high: Math.max(...weekGroup.days.map(d => d.high)),  // Highest high during the week
+            low: Math.min(...weekGroup.days.map(d => d.low)),    // Lowest low during the week
+            days_in_week: weekGroup.days.length
+          };
+          
+          weeklyData.push(weekRecord);
+        }
+      }
+      
+      // Sort weekly data by date
+      weeklyData.sort((a, b) => a.timestamp - b.timestamp);
+      
+      console.log(`DEBUG [${type}]: Generated ${weeklyData.length} weekly records from daily data`);
+      finalData = weeklyData;
+      dataSource = "calculated_weekly_from_daily";
+    }
+
+    const payload = {
+      success: true,
+      data: finalData,
+      frequency: frequency,
+      total_records: finalData.length,
+      date_range: {
+        start: finalData.length > 0 ? finalData[0].date : null,
+        end: finalData.length > 0 ? finalData[finalData.length - 1].date : null
+      },
+      current_price: finalData.length > 0 ? finalData[finalData.length - 1].close : null,
+      lastUpdated: new Date().toISOString(),
+      method: "live",
+      dataSource: dataSource,
+      asset: "sp500",
+      currency: "USD"
+    };
+
+    console.log(`DEBUG [${type}]: Successfully processed ${finalData.length} ${frequency} S&P 500 records`);
+    console.log(`DEBUG [${type}]: Date range: ${payload.date_range.start} to ${payload.date_range.end}`);
+    console.log(`DEBUG [${type}]: Current price: $${payload.current_price}`);
+
+    // 4) Cache it
+    await Promise.all([
+      kv.set(cacheKey, payload, { ex: TTL }),
+      kv.set(lastGoodKey, payload, { ex: TTL * 48 }) // Keep fallback longer
+    ]);
+
+    return res.json(payload);
+
+  } catch (err) {
+    console.error(`[${type}] Live fetch failed:`, err.message);
+
+    // 5) Fall back to last good
+    const last = await kv.get(lastGoodKey);
+    if (last) {
+      console.log(`DEBUG [${type}]: Serving last good data after error`);
+      return res.json({
+        ...last,
+        method: "fallback-after-error",
+        error_message: err.message
+      });
+    }
+
+    // 6) Final fallback
+    return res.status(500).json({
+      success: false,
+      data: [],
+      error: "Failed to fetch S&P 500 DCA data",
+      message: err.message,
+      method: "error-fallback"
+    });
+  }
+}
         
         
         
