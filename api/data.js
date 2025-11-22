@@ -3194,46 +3194,55 @@ case "bitcoin-daily": {
       throw new Error(`All Google Sheets CSV URLs failed. Sheet may not be publicly accessible. Please share the sheet with "Anyone with the link can view"`);
     }
 
-    // Parse CSV data
+    // Parse CSV data for daily format (DATE, PRICE)
     const lines = csvData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
     if (lines.length < 2) {
       throw new Error("CSV data appears to be empty or invalid");
     }
     
-    console.log(`DEBUG [${type}]: Processing ${lines.length} lines from CSV`);
+    console.log(`DEBUG [${type}]: Processing ${lines.length} lines from daily CSV`);
     
-    // Process data starting from row 2 (skip header)
+    // Check header to confirm format
+    const headerLine = lines[0].toLowerCase();
+    if (!headerLine.includes('date') || !headerLine.includes('price')) {
+      console.log(`DEBUG [${type}]: Warning - Expected DATE,PRICE format but got: ${lines[0]}`);
+    }
+    
+    // Process data starting from row 2 (skip header: DATE, PRICE)
     const dailyData = [];
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
       if (!line) continue;
       
-      // Handle CSV parsing more carefully
-      const values = line.split(',');
+      // Handle CSV parsing for 2-column format: DATE, PRICE
+      const values = line.split(',').map(val => val.replace(/"/g, '').trim());
       
-      if (values.length >= 5) {
-        const dateStr = values[0].replace(/"/g, '').trim();
-        const open = parseFloat(values[1].replace(/"/g, '').trim());
-        const high = parseFloat(values[2].replace(/"/g, '').trim());
-        const low = parseFloat(values[3].replace(/"/g, '').trim());
-        const close = parseFloat(values[4].replace(/"/g, '').trim());
+      if (values.length >= 2) {
+        const dateStr = values[0]; // DATE column
+        const priceStr = values[1]; // PRICE column
+        
+        // Handle European decimal format (comma as decimal separator)
+        const price = parseFloat(priceStr.replace(',', '.'));
         
         // Convert date string to timestamp
         const date = new Date(dateStr);
-        if (isNaN(date.getTime()) || isNaN(close) || close <= 0) {
-          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: ${line}`);
+        if (isNaN(date.getTime()) || isNaN(price) || price <= 0) {
+          console.log(`DEBUG [${type}]: Skipping invalid row ${i}: date="${dateStr}", price="${priceStr}"`);
           continue;
         }
         
+        // For daily data, we only have one price, so use it for all OHLC values
         dailyData.push({
           date: dateStr,
           timestamp: date.getTime(),
-          open: open,
-          high: high,
-          low: low,
-          close: close
+          open: price,   // Use price for open
+          high: price,   // Use price for high  
+          low: price,    // Use price for low
+          close: price   // Use price for close
         });
+      } else {
+        console.log(`DEBUG [${type}]: Skipping malformed row ${i}: ${line}`);
       }
     }
 
@@ -3255,10 +3264,12 @@ case "bitcoin-daily": {
       current_price: dailyData.length > 0 ? dailyData[dailyData.length - 1].close : null,
       lastUpdated: new Date().toISOString(),
       method: "live",
-      dataSource: "google_sheets_daily_csv"
+      dataSource: "google_sheets_daily_csv_2_column"
     };
 
     console.log(`DEBUG [${type}]: Successfully processed ${dailyData.length} daily records`);
+    console.log(`DEBUG [${type}]: Date range: ${payload.date_range.start} to ${payload.date_range.end}`);
+    console.log(`DEBUG [${type}]: Current price: $${payload.current_price}`);
 
     // 4) Cache it
     await Promise.all([
