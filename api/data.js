@@ -2968,6 +2968,159 @@ case "funding-fear-correlation": {
   }
 }
 
+
+case "bitcoin-daily-price": {
+  const TTL = 3600; // Cache for 1 hour
+  const cacheKey = "bitcoin-daily-price-data";
+  const lastGoodKey = "last:bitcoin-daily-price-data";
+
+  // 1) Fast lane - check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log(`DEBUG [${type}]: Returning cached Bitcoin daily price data`);
+    return res.json(cached);
+  }
+
+  // 2) Traffic cop
+  if (!(await allow("cg:GLOBAL", 250))) {
+    console.log(`DEBUG [${type}]: Rate limit active. Serving last known good`);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    return res.json({
+      success: false,
+      data: null,
+      message: "Rate limit active and no cached data available",
+      method: "guarded-fallback"
+    });
+  }
+
+  // 3) Live fetch from CoinGlass
+  try {
+    console.log(`DEBUG [${type}]: Fetching current Bitcoin price from CoinGlass`);
+    
+    const url = "https://open-api-v4.coinglass.com/api/spot/coins-markets";
+    const params = {
+      per_page: 1 // Only get Bitcoin (first result by market cap)
+    };
+    
+    const response = await axiosWithBackoff(() =>
+      axios.get(url, { 
+        headers,
+        params,
+        timeout: 15000, 
+        validateStatus: s => s < 500 
+      })
+    );
+
+    console.log("DEBUG: CoinGlass Response Status:", response.status);
+
+    if (response.status === 401) {
+      return res.status(401).json({
+        error: 'API Authentication Failed',
+        message: 'Invalid API key or insufficient permissions. Check your CoinGlass API plan.'
+      });
+    }
+    
+    if (response.status === 403) {
+      return res.status(403).json({
+        error: 'API Access Forbidden',
+        message: 'Your API plan does not include access to this endpoint. Upgrade to Pro plan or higher.'
+      });
+    }
+    
+    if (response.status !== 200 || response.data?.code !== "0") {
+      throw new Error(`CoinGlass API failed: HTTP ${response.status} code=${response.data?.code} msg=${response.data?.message || response.data?.msg || "unknown"}`);
+    }
+
+    const rawData = response.data.data || [];
+    
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      throw new Error("No Bitcoin price data received from CoinGlass");
+    }
+
+    // Find Bitcoin data (should be first result due to market cap sorting)
+    const btcData = rawData.find(coin => coin.symbol === 'BTC') || rawData[0];
+    
+    if (!btcData || !btcData.current_price) {
+      throw new Error("Bitcoin price data not found in response");
+    }
+
+    console.log(`DEBUG [${type}]: Found Bitcoin price: $${btcData.current_price}`);
+
+    // Format the current timestamp for South African timezone (SAST = UTC+2)
+    const now = new Date();
+    const sastTime = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // Add 2 hours for SAST
+    const formattedDate = `${(sastTime.getMonth() + 1).toString().padStart(2, '0')}/${sastTime.getDate().toString().padStart(2, '0')}/${sastTime.getFullYear()}`;
+    const formattedTime = `${sastTime.getHours().toString().padStart(2, '0')}:${sastTime.getMinutes().toString().padStart(2, '0')}:${sastTime.getSeconds().toString().padStart(2, '0')}`;
+
+    // Check if this is a new day compared to existing data
+    let isNewDay = true;
+    const lastPriceKey = "bitcoin-daily-price:last-date";
+    try {
+      const lastDate = await kv.get(lastPriceKey);
+      if (lastDate === formattedDate) {
+        isNewDay = false;
+        console.log(`DEBUG: Price for ${formattedDate} already captured today`);
+      } else {
+        await kv.set(lastPriceKey, formattedDate, { ex: 86400 }); // Cache for 24 hours
+        console.log(`DEBUG: New day detected: ${formattedDate}`);
+      }
+    } catch (dateError) {
+      console.log(`DEBUG: Could not check last date: ${dateError.message}`);
+      // Continue anyway - let Zapier handle duplicates
+    }
+
+    const payload = {
+      success: true,
+      data: {
+        symbol: btcData.symbol,
+        current_price: btcData.current_price,
+        timestamp: now.getTime(),
+        date: formattedDate, // MM/DD/YYYY format for Google Sheets
+        time_sast: formattedTime, // HH:MM:SS format
+        iso_date: now.toISOString().split('T')[0], // Keep ISO format for internal use
+        full_timestamp_sast: `${formattedDate} ${formattedTime}`,
+        is_new_day: isNewDay
+      },
+      data_source: "coinglass_spot_markets_api",
+      lastUpdated: new Date().toISOString(),
+      method: "live-fetch",
+      zapier_ready: {
+        // Format specifically for Zapier to easily add to Google Sheets
+        date: formattedDate, // MM/DD/YYYY format
+        time: formattedTime, // HH:MM:SS format
+        price: btcData.current_price,
+        symbol: "BTC"
+      }
+    };
+
+    // 4) Cache both
+    await kv.set(cacheKey, payload, { ex: TTL });
+    await kv.set(lastGoodKey, payload, { ex: 7200 }); // Keep last good for 2 hours
+
+    console.log(`DEBUG [${type}]: Successfully captured Bitcoin daily price: $${btcData.current_price} at ${formattedDate} ${formattedTime} SAST (${isNewDay ? 'NEW DAY' : 'SAME DAY'})`);
+    
+    return res.json(payload);
+
+  } catch (error) {
+    console.error(`[${type}] Bitcoin daily price fetch error:`, error.message);
+    const last = await kv.get(lastGoodKey);
+    if (last) return res.json(last);
+    
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: "Bitcoin daily price fetch failed",
+      message: error.message,
+      lastUpdated: new Date().toISOString(),
+      method: "live-error"
+    });
+  }
+}
+
+
+
+
         
       default:
         return res.status(400).json({ error: "Invalid type parameter" });
