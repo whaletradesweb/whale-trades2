@@ -3441,61 +3441,60 @@ case "gold-dca": {
     if (frequency === "weekly") {
       console.log(`DEBUG [${type}]: Calculating weekly aggregations from ${dailyData.length} daily records`);
       
-      // Group data by ISO week using a more reliable method
-      const weekGroups = new Map();
-      
-      for (const dayData of dailyData) {
-        const date = new Date(dayData.timestamp);
-        
-        // Calculate the Monday of the week (ISO week standard)
-        // Then adjust back to Sunday for financial week
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        
-        // Calculate days back to the previous Sunday
-        const daysBackToSunday = dayOfWeek === 0 ? 0 : dayOfWeek;
-        
-        const weekStartSunday = new Date(date);
-        weekStartSunday.setDate(date.getDate() - daysBackToSunday);
-        weekStartSunday.setHours(0, 0, 0, 0);
-        
-        // Create a unique week key using YYYY-MM-DD format
-        const weekKey = weekStartSunday.toISOString().split('T')[0];
-        
-        if (!weekGroups.has(weekKey)) {
-          weekGroups.set(weekKey, {
-            weekStart: weekStartSunday,
-            weekKey: weekKey,
-            days: []
-          });
-        }
-        
-        weekGroups.get(weekKey).days.push(dayData);
-      }
-      
-      console.log(`DEBUG [${type}]: Found ${weekGroups.size} distinct weeks`);
-      
-      // Log first few weeks for debugging
-      let debugCount = 0;
-      for (const [weekKey, weekGroup] of weekGroups) {
-        if (debugCount < 3) {
-          console.log(`DEBUG [${type}]: Week ${weekKey} has ${weekGroup.days.length} days`);
-          debugCount++;
-        }
-      }
-      
-      // Convert grouped data to weekly records
       const weeklyData = [];
-      for (const [weekKey, weekGroup] of weekGroups) {
-        if (weekGroup.days.length > 0) {
-          const weekRecord = calculateWeeklyAggregation(weekGroup.days, weekGroup.weekStart);
-          if (weekRecord) {
-            weeklyData.push(weekRecord);
+      let i = 0;
+      
+      while (i < dailyData.length) {
+        const currentDay = dailyData[i];
+        const currentDate = new Date(currentDay.timestamp);
+        
+        // Find the start of this week (go back to Sunday)
+        let weekStart = new Date(currentDate);
+        while (weekStart.getDay() !== 0) { // 0 = Sunday
+          weekStart.setDate(weekStart.getDate() - 1);
+        }
+        weekStart.setHours(0, 0, 0, 0);
+        
+        // Find the end of this week (next Sunday)
+        let weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6); // Saturday
+        weekEnd.setHours(23, 59, 59, 999);
+        
+        // Collect all days in this week
+        const weekDays = [];
+        let j = i;
+        
+        while (j < dailyData.length) {
+          const dayDate = new Date(dailyData[j].timestamp);
+          if (dayDate >= weekStart && dayDate <= weekEnd) {
+            weekDays.push(dailyData[j]);
+            j++;
+          } else {
+            break;
           }
         }
+        
+        // Create weekly record if we have days
+        if (weekDays.length > 0) {
+          // Sort days chronologically
+          weekDays.sort((a, b) => a.timestamp - b.timestamp);
+          
+          const weekRecord = {
+            date: weekStart.toISOString().split('T')[0],
+            timestamp: weekStart.getTime(),
+            open: weekDays[0].open, // First day's open
+            close: weekDays[weekDays.length - 1].close, // Last day's close
+            high: Math.max(...weekDays.map(d => d.high)),
+            low: Math.min(...weekDays.map(d => d.low)),
+            days_in_week: weekDays.length
+          };
+          
+          weeklyData.push(weekRecord);
+        }
+        
+        // Move to next week
+        i = j;
       }
-      
-      // Sort weekly data by date
-      weeklyData.sort((a, b) => a.timestamp - b.timestamp);
       
       console.log(`DEBUG [${type}]: Generated ${weeklyData.length} weekly records from daily data`);
       finalData = weeklyData;
