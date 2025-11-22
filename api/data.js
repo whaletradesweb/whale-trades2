@@ -3441,28 +3441,30 @@ case "gold-dca": {
     if (frequency === "weekly") {
       console.log(`DEBUG [${type}]: Calculating weekly aggregations from ${dailyData.length} daily records`);
       
-      const weeklyData = [];
-      
-      // Group data by week (Sunday to Saturday)
+      // Group data by ISO week using a more reliable method
       const weekGroups = new Map();
       
       for (const dayData of dailyData) {
         const date = new Date(dayData.timestamp);
         
-        // Find the Sunday that starts this week
+        // Calculate the Monday of the week (ISO week standard)
+        // Then adjust back to Sunday for financial week
         const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysToSubtract = dayOfWeek; // Days back to Sunday
         
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - daysToSubtract);
-        weekStart.setHours(0, 0, 0, 0); // Set to start of day
+        // Calculate days back to the previous Sunday
+        const daysBackToSunday = dayOfWeek === 0 ? 0 : dayOfWeek;
         
-        // Use week start timestamp as the key
-        const weekKey = weekStart.getTime();
+        const weekStartSunday = new Date(date);
+        weekStartSunday.setDate(date.getDate() - daysBackToSunday);
+        weekStartSunday.setHours(0, 0, 0, 0);
+        
+        // Create a unique week key using YYYY-MM-DD format
+        const weekKey = weekStartSunday.toISOString().split('T')[0];
         
         if (!weekGroups.has(weekKey)) {
           weekGroups.set(weekKey, {
-            weekStart: weekStart,
+            weekStart: weekStartSunday,
+            weekKey: weekKey,
             days: []
           });
         }
@@ -3472,7 +3474,17 @@ case "gold-dca": {
       
       console.log(`DEBUG [${type}]: Found ${weekGroups.size} distinct weeks`);
       
+      // Log first few weeks for debugging
+      let debugCount = 0;
+      for (const [weekKey, weekGroup] of weekGroups) {
+        if (debugCount < 3) {
+          console.log(`DEBUG [${type}]: Week ${weekKey} has ${weekGroup.days.length} days`);
+          debugCount++;
+        }
+      }
+      
       // Convert grouped data to weekly records
+      const weeklyData = [];
       for (const [weekKey, weekGroup] of weekGroups) {
         if (weekGroup.days.length > 0) {
           const weekRecord = calculateWeeklyAggregation(weekGroup.days, weekGroup.weekStart);
