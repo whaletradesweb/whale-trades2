@@ -1,10 +1,10 @@
 {
-  "author": "dimitar0728",
-  "profit_percentage": "1126.76",
-  "symbol": "OMUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "7X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1441393895937409138/IMG_7324.jpg?ex=69224aec&is=6920f96c&hm=8fd3a1464f4257e5cd6b6d797b8c0ed0b33560133dbc41a4ec7599cdc7e26601&",
-  "summary": "Futures Grid trading strategy indicating a profit rate of 77.17% over 24 days. ",
-  "updated_at": " 2025-11-22T06:01:21.450Z"
+  "author": "mojallo",
+  "profit_percentage": "2653.99",
+  "symbol": "AIAUSDT ",
+  "position_type": "LONG ",
+  "leverage": "20X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1441800933158817943/IMG_4013.png?ex=6923c601&is=69227481&hm=3f371dc1672b6b1fb1443dcc5ddbb25a63aca52e9998c7b089f8a6fa4d5afa0c&",
+  "summary": "Closed long trade on AIAUSDT with a profit percentage of +2653.99% using 20X leverage. ",
+  "updated_at": " 2025-11-23T06:01:49.599Z"
 }
