@@ -1,10 +1,10 @@
 {
-  "author": "mojallo",
-  "profit_percentage": "2653.99",
-  "symbol": "AIAUSDT ",
-  "position_type": "LONG ",
-  "leverage": "20X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1441800933158817943/IMG_4013.png?ex=6923c601&is=69227481&hm=3f371dc1672b6b1fb1443dcc5ddbb25a63aca52e9998c7b089f8a6fa4d5afa0c&",
-  "summary": "Closed long trade on AIAUSDT with a profit percentage of +2653.99% using 20X leverage. ",
-  "updated_at": " 2025-11-23T06:01:49.599Z"
+  "author": "theadventuredan",
+  "profit_percentage": "559.73",
+  "symbol": "PIPPINUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "20x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1442156168834322593/image.png?ex=692510d8&is=6923bf58&hm=8525f70d9ffe9803540a6b1832b47792e10ed1d2def4977de0225212030bf4d6&",
+  "summary": "Short position on PIPPINUSDT with a profit of 559.73% ",
+  "updated_at": " 2025-11-24T06:01:34.565Z"
 }
