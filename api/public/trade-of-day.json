@@ -1,10 +1,10 @@
 {
-  "author": "emil_1988",
-  "profit_percentage": "335.46",
-  "symbol": "BTCUSDT ",
-  "position_type": "LONG ",
-  "leverage": "37x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1443304559715029023/blofin_1764180979835.png?ex=6928959e&is=6927441e&hm=686e8741e19525e777b7165b05892fa1d0d77138502048ffdb85fb8aec6c5d6c&",
-  "summary": "Position on BTCUSDT indicating a profit of 335.46%. ",
-  "updated_at": " 2025-11-27T06:01:51.337Z"
+  "author": "jumpflex_",
+  "profit_percentage": "8502",
+  "symbol": "ZEC/USDT ",
+  "position_type": "SHORT ",
+  "leverage": "10x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1443793845212156066/DA6A9A78-5A7C-40F4-9BDC-E1520764C8F8.png?ex=692a5d4d&is=69290bcd&hm=2cf47b97cfbbbd610fc151abf3ea1ca7a6effa5b25678bb5d757ff8c29275fb2&",
+  "summary": "Profit of 8502% on a short position in ZEC/USDT with an average price of 543.20 and last price of 451.10. ",
+  "updated_at": " 2025-11-28T06:01:51.259Z"
 }
