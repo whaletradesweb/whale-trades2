@@ -4267,12 +4267,21 @@ case "btc-funding-chart": {
       ? "https://whale-trades.vercel.app/api/data?type=bitcoin-daily"
       : "https://whale-trades.vercel.app/api/data?type=bitcoin-historical";
     
-    // Fetch both BTC price data and funding rates in parallel
-    const [priceResponse, fundingResponse] = await Promise.all([
+    // Fetch Bitcoin price data, historical funding data, and current funding rates
+    const [priceResponse, historicalFundingResponse, currentFundingResponse] = await Promise.all([
       // Use your existing Bitcoin price APIs
-      axios.get(btcPriceUrl, { timeout: 15000 }),
+      axios.get(btcPriceUrl, { timeout: 15000 }).catch(err => {
+        console.log("DEBUG: Bitcoin price API failed:", err.message);
+        return { status: 404, data: null };
+      }),
       
-      // Get aggregated funding rates from CoinGlass
+      // Get historical funding rates from Google Sheets
+      axios.get("https://whale-trades.vercel.app/api/data?type=historical-funding-rates").catch(err => {
+        console.log("DEBUG: Historical funding API failed:", err.message);
+        return { status: 404, data: null };
+      }),
+      
+      // Get current funding rates from CoinGlass (8h interval to match historical data)
       axios.get(`https://open-api-v4.coinglass.com/api/futures/funding-rate/accumulated-exchange-list?range=${range}`, { 
         headers,
         timeout: 15000,
@@ -4283,7 +4292,8 @@ case "btc-funding-chart": {
     ]);
     
     console.log("DEBUG: Price Response Status:", priceResponse.status);
-    console.log("DEBUG: Funding Response Status:", fundingResponse.status);
+    console.log("DEBUG: Historical Funding Response Status:", historicalFundingResponse.status);
+    console.log("DEBUG: Current Funding Response Status:", currentFundingResponse.status);
     
     // Validate price response
     if (priceResponse.status !== 200) {
@@ -4293,66 +4303,84 @@ case "btc-funding-chart": {
       });
     }
     
-    // Validate funding response
-    if (fundingResponse.status !== 200) {
-      return res.status(fundingResponse.status).json({
-        error: 'Funding API Request Failed',
-        message: `CoinGlass API returned status ${fundingResponse.status}`,
-        details: fundingResponse.data
+    // Validate current funding response
+    if (currentFundingResponse.status !== 200) {
+      return res.status(currentFundingResponse.status).json({
+        error: 'Current Funding API Request Failed',
+        message: `CoinGlass API returned status ${currentFundingResponse.status}`,
+        details: currentFundingResponse.data
       });
     }
     
-    if (!fundingResponse.data || fundingResponse.data.code !== "0") {
+    if (!currentFundingResponse.data || currentFundingResponse.data.code !== "0") {
       return res.status(400).json({
-        error: 'Funding API Error',
-        message: fundingResponse.data?.message || 'CoinGlass API returned error code',
-        code: fundingResponse.data?.code
+        error: 'Current Funding API Error',
+        message: currentFundingResponse.data?.message || 'CoinGlass API returned error code',
+        code: currentFundingResponse.data?.code
       });
     }
     
     // Process price data from your APIs
     const priceData = priceResponse.data?.data || priceResponse.data || [];
     console.log(`DEBUG: Received ${priceData.length} price data points from ${btcPriceUrl}`);
-    console.log(`DEBUG: First 3 price items structure:`, priceData.slice(0, 3));
     
     if (!Array.isArray(priceData) || priceData.length === 0) {
       throw new Error("No price data received from Bitcoin API");
     }
     
-    // Process funding data - get BTC data from the response
-    const rawFundingData = fundingResponse.data.data || [];
-    const btcFunding = rawFundingData.find(item => item.symbol === "BTC");
+    // Process historical funding data
+    const historicalFundingData = historicalFundingResponse.status === 200 
+      ? historicalFundingResponse.data?.data || []
+      : [];
     
-    if (!btcFunding) {
-      throw new Error("BTC funding rate data not found in response");
+    console.log(`DEBUG: Received ${historicalFundingData.length} historical funding records`);
+    
+    // Process current funding data - get BTC data from CoinGlass
+    const rawCurrentFundingData = currentFundingResponse.data.data || [];
+    const btcCurrentFunding = rawCurrentFundingData.find(item => item.symbol === "BTC");
+    
+    if (!btcCurrentFunding) {
+      throw new Error("BTC funding rate data not found in current CoinGlass response");
     }
     
-    // Filter for Binance funding rate only (you can use this for cleaner data)
-    const binanceStablecoin = btcFunding.stablecoin_margin_list?.find(r => r.exchange === "BINANCE");
-    const binanceToken = btcFunding.token_margin_list?.find(r => r.exchange === "BINANCE");
+    // Get Binance funding rate from current data
+    const binanceStablecoin = btcCurrentFunding.stablecoin_margin_list?.find(r => r.exchange === "BINANCE");
+    const binanceToken = btcCurrentFunding.token_margin_list?.find(r => r.exchange === "BINANCE");
+    const currentBinanceFundingRate = binanceStablecoin?.funding_rate || binanceToken?.funding_rate || 0;
     
-    const binanceFundingRate = binanceStablecoin?.funding_rate || binanceToken?.funding_rate || 0;
-    console.log(`DEBUG: Binance funding rate: ${binanceFundingRate}`);
+    console.log(`DEBUG: Current Binance funding rate: ${currentBinanceFundingRate}`);
     
-    // Calculate average funding rate across all exchanges (keep for other uses)
-    const stablecoinRates = btcFunding.stablecoin_margin_list || [];
-    const tokenRates = btcFunding.token_margin_list || [];
-    
-    // Combine all funding rates for averaging
+    // Calculate all exchange average (keep for reference)
+    const stablecoinRates = btcCurrentFunding.stablecoin_margin_list || [];
+    const tokenRates = btcCurrentFunding.token_margin_list || [];
     const allRates = [
       ...stablecoinRates.map(r => r.funding_rate).filter(r => r !== undefined),
       ...tokenRates.map(r => r.funding_rate).filter(r => r !== undefined)
     ];
-    
     const avgFundingRate = allRates.length > 0 
       ? allRates.reduce((sum, rate) => sum + rate, 0) / allRates.length 
       : 0;
     
-    console.log(`DEBUG: Average funding rate: ${avgFundingRate}, from ${allRates.length} exchanges`);
+    // Combine historical and current funding data
+    const allFundingData = [...historicalFundingData];
+    
+    // Add current funding rate as the latest data point
+    const currentTimestamp = Date.now();
+    allFundingData.push({
+      timestamp: currentTimestamp,
+      date: new Date(currentTimestamp).toISOString().slice(0, 19).replace('T', ' '),
+      funding_rate: currentBinanceFundingRate,
+      source: 'coinglass_current'
+    });
+    
+    // Sort all funding data by timestamp
+    allFundingData.sort((a, b) => a.timestamp - b.timestamp);
+    
+    console.log(`DEBUG: Total funding data points: ${allFundingData.length}`);
+    console.log(`DEBUG: Funding date range: ${allFundingData[0]?.date} to ${allFundingData[allFundingData.length - 1]?.date}`);
     
     // Transform price data for ECharts format
-    // Your APIs return data with: {date, timestamp, close, open, high, low}
-    const chartData = priceData.map((item, index) => {
+    const chartData = priceData.map((item) => {
       let timestamp, price, date;
       
       // Handle your API structure: {date, timestamp, close}
@@ -4361,18 +4389,29 @@ case "btc-funding-chart": {
         price = parseFloat(item.close);
         date = item.date;
       } else {
-        // Fallback - log unexpected structure
         console.log("DEBUG: Unexpected price data structure:", item);
         return null;
+      }
+      
+      // Find the closest funding rate for this timestamp
+      let closestFundingRate = currentBinanceFundingRate; // Default fallback
+      let minTimeDiff = Infinity;
+      
+      for (const fundingPoint of allFundingData) {
+        const timeDiff = Math.abs(timestamp - fundingPoint.timestamp);
+        if (timeDiff < minTimeDiff) {
+          minTimeDiff = timeDiff;
+          closestFundingRate = fundingPoint.funding_rate;
+        }
       }
       
       return {
         timestamp,
         date,
         price: price || 0,
-        funding_rate: binanceFundingRate // Use current Binance rate for all historical points
+        funding_rate: closestFundingRate
       };
-    }).filter(item => item !== null); // Remove null items
+    }).filter(item => item !== null);
     
     // Sort by timestamp to ensure chronological order
     chartData.sort((a, b) => a.timestamp - b.timestamp);
@@ -4403,7 +4442,7 @@ case "btc-funding-chart": {
         // Current values (use Binance funding rate for consistency)
         current: {
           price: recentData[recentData.length - 1]?.price || 0,
-          funding_rate: binanceFundingRate, // Use Binance rate
+          funding_rate: currentBinanceFundingRate, // Use current Binance rate
           funding_rate_avg: avgFundingRate, // Keep average for reference
           exchanges_count: allRates.length,
           price_date: recentData[recentData.length - 1]?.date || null
@@ -4414,7 +4453,7 @@ case "btc-funding-chart": {
           binance_only: {
             stablecoin: binanceStablecoin?.funding_rate || null,
             token: binanceToken?.funding_rate || null,
-            selected: binanceFundingRate
+            selected: currentBinanceFundingRate
           },
           all_exchanges: {
             stablecoin_margin: stablecoinRates.map(r => ({
@@ -4426,6 +4465,16 @@ case "btc-funding-chart": {
               funding_rate: r.funding_rate
             }))
           }
+        },
+        
+        // Historical data info
+        historical_info: {
+          total_historical_points: historicalFundingData.length,
+          historical_date_range: historicalFundingData.length > 0 ? {
+            start: historicalFundingData[0]?.date,
+            end: historicalFundingData[historicalFundingData.length - 1]?.date
+          } : null,
+          interval: "8h"
         }
       },
       range: range,
@@ -4460,6 +4509,136 @@ case "btc-funding-chart": {
   }
 }
         
+
+
+case "historical-funding-rates": {
+  console.log("DEBUG: Requesting historical funding rates from Google Sheets...");
+  
+  try {
+    // Fetch the CSV data from Google Sheets
+    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTkJNkMbUI5oRsZRbRRv8eiDVtELvES8l8lOdlWMFRvJGJbYVQWmpG1A43nAJIxHcjJUfhmFMh13p5h/pub?output=csv";
+    
+    const response = await axios.get(csvUrl, {
+      timeout: 15000,
+      headers: {
+        'Accept': 'text/csv',
+        'User-Agent': 'Mozilla/5.0 (compatible; API-Client/1.0)'
+      }
+    });
+    
+    console.log("DEBUG: CSV Response Status:", response.status);
+    
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch CSV data: ${response.status}`);
+    }
+    
+    const csvData = response.data;
+    console.log("DEBUG: CSV data length:", csvData.length);
+    
+    // Parse CSV data manually (simple parsing for your structure)
+    const lines = csvData.split('\n').filter(line => line.trim());
+    const headers = lines[0].split(',').map(h => h.trim());
+    
+    console.log("DEBUG: CSV headers:", headers);
+    console.log("DEBUG: Total lines:", lines.length);
+    
+    const fundingData = [];
+    
+    // Parse each data line (skip header)
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      
+      if (values.length >= 4) {
+        const dateTimeStr = values[0]; // e.g., "2019-09-10 10:00:00"
+        const symbol = values[1];      // e.g., "BTCUSDT Perpetual"
+        const interval = values[2];    // e.g., "8h"
+        const fundingRate = parseFloat(values[3]?.replace('%', '')) / 100; // Convert percentage to decimal
+        
+        // Only process BTC data
+        if (symbol.includes('BTCUSDT') && !isNaN(fundingRate)) {
+          // Parse datetime string to timestamp
+          const timestamp = new Date(dateTimeStr).getTime();
+          
+          if (!isNaN(timestamp)) {
+            fundingData.push({
+              timestamp,
+              date: dateTimeStr,
+              symbol,
+              interval,
+              funding_rate: fundingRate,
+              funding_rate_percent: fundingRate * 100
+            });
+          }
+        }
+      }
+    }
+    
+    // Sort by timestamp (oldest first)
+    fundingData.sort((a, b) => a.timestamp - b.timestamp);
+    
+    console.log(`DEBUG: Parsed ${fundingData.length} funding rate records`);
+    console.log("DEBUG: Date range:", fundingData[0]?.date, "to", fundingData[fundingData.length - 1]?.date);
+    console.log("DEBUG: Sample data:", fundingData.slice(0, 3));
+    
+    // Calculate some statistics
+    const rates = fundingData.map(d => d.funding_rate);
+    const avgRate = rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
+    const maxRate = Math.max(...rates);
+    const minRate = Math.min(...rates);
+    const positiveCount = rates.filter(r => r > 0).length;
+    const negativeCount = rates.filter(r => r < 0).length;
+    
+    return res.json({
+      success: true,
+      data: fundingData,
+      statistics: {
+        total_records: fundingData.length,
+        date_range: {
+          start: fundingData[0]?.date,
+          end: fundingData[fundingData.length - 1]?.date
+        },
+        funding_rate_stats: {
+          average: avgRate,
+          max: maxRate,
+          min: minRate,
+          positive_count: positiveCount,
+          negative_count: negativeCount,
+          positive_percent: ((positiveCount / fundingData.length) * 100).toFixed(2),
+          negative_percent: ((negativeCount / fundingData.length) * 100).toFixed(2)
+        }
+      },
+      lastUpdated: new Date().toISOString(),
+      source: "google_sheets_csv",
+      interval: "8h"
+    });
+    
+  } catch (err) {
+    console.error("[Historical Funding Rates] Error:", err.message);
+    
+    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        error: "Network connection failed",
+        message: "Unable to connect to Google Sheets. Please try again later."
+      });
+    }
+    
+    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+      return res.status(504).json({
+        error: "Request timeout",
+        message: "Google Sheets request timed out. Please try again."
+      });
+    }
+    
+    return res.status(500).json({
+      error: "Historical funding rates fetch failed",
+      message: err.message
+    });
+  }
+}
+
+
+
+
         
         
       default:
