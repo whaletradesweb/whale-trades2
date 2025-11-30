@@ -4253,11 +4253,11 @@ case "btc-funding-chart": {
   const { range = "1d" } = req.query;
   console.log(`DEBUG: Requesting BTC funding chart data for range: ${range}`);
   
-  // Validate range parameter
-  if (!["1d", "7d"].includes(range)) {
+  // Validate range parameter - now includes historical
+  if (!["1d", "7d", "historical"].includes(range)) {
     return res.status(400).json({
       error: "Invalid range",
-      message: "Range must be either '1d' or '7d'"
+      message: "Range must be '1d', '7d', or 'historical'"
     });
   }
   
@@ -4281,8 +4281,8 @@ case "btc-funding-chart": {
         return { status: 404, data: null };
       }),
       
-      // Get current funding rates from CoinGlass (8h interval to match historical data)
-      axios.get(`https://open-api-v4.coinglass.com/api/futures/funding-rate/accumulated-exchange-list?range=${range}`, { 
+      // Get current funding rates from CoinGlass
+      axios.get(`https://open-api-v4.coinglass.com/api/futures/funding-rate/accumulated-exchange-list?range=1d`, { 
         headers,
         timeout: 15000,
         validateStatus: function (status) {
@@ -4416,14 +4416,18 @@ case "btc-funding-chart": {
     // Sort by timestamp to ensure chronological order
     chartData.sort((a, b) => a.timestamp - b.timestamp);
     
-    // Take appropriate number of recent points based on range
-    const recentData = range === "1d" 
-      ? chartData.slice(-30)   // Last 30 days for daily data
-      : chartData.slice(-200); // Last 200 weeks for historical data
+    // For historical range, use ALL data, otherwise apply limits
+    const recentData = range === "historical" 
+      ? chartData  // Use ALL data for historical view
+      : range === "1d" 
+        ? chartData.slice(-30)   // Last 30 days for daily data
+        : chartData.slice(-200); // Last 200 weeks for 7d data
     
     console.log(`DEBUG: Processed ${recentData.length} data points for ${range} range`);
-    console.log(`DEBUG: Date range: ${recentData[0]?.date} to ${recentData[recentData.length - 1]?.date}`);
-    console.log(`DEBUG: Price range: ${recentData[0]?.price} to ${recentData[recentData.length - 1]?.price}`);
+    if (recentData.length > 0) {
+      console.log(`DEBUG: Date range: ${recentData[0]?.date} to ${recentData[recentData.length - 1]?.date}`);
+      console.log(`DEBUG: Price range: ${recentData[0]?.price} to ${recentData[recentData.length - 1]?.price}`);
+    }
     
     if (recentData.length === 0) {
       throw new Error("No valid data points after processing");
