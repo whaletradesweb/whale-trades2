@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "1045.12",
-  "symbol": "PIPPINUSDT ",
-  "position_type": "LONG ",
-  "leverage": "50x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1443930386995482644/IMG_0676.png?ex=692b8537&is=692a33b7&hm=cd0feb53957f62205695c98315a58b15266728826db0b5bd87fa76a18c8da55d&",
-  "summary": "A screenshot showing a long position on PIPPINUSDT with a profit percentage of +1,045.12%. ",
-  "updated_at": " 2025-11-29T06:01:10.853Z"
+  "author": "sandris8504",
+  "profit_percentage": "209.76",
+  "symbol": "FFUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "60x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1444419644491567215/share_3.jpg?ex=692ca41f&is=692b529f&hm=0828832701297fccaca8da99b1635c5227ba02599a46070883621f36d00e14a4&",
+  "summary": "Screenshot showing profit of 209.76% from a short position on FFUSDT with an average entry price of 0.12133 and an average exit price of 0.11687. ",
+  "updated_at": " 2025-11-30T06:00:56.319Z"
 }
