@@ -4250,14 +4250,27 @@ case "nasdaq-dca": {
 
 
 case "btc-funding-chart": {
-  const { range = "365d" } = req.query;
+  const { range = "1d" } = req.query;
   console.log(`DEBUG: Requesting BTC funding chart data for range: ${range}`);
   
+  // Validate range parameter
+  if (!["1d", "7d"].includes(range)) {
+    return res.status(400).json({
+      error: "Invalid range",
+      message: "Range must be either '1d' or '7d'"
+    });
+  }
+  
   try {
+    // Determine which Bitcoin API to use based on range
+    const btcPriceUrl = range === "1d" 
+      ? "https://whale-trades.vercel.app/api/data?type=bitcoin-daily"
+      : "https://whale-trades.vercel.app/api/data?type=bitcoin-historical";
+    
     // Fetch both BTC price data and funding rates in parallel
     const [priceResponse, fundingResponse] = await Promise.all([
-      // Use your existing Bitcoin historical price API
-      axios.get("https://whale-trades.vercel.app/api/data?type=bitcoin-historical"),
+      // Use your existing Bitcoin price APIs
+      axios.get(btcPriceUrl, { timeout: 15000 }),
       
       // Get aggregated funding rates from CoinGlass
       axios.get(`https://open-api-v4.coinglass.com/api/futures/funding-rate/accumulated-exchange-list?range=${range}`, { 
@@ -4271,6 +4284,14 @@ case "btc-funding-chart": {
     
     console.log("DEBUG: Price Response Status:", priceResponse.status);
     console.log("DEBUG: Funding Response Status:", fundingResponse.status);
+    
+    // Validate price response
+    if (priceResponse.status !== 200) {
+      return res.status(priceResponse.status).json({
+        error: 'Price API Request Failed',
+        message: `Bitcoin price API returned status ${priceResponse.status}`
+      });
+    }
     
     // Validate funding response
     if (fundingResponse.status !== 200) {
@@ -4289,17 +4310,13 @@ case "btc-funding-chart": {
       });
     }
     
-    // Validate price response
-    if (priceResponse.status !== 200) {
-      return res.status(priceResponse.status).json({
-        error: 'Price API Request Failed',
-        message: `Price API returned status ${priceResponse.status}`
-      });
-    }
+    // Process price data from your APIs
+    const priceData = priceResponse.data?.data || priceResponse.data || [];
+    console.log(`DEBUG: Received ${priceData.length} price data points from ${btcPriceUrl}`);
     
-    // Process price data
-    const priceData = priceResponse.data?.data || [];
-    console.log(`DEBUG: Received ${priceData.length} price data points`);
+    if (!Array.isArray(priceData) || priceData.length === 0) {
+      throw new Error("No price data received from Bitcoin API");
+    }
     
     // Process funding data - get BTC data from the response
     const rawFundingData = fundingResponse.data.data || [];
@@ -4325,43 +4342,63 @@ case "btc-funding-chart": {
     
     console.log(`DEBUG: Average funding rate: ${avgFundingRate}, from ${allRates.length} exchanges`);
     
-    // For the chart, we need historical funding data
-    // Since the API only gives current accumulated rates, we'll create mock historical data
-    // In a real implementation, you'd need to store these values over time
-    
     // Transform price data for ECharts format
-    const chartData = priceData.slice(-365).map((item, index) => {
-      // Convert date string to timestamp for ECharts
-      const timestamp = new Date(item.date).getTime();
+    // Assume your API returns data with 'date' and 'price' fields
+    const chartData = priceData.map((item, index) => {
+      // Handle different possible data structures
+      let timestamp, price, date;
       
-      // Mock funding rate variation around the average (for demo purposes)
+      if (item.date && item.price) {
+        // Structure: {date: "2024-01-01", price: 50000}
+        date = item.date;
+        price = item.price;
+        timestamp = new Date(date).getTime();
+      } else if (Array.isArray(item) && item.length >= 2) {
+        // Structure: [timestamp, price] or [date, price]
+        timestamp = typeof item[0] === 'number' ? item[0] : new Date(item[0]).getTime();
+        price = item[1];
+        date = new Date(timestamp).toISOString().split('T')[0];
+      } else {
+        // Fallback - log the structure for debugging
+        console.log("DEBUG: Unexpected price data structure:", item);
+        return null;
+      }
+      
+      // Create mock funding rate variation around the average
       // In production, you'd use actual historical funding data
       const mockFundingRate = avgFundingRate + (Math.sin(index * 0.1) * 0.0001);
       
       return {
         timestamp,
-        date: item.date,
-        price: item.price,
+        date,
+        price: parseFloat(price) || 0,
         funding_rate: mockFundingRate
       };
-    });
+    }).filter(item => item !== null); // Remove null items
     
     // Sort by timestamp to ensure chronological order
     chartData.sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Take appropriate number of recent points based on range
+    const recentData = range === "1d" 
+      ? chartData.slice(-24)  // Last 24 hours
+      : chartData.slice(-168); // Last 7 days (168 hours)
+    
+    console.log(`DEBUG: Processed ${recentData.length} data points for ${range} range`);
     
     // Prepare data for dual-axis chart
     const chartResponse = {
       success: true,
       data: {
-        // Price data for top chart
-        priceData: chartData.map(d => [d.timestamp, d.price]),
+        // Price data for top chart - [timestamp, price]
+        priceData: recentData.map(d => [d.timestamp, d.price]),
         
-        // Funding rate data for bottom chart
-        fundingData: chartData.map(d => [d.timestamp, d.funding_rate]),
+        // Funding rate data for bottom chart - [timestamp, funding_rate]
+        fundingData: recentData.map(d => [d.timestamp, d.funding_rate]),
         
         // Current values
         current: {
-          price: chartData[chartData.length - 1]?.price || 0,
+          price: recentData[recentData.length - 1]?.price || 0,
           funding_rate: avgFundingRate,
           exchanges_count: allRates.length
         },
@@ -4380,10 +4417,10 @@ case "btc-funding-chart": {
       },
       range: range,
       lastUpdated: new Date().toISOString(),
-      dataPoints: chartData.length
+      dataPoints: recentData.length
     };
     
-    console.log(`DEBUG: Returning chart data with ${chartData.length} points`);
+    console.log(`DEBUG: Returning chart data with ${recentData.length} points`);
     return res.json(chartResponse);
     
   } catch (err) {
