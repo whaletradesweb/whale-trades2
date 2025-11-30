@@ -4254,10 +4254,10 @@ case "btc-funding-chart": {
   console.log(`DEBUG: Requesting BTC funding chart data for range: ${range}`);
   
   // Validate range parameter
-  if (!["1d", "7d"].includes(range)) {
+  if (!["1d", "7d", "historical"].includes(range)) {
     return res.status(400).json({
       error: "Invalid range",
-      message: "Range must be either '1d' or '7d'"
+      message: "Range must be '1d', '7d', or 'historical'"
     });
   }
   
@@ -4281,9 +4281,15 @@ case "btc-funding-chart": {
         return { status: 404, data: null };
       }),
       
-      // Get current funding rates from CoinGlass (8h interval to match historical data)
-      axios.get(`https://open-api-v4.coinglass.com/api/futures/funding-rate/accumulated-exchange-list?range=${range}`, { 
+      // Get recent funding rates from CoinGlass (8h intervals to match historical data)
+      axios.get("https://open-api-v4.coinglass.com/api/futures/funding-rate/history", {
         headers,
+        params: {
+          symbol: "BTC",
+          exchange: "Binance",  // Focus on Binance to match historical data
+          interval: "8h",
+          limit: range === "historical" ? 500 : (range === "7d" ? 21 : 3)  // Adjust limit based on range
+        },
         timeout: 15000,
         validateStatus: function (status) {
           return status < 500;
@@ -4335,49 +4341,56 @@ case "btc-funding-chart": {
     
     console.log(`DEBUG: Received ${historicalFundingData.length} historical funding records`);
     
-    // Process current funding data - get BTC data from CoinGlass
+    // Process current funding data - get BTC data from CoinGlass 8h history
     const rawCurrentFundingData = currentFundingResponse.data.data || [];
-    const btcCurrentFunding = rawCurrentFundingData.find(item => item.symbol === "BTC");
     
-    if (!btcCurrentFunding) {
-      throw new Error("BTC funding rate data not found in current CoinGlass response");
+    if (!Array.isArray(rawCurrentFundingData) || rawCurrentFundingData.length === 0) {
+      throw new Error("No current funding rate data found in CoinGlass response");
     }
     
-    // Get Binance funding rate from current data
-    const binanceStablecoin = btcCurrentFunding.stablecoin_margin_list?.find(r => r.exchange === "BINANCE");
-    const binanceToken = btcCurrentFunding.token_margin_list?.find(r => r.exchange === "BINANCE");
-    const currentBinanceFundingRate = binanceStablecoin?.funding_rate || binanceToken?.funding_rate || 0;
+    console.log(`DEBUG: Received ${rawCurrentFundingData.length} current funding rate records from CoinGlass`);
     
-    console.log(`DEBUG: Current Binance funding rate: ${currentBinanceFundingRate}`);
+    // Process the funding rate history data (should be 8h intervals)
+    const currentFundingData = rawCurrentFundingData.map(item => ({
+      timestamp: item.timestamp || item.time,
+      date: new Date(item.timestamp || item.time).toISOString().slice(0, 19).replace('T', ' '),
+      funding_rate: item.funding_rate || item.rate || 0,
+      source: 'coinglass_8h'
+    }));
     
-    // Calculate all exchange average (keep for reference)
-    const stablecoinRates = btcCurrentFunding.stablecoin_margin_list || [];
-    const tokenRates = btcCurrentFunding.token_margin_list || [];
-    const allRates = [
-      ...stablecoinRates.map(r => r.funding_rate).filter(r => r !== undefined),
-      ...tokenRates.map(r => r.funding_rate).filter(r => r !== undefined)
-    ];
-    const avgFundingRate = allRates.length > 0 
-      ? allRates.reduce((sum, rate) => sum + rate, 0) / allRates.length 
+    // Get the most recent Binance funding rate
+    const currentBinanceFundingRate = currentFundingData.length > 0 
+      ? currentFundingData[currentFundingData.length - 1].funding_rate 
       : 0;
     
-    // Combine historical and current funding data
+    console.log(`DEBUG: Most recent Binance funding rate: ${currentBinanceFundingRate}`);
+    
+    // Calculate all exchange average (removed since we're focusing on 8h historical data)
+    const avgFundingRate = currentBinanceFundingRate; // Use current rate as reference
+    
+    // Combine historical and current funding data (both in 8h intervals)
     const allFundingData = [...historicalFundingData];
     
-    // Add current funding rate as the latest data point
-    const currentTimestamp = Date.now();
-    allFundingData.push({
-      timestamp: currentTimestamp,
-      date: new Date(currentTimestamp).toISOString().slice(0, 19).replace('T', ' '),
-      funding_rate: currentBinanceFundingRate,
-      source: 'coinglass_current'
-    });
+    // Add current funding rate data points (8h intervals from CoinGlass)
+    allFundingData.push(...currentFundingData);
     
     // Sort all funding data by timestamp
     allFundingData.sort((a, b) => a.timestamp - b.timestamp);
     
-    console.log(`DEBUG: Total funding data points: ${allFundingData.length}`);
-    console.log(`DEBUG: Funding date range: ${allFundingData[0]?.date} to ${allFundingData[allFundingData.length - 1]?.date}`);
+    // Remove duplicates based on timestamp (keep most recent for same timestamp)
+    const uniqueFundingData = [];
+    const seenTimestamps = new Set();
+    
+    for (let i = allFundingData.length - 1; i >= 0; i--) {
+      const item = allFundingData[i];
+      if (!seenTimestamps.has(item.timestamp)) {
+        seenTimestamps.add(item.timestamp);
+        uniqueFundingData.unshift(item);
+      }
+    }
+    
+    console.log(`DEBUG: Combined funding data points: ${uniqueFundingData.length}`);
+    console.log(`DEBUG: Funding date range: ${uniqueFundingData[0]?.date} to ${uniqueFundingData[uniqueFundingData.length - 1]?.date}`);
     
     // Transform price data for ECharts format
     const chartData = priceData.map((item) => {
@@ -4393,11 +4406,11 @@ case "btc-funding-chart": {
         return null;
       }
       
-      // Find the closest funding rate for this timestamp
+      // Find the closest funding rate for this timestamp from combined 8h data
       let closestFundingRate = currentBinanceFundingRate; // Default fallback
       let minTimeDiff = Infinity;
       
-      for (const fundingPoint of allFundingData) {
+      for (const fundingPoint of uniqueFundingData) {
         const timeDiff = Math.abs(timestamp - fundingPoint.timestamp);
         if (timeDiff < minTimeDiff) {
           minTimeDiff = timeDiff;
@@ -4416,14 +4429,18 @@ case "btc-funding-chart": {
     // Sort by timestamp to ensure chronological order
     chartData.sort((a, b) => a.timestamp - b.timestamp);
     
-    // Take appropriate number of recent points based on range
-    const recentData = range === "1d" 
-      ? chartData.slice(-30)   // Last 30 days for daily data
-      : chartData.slice(-200); // Last 200 weeks for historical data
+    // For historical range, use ALL data, otherwise apply limits
+    const recentData = range === "historical" 
+      ? chartData  // Use ALL data for historical view
+      : range === "1d" 
+        ? chartData.slice(-30)   // Last 30 days for daily data
+        : chartData.slice(-200); // Last 200 weeks for 7d data
     
     console.log(`DEBUG: Processed ${recentData.length} data points for ${range} range`);
-    console.log(`DEBUG: Date range: ${recentData[0]?.date} to ${recentData[recentData.length - 1]?.date}`);
-    console.log(`DEBUG: Price range: ${recentData[0]?.price} to ${recentData[recentData.length - 1]?.price}`);
+    if (recentData.length > 0) {
+      console.log(`DEBUG: Date range: ${recentData[0]?.date} to ${recentData[recentData.length - 1]?.date}`);
+      console.log(`DEBUG: Price range: ${recentData[0]?.price} to ${recentData[recentData.length - 1]?.price}`);
+    }
     
     if (recentData.length === 0) {
       throw new Error("No valid data points after processing");
@@ -4507,8 +4524,7 @@ case "btc-funding-chart": {
       message: err.message
     });
   }
-}
-        
+}   
 
 
 case "historical-funding-rates": {
