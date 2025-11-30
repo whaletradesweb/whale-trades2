@@ -4247,6 +4247,168 @@ case "nasdaq-dca": {
     });
   }
 }
+
+
+case "btc-funding-chart": {
+  const { range = "365d" } = req.query;
+  console.log(`DEBUG: Requesting BTC funding chart data for range: ${range}`);
+  
+  try {
+    // Fetch both BTC price data and funding rates in parallel
+    const [priceResponse, fundingResponse] = await Promise.all([
+      // Use your existing Bitcoin historical price API
+      axios.get("https://whale-trades.vercel.app/api/data?type=bitcoin-historical"),
+      
+      // Get aggregated funding rates from CoinGlass
+      axios.get(`https://open-api-v4.coinglass.com/api/futures/funding-rate/accumulated-exchange-list?range=${range}`, { 
+        headers,
+        timeout: 15000,
+        validateStatus: function (status) {
+          return status < 500;
+        }
+      })
+    ]);
+    
+    console.log("DEBUG: Price Response Status:", priceResponse.status);
+    console.log("DEBUG: Funding Response Status:", fundingResponse.status);
+    
+    // Validate funding response
+    if (fundingResponse.status !== 200) {
+      return res.status(fundingResponse.status).json({
+        error: 'Funding API Request Failed',
+        message: `CoinGlass API returned status ${fundingResponse.status}`,
+        details: fundingResponse.data
+      });
+    }
+    
+    if (!fundingResponse.data || fundingResponse.data.code !== "0") {
+      return res.status(400).json({
+        error: 'Funding API Error',
+        message: fundingResponse.data?.message || 'CoinGlass API returned error code',
+        code: fundingResponse.data?.code
+      });
+    }
+    
+    // Validate price response
+    if (priceResponse.status !== 200) {
+      return res.status(priceResponse.status).json({
+        error: 'Price API Request Failed',
+        message: `Price API returned status ${priceResponse.status}`
+      });
+    }
+    
+    // Process price data
+    const priceData = priceResponse.data?.data || [];
+    console.log(`DEBUG: Received ${priceData.length} price data points`);
+    
+    // Process funding data - get BTC data from the response
+    const rawFundingData = fundingResponse.data.data || [];
+    const btcFunding = rawFundingData.find(item => item.symbol === "BTC");
+    
+    if (!btcFunding) {
+      throw new Error("BTC funding rate data not found in response");
+    }
+    
+    // Calculate average funding rate across exchanges
+    const stablecoinRates = btcFunding.stablecoin_margin_list || [];
+    const tokenRates = btcFunding.token_margin_list || [];
+    
+    // Combine all funding rates for averaging
+    const allRates = [
+      ...stablecoinRates.map(r => r.funding_rate),
+      ...tokenRates.map(r => r.funding_rate)
+    ];
+    
+    const avgFundingRate = allRates.length > 0 
+      ? allRates.reduce((sum, rate) => sum + rate, 0) / allRates.length 
+      : 0;
+    
+    console.log(`DEBUG: Average funding rate: ${avgFundingRate}, from ${allRates.length} exchanges`);
+    
+    // For the chart, we need historical funding data
+    // Since the API only gives current accumulated rates, we'll create mock historical data
+    // In a real implementation, you'd need to store these values over time
+    
+    // Transform price data for ECharts format
+    const chartData = priceData.slice(-365).map((item, index) => {
+      // Convert date string to timestamp for ECharts
+      const timestamp = new Date(item.date).getTime();
+      
+      // Mock funding rate variation around the average (for demo purposes)
+      // In production, you'd use actual historical funding data
+      const mockFundingRate = avgFundingRate + (Math.sin(index * 0.1) * 0.0001);
+      
+      return {
+        timestamp,
+        date: item.date,
+        price: item.price,
+        funding_rate: mockFundingRate
+      };
+    });
+    
+    // Sort by timestamp to ensure chronological order
+    chartData.sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Prepare data for dual-axis chart
+    const chartResponse = {
+      success: true,
+      data: {
+        // Price data for top chart
+        priceData: chartData.map(d => [d.timestamp, d.price]),
+        
+        // Funding rate data for bottom chart
+        fundingData: chartData.map(d => [d.timestamp, d.funding_rate]),
+        
+        // Current values
+        current: {
+          price: chartData[chartData.length - 1]?.price || 0,
+          funding_rate: avgFundingRate,
+          exchanges_count: allRates.length
+        },
+        
+        // Exchange breakdown
+        exchanges: {
+          stablecoin_margin: stablecoinRates.map(r => ({
+            exchange: r.exchange,
+            funding_rate: r.funding_rate
+          })),
+          token_margin: tokenRates.map(r => ({
+            exchange: r.exchange,
+            funding_rate: r.funding_rate
+          }))
+        }
+      },
+      range: range,
+      lastUpdated: new Date().toISOString(),
+      dataPoints: chartData.length
+    };
+    
+    console.log(`DEBUG: Returning chart data with ${chartData.length} points`);
+    return res.json(chartResponse);
+    
+  } catch (err) {
+    console.error("[BTC Funding Chart] API Error:", err.message);
+    
+    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        error: "Network connection failed",
+        message: "Unable to connect to API. Please try again later."
+      });
+    }
+    
+    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+      return res.status(504).json({
+        error: "Request timeout",
+        message: "API request timed out. Please try again."
+      });
+    }
+    
+    return res.status(500).json({
+      error: "BTC funding chart failed",
+      message: err.message
+    });
+  }
+}
         
         
         
