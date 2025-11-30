@@ -4313,6 +4313,7 @@ case "btc-funding-chart": {
     // Process price data from your APIs
     const priceData = priceResponse.data?.data || priceResponse.data || [];
     console.log(`DEBUG: Received ${priceData.length} price data points from ${btcPriceUrl}`);
+    console.log(`DEBUG: First 3 price items structure:`, priceData.slice(0, 3));
     
     if (!Array.isArray(priceData) || priceData.length === 0) {
       throw new Error("No price data received from Bitcoin API");
@@ -4326,14 +4327,21 @@ case "btc-funding-chart": {
       throw new Error("BTC funding rate data not found in response");
     }
     
-    // Calculate average funding rate across exchanges
+    // Filter for Binance funding rate only (you can use this for cleaner data)
+    const binanceStablecoin = btcFunding.stablecoin_margin_list?.find(r => r.exchange === "BINANCE");
+    const binanceToken = btcFunding.token_margin_list?.find(r => r.exchange === "BINANCE");
+    
+    const binanceFundingRate = binanceStablecoin?.funding_rate || binanceToken?.funding_rate || 0;
+    console.log(`DEBUG: Binance funding rate: ${binanceFundingRate}`);
+    
+    // Calculate average funding rate across all exchanges (keep for other uses)
     const stablecoinRates = btcFunding.stablecoin_margin_list || [];
     const tokenRates = btcFunding.token_margin_list || [];
     
     // Combine all funding rates for averaging
     const allRates = [
-      ...stablecoinRates.map(r => r.funding_rate),
-      ...tokenRates.map(r => r.funding_rate)
+      ...stablecoinRates.map(r => r.funding_rate).filter(r => r !== undefined),
+      ...tokenRates.map(r => r.funding_rate).filter(r => r !== undefined)
     ];
     
     const avgFundingRate = allRates.length > 0 
@@ -4343,36 +4351,26 @@ case "btc-funding-chart": {
     console.log(`DEBUG: Average funding rate: ${avgFundingRate}, from ${allRates.length} exchanges`);
     
     // Transform price data for ECharts format
-    // Assume your API returns data with 'date' and 'price' fields
+    // Your APIs return data with: {date, timestamp, close, open, high, low}
     const chartData = priceData.map((item, index) => {
-      // Handle different possible data structures
       let timestamp, price, date;
       
-      if (item.date && item.price) {
-        // Structure: {date: "2024-01-01", price: 50000}
+      // Handle your API structure: {date, timestamp, close}
+      if (item.timestamp && item.close !== undefined) {
+        timestamp = item.timestamp;
+        price = parseFloat(item.close);
         date = item.date;
-        price = item.price;
-        timestamp = new Date(date).getTime();
-      } else if (Array.isArray(item) && item.length >= 2) {
-        // Structure: [timestamp, price] or [date, price]
-        timestamp = typeof item[0] === 'number' ? item[0] : new Date(item[0]).getTime();
-        price = item[1];
-        date = new Date(timestamp).toISOString().split('T')[0];
       } else {
-        // Fallback - log the structure for debugging
+        // Fallback - log unexpected structure
         console.log("DEBUG: Unexpected price data structure:", item);
         return null;
       }
       
-      // Create mock funding rate variation around the average
-      // In production, you'd use actual historical funding data
-      const mockFundingRate = avgFundingRate + (Math.sin(index * 0.1) * 0.0001);
-      
       return {
         timestamp,
         date,
-        price: parseFloat(price) || 0,
-        funding_rate: mockFundingRate
+        price: price || 0,
+        funding_rate: binanceFundingRate // Use current Binance rate for all historical points
       };
     }).filter(item => item !== null); // Remove null items
     
@@ -4381,10 +4379,16 @@ case "btc-funding-chart": {
     
     // Take appropriate number of recent points based on range
     const recentData = range === "1d" 
-      ? chartData.slice(-24)  // Last 24 hours
-      : chartData.slice(-168); // Last 7 days (168 hours)
+      ? chartData.slice(-30)   // Last 30 days for daily data
+      : chartData.slice(-200); // Last 200 weeks for historical data
     
     console.log(`DEBUG: Processed ${recentData.length} data points for ${range} range`);
+    console.log(`DEBUG: Date range: ${recentData[0]?.date} to ${recentData[recentData.length - 1]?.date}`);
+    console.log(`DEBUG: Price range: ${recentData[0]?.price} to ${recentData[recentData.length - 1]?.price}`);
+    
+    if (recentData.length === 0) {
+      throw new Error("No valid data points after processing");
+    }
     
     // Prepare data for dual-axis chart
     const chartResponse = {
@@ -4396,23 +4400,32 @@ case "btc-funding-chart": {
         // Funding rate data for bottom chart - [timestamp, funding_rate]
         fundingData: recentData.map(d => [d.timestamp, d.funding_rate]),
         
-        // Current values
+        // Current values (use Binance funding rate for consistency)
         current: {
           price: recentData[recentData.length - 1]?.price || 0,
-          funding_rate: avgFundingRate,
-          exchanges_count: allRates.length
+          funding_rate: binanceFundingRate, // Use Binance rate
+          funding_rate_avg: avgFundingRate, // Keep average for reference
+          exchanges_count: allRates.length,
+          price_date: recentData[recentData.length - 1]?.date || null
         },
         
-        // Exchange breakdown
+        // Exchange breakdown (keeping all data for other uses)
         exchanges: {
-          stablecoin_margin: stablecoinRates.map(r => ({
-            exchange: r.exchange,
-            funding_rate: r.funding_rate
-          })),
-          token_margin: tokenRates.map(r => ({
-            exchange: r.exchange,
-            funding_rate: r.funding_rate
-          }))
+          binance_only: {
+            stablecoin: binanceStablecoin?.funding_rate || null,
+            token: binanceToken?.funding_rate || null,
+            selected: binanceFundingRate
+          },
+          all_exchanges: {
+            stablecoin_margin: stablecoinRates.map(r => ({
+              exchange: r.exchange,
+              funding_rate: r.funding_rate
+            })),
+            token_margin: tokenRates.map(r => ({
+              exchange: r.exchange,
+              funding_rate: r.funding_rate
+            }))
+          }
         }
       },
       range: range,
