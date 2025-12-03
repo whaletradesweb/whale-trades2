@@ -1,10 +1,10 @@
 {
-  "author": "tomjay_181818",
-  "profit_percentage": "566.92",
-  "symbol": "ZECUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "33X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1444943509194018816/IMG_3909.jpg?ex=692f34c2&is=692de342&hm=055f0cd136840a856d7b0d4ae79e1832d524287b8b82c7ad2e6e8dd3e3046c77&",
-  "summary": "Profit of +566.92% on a short position for ZECUSDT with a mark price lower than entry price. ",
-  "updated_at": " 2025-12-02T06:01:45.930Z"
+  "author": "unknown",
+  "profit_percentage": "494.3",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
+  "leverage": " ",
+  "image_url": " unknown",
+  "summary": "A buy trade on XAUUSD resulting in a profit of 494.30. ",
+  "updated_at": " 2025-12-03T06:02:42.252Z"
 }
