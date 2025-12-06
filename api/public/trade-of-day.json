@@ -1,10 +1,10 @@
 {
   "author": ".theocap",
-  "profit_percentage": "2171.56",
+  "profit_percentage": "2606.35",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "CLOSED ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1446153481084735661/share_5661819675213770727.png?ex=69339ba2&is=69324a22&hm=c73b9821a5656954003c9ea5ba62546a2f67b1d19e5877519ca79fb587212698&",
-  "summary": "Closed profit and net profit for XAUUSD showing a profit of +2171.56 CAD. ",
-  "updated_at": " 2025-12-05T06:01:55.388Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1446484275078762588/share_5020964663827244601.png?ex=6934cfb5&is=69337e35&hm=b7bc43aa15514bd004349b607cb2e164f4d0f7684bc36964d8e1ceb8649b3bcb&",
+  "summary": "History of closed trades showing a profit of 2606.35 CAD for trading XAUUSD. ",
+  "updated_at": " 2025-12-06T06:01:47.626Z"
 }
