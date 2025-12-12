@@ -1,10 +1,10 @@
 {
   "author": ".theocap",
-  "profit_percentage": "5061.05",
-  "symbol": "XAUUSD-STD ",
-  "position_type": "UNKNOWN ",
+  "profit_percentage": "7048.79",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1448392355714437253/share_5776881005726716172.png?ex=693b17ff&is=6939c67f&hm=e31c16d0a4e68fa2b6e549766743a73ae43319705bb2a74f0d24793f53cf595e&",
-  "summary": "Closed PnL for XAUUSD showing a profit of 5061.05 CAD. ",
-  "updated_at": " 2025-12-11T06:01:49.050Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1448618922935849053/share_3789569265134170901.png?ex=693c93c1&is=693b4241&hm=207e483604c13d91194b90e636fe37255c7e076d8ad7dfd2fe42d0922834f240&",
+  "summary": "Closed net PnL of +7048.79 CAD on XAUUSD. ",
+  "updated_at": " 2025-12-12T06:02:28.253Z"
 }
