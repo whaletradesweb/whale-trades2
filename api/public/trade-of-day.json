@@ -1,10 +1,10 @@
 {
-  "author": "clarry77",
-  "profit_percentage": "1467.78",
-  "symbol": "GOLD ",
+  "author": "patricksebastine",
+  "profit_percentage": "140.95",
+  "symbol": "XMRUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1448992109020450837/1765536997731.jpg?ex=693def4f&is=693c9dcf&hm=759f3334da19b4900a9cf06739aa07d003a813eebc317d9e62607dfa284106cf&",
-  "summary": "A trade showing a profit of +1467.78% from a long position on GOLD with specified entry and close prices. ",
-  "updated_at": " 2025-12-13T06:01:32.421Z"
+  "leverage": "10X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1449315512159965286/image.png?ex=693f1c81&is=693dcb01&hm=642c0ec45c8eeaac8a0b953843c2663a4688803aad5c9bdd5a58da9e995fb306&",
+  "summary": "A profitable long position on XMRUSDT with a profit of 140.95%. ",
+  "updated_at": " 2025-12-14T06:01:14.751Z"
 }
