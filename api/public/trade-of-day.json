@@ -1,10 +1,10 @@
 {
-  "author": "clarry77",
-  "profit_percentage": "2474.85",
-  "symbol": "SILVER ",
+  "author": "patricksebastine",
+  "profit_percentage": "288.9",
+  "symbol": "XMRUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1451588366113181878/image.png?ex=69476143&is=69460fc3&hm=bb4a590f190186146aa0a068ef6045d4e5743965158f400ac538e1ebc6cceb3e&",
-  "summary": "A screenshot showing an extremely profitable long position on SILVER with a profit of 2474.85%. ",
-  "updated_at": " 2025-12-20T06:01:22.257Z"
+  "leverage": "10X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1452171867770327254/image.png?ex=6948d7f1&is=69478671&hm=6ed8e33f0ba715f07997b01afabccb89cd6149f2fd052c7b3d7dfd1597399865&",
+  "summary": "Long position on XMRUSDT with an entry price of 361.36, marked price at 465.75. ",
+  "updated_at": " 2025-12-21T06:00:40.213Z"
 }
