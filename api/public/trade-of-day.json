@@ -1,10 +1,10 @@
 {
-  "author": "borderlessbyblockchain",
-  "profit_percentage": "290.44",
-  "symbol": "ETHUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "200X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1453329019834601594/IMG_5429.png?ex=694db65f&is=694c64df&hm=50dbc0845962e3e80731546bb263db5fa83dcca7bb0c7448bb39a15547deb761&",
-  "summary": "Screenshot showing a SHORT position on ETHUSDT with a profit of +290.44%. ",
-  "updated_at": " 2025-12-25T06:01:50.360Z"
+  "author": "sav9590",
+  "profit_percentage": "71.78",
+  "symbol": "BTCUSD ",
+  "position_type": "LONG ",
+  "leverage": "50.0X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1453936052283637890/Screenshot_2025-12-26-03-21-02-648_com.bybit.app.jpg?ex=694f42f7&is=694df177&hm=85bd3d744a3b9bef9eac7dc91867898970f40d5ef698575f128b03dd61f56b29&",
+  "summary": "A profit and loss screenshot showing a profitable long trade on BTCUSD with a return on investment of +71.78%. Entry price at 86,850.01 and exit price at 88,096.90. ",
+  "updated_at": " 2025-12-26T06:00:41.175Z"
 }
