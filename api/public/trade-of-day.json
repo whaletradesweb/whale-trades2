@@ -1,10 +1,10 @@
 {
-  "author": "borderlessbyblockchain",
-  "profit_percentage": "318.7",
-  "symbol": "ETHUSDT ",
+  "author": "patricksebastine",
+  "profit_percentage": "413.64",
+  "symbol": "XAUTUSDT ",
   "position_type": "LONG ",
-  "leverage": "200X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1454088515678638130/IMG_5594.png?ex=695079b5&is=694f2835&hm=a7431057fc23143162155293da83bfdb6421ab2158dd7fd391ce652190f6bc0e&",
-  "summary": "A profit of 318.7% on a long position in ETHUSDT with leveraged trading at 200X. ",
-  "updated_at": " 2025-12-27T06:01:14.192Z"
+  "leverage": "50X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1454544528357720075/image.png?ex=695179a7&is=69502827&hm=a938019391f7db739e5a40b45e0f711bc23ac59bd0a0fe0ce21e1a15fd34a3cc&",
+  "summary": "A screenshot showing a profitable long position on the XAUTUSDT perpetual contract with a profit percentage of +413.64%. ",
+  "updated_at": " 2025-12-28T06:00:35.657Z"
 }
