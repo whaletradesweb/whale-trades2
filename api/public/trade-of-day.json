@@ -1,10 +1,10 @@
 {
-  "author": "patricksebastine",
-  "profit_percentage": "413.64",
-  "symbol": "XAUTUSDT ",
+  "author": "clarry77",
+  "profit_percentage": "5327.67",
+  "symbol": "SILVER ",
   "position_type": "LONG ",
-  "leverage": "50X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1454544528357720075/image.png?ex=695179a7&is=69502827&hm=a938019391f7db739e5a40b45e0f711bc23ac59bd0a0fe0ce21e1a15fd34a3cc&",
-  "summary": "A screenshot showing a profitable long position on the XAUTUSDT perpetual contract with a profit percentage of +413.64%. ",
-  "updated_at": " 2025-12-28T06:00:35.657Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1455051431756300403/1766979779102.jpg?ex=695351be&is=6952003e&hm=0cdb16118bcb2dd09e8d81c524f585f39e466e237b9394f5f78981d81e42271d&",
+  "summary": "The trade was initiated long on SILVER at an entry price of 76.473 and closed at 80.546, resulting in a profit of 5327.67%. ",
+  "updated_at": " 2025-12-29T06:01:12.631Z"
 }
