@@ -1,10 +1,10 @@
 {
-  "author": "clarry77",
-  "profit_percentage": "905.45",
-  "symbol": "GOLD ",
-  "position_type": "LONG ",
+  "author": "ruzel9029",
+  "profit_percentage": "351.07",
+  "symbol": "XAUUSD ",
+  "position_type": "SHORT ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1455101859155939413/1766992874744.jpg?ex=69542975&is=6952d7f5&hm=02679e452b5b82fd094ca85c896bbbfff3fe833f2c01222fe7a9544ecd305545&",
-  "summary": "A trading profit of +905.45% on a long position for GOLD, with an entry price of 4474.65 and a close price of 4515.16. ",
-  "updated_at": " 2025-12-30T06:00:55.737Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1455575588181119069/image.png?ex=6955e2a7&is=69549127&hm=15722bc71ac47d02965a7d385827e897f47fe580ba87bc8b7878bab2f517fb60&",
+  "summary": "A trade with an entry price of 4395.91 and a close price of 4365.07, resulting in a +351.07% ROI. ",
+  "updated_at": " 2025-12-31T06:01:41.001Z"
 }
