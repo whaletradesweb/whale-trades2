@@ -1,10 +1,10 @@
 {
-  "author": "ruzel9029",
-  "profit_percentage": "351.07",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1455575588181119069/image.png?ex=6955e2a7&is=69549127&hm=15722bc71ac47d02965a7d385827e897f47fe580ba87bc8b7878bab2f517fb60&",
-  "summary": "A trade with an entry price of 4395.91 and a close price of 4365.07, resulting in a +351.07% ROI. ",
-  "updated_at": " 2025-12-31T06:01:41.001Z"
+  "author": "paulo018154",
+  "profit_percentage": "1546.83",
+  "symbol": "LIGHTUSDT ",
+  "position_type": "LONG ",
+  "leverage": "10X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1455867883505713152/1767176325580.jpg?ex=6956f2e0&is=6955a160&hm=4099f45ed68875b8bd1018596c74e69962444351f7f4fff894ec54facb3a16ad&",
+  "summary": "An open long position on LIGHTUSDT showing high profit. ",
+  "updated_at": " 2026-01-01T06:01:13.112Z"
 }
