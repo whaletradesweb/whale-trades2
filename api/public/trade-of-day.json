@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "1237.32",
-  "symbol": "ZECUSDT ",
+  "author": "philverheyen",
+  "profit_percentage": "277.43",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": "100X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1456182014825726100/IMG_0781.png?ex=6958176e&is=6956c5ee&hm=b9426f045756771b9b2b8da1d89bc20cedf7c7322dc201c7ec0306fbc3b5cb9c&",
-  "summary": "Trade for ZECUSDT showing a profit of 1237.32% with a leverage of 100x. ",
-  "updated_at": " 2026-01-02T06:00:56.710Z"
+  "leverage": "100x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1456698338333163592/IMG_3033.jpg?ex=6959f84c&is=6958a6cc&hm=3f9d613649e90cceb6ae4fcf614e486db487f2257f4ee6ae8f39d4e5ac1da75b&",
+  "summary": "A profitable long trade on BTCUSDT with a ROI of 277.43% ",
+  "updated_at": " 2026-01-03T06:01:03.254Z"
 }
