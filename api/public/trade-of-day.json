@@ -1,10 +1,10 @@
 {
-  "author": "philverheyen",
-  "profit_percentage": "277.43",
-  "symbol": "BTCUSDT ",
+  "author": "cryptohussler",
+  "profit_percentage": "34.53",
+  "symbol": "SYRUPUSDT ",
   "position_type": "LONG ",
-  "leverage": "100x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1456698338333163592/IMG_3033.jpg?ex=6959f84c&is=6958a6cc&hm=3f9d613649e90cceb6ae4fcf614e486db487f2257f4ee6ae8f39d4e5ac1da75b&",
-  "summary": "A profitable long trade on BTCUSDT with a ROI of 277.43% ",
-  "updated_at": " 2026-01-03T06:01:03.254Z"
+  "leverage": "25.0X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1457139444095254693/1767479419641.jpg?ex=695aea5b&is=695998db&hm=cf1f6e9328e817abdc3d4c70ce838f5ae0fe0c7876768a84a848099bd35736dc&",
+  "summary": "A screenshot displaying a trade result with a return of +34.53% on a long position for SYRUPUSDT with 25x leverage. ",
+  "updated_at": " 2026-01-04T06:00:44.055Z"
 }
