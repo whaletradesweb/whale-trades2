@@ -1,10 +1,10 @@
 {
   "author": "cryptohussler",
-  "profit_percentage": "34.53",
-  "symbol": "SYRUPUSDT ",
+  "profit_percentage": "158.42",
+  "symbol": "AAVEUSDT ",
   "position_type": "LONG ",
-  "leverage": "25.0X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1457139444095254693/1767479419641.jpg?ex=695aea5b&is=695998db&hm=cf1f6e9328e817abdc3d4c70ce838f5ae0fe0c7876768a84a848099bd35736dc&",
-  "summary": "A screenshot displaying a trade result with a return of +34.53% on a long position for SYRUPUSDT with 25x leverage. ",
-  "updated_at": " 2026-01-04T06:00:44.055Z"
+  "leverage": "75X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1457351661436534939/1767530088134.jpg?ex=695c58c0&is=695b0740&hm=b483820fe52e9d14902e2e7fdcc2929b2f5171a3e591a6dbfc1dfbe75cd50da8&",
+  "summary": "Long position on AAVEUSDT with a return on investment of 158.42%. ",
+  "updated_at": " 2026-01-05T06:01:24.195Z"
 }
