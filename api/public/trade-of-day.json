@@ -1,10 +1,10 @@
 {
-  "author": "luvme0382",
-  "profit_percentage": "401.16",
-  "symbol": "XAUUSD-STD ",
+  "author": "dcrypt0705",
+  "profit_percentage": "49.03",
+  "symbol": "XMRUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1459256250658455552/IMG-20260109-WA00072.jpg?ex=69629dc9&is=69614c49&hm=cf9441cd5be0a2d3afcbb549f69359b6d63492d75a5e6f6f6764d378689643a3&",
-  "summary": "Positions showing a profit of 401.16 with several recent trades on XAUUSD. ",
-  "updated_at": " 2026-01-10T06:00:51.832Z"
+  "leverage": "8X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1459608848577855639/image.png?ex=6963e62b&is=696294ab&hm=8e4a4c75f0bb1ffb450c68bb049260ed7b0c55916a144289f97da231f5846b3b&",
+  "summary": "The image shows a trading profit of 49.03% with details on the symbol XMRUSDT, direction as LONG, and leverage used is 8X. ",
+  "updated_at": " 2026-01-11T06:00:46.763Z"
 }
