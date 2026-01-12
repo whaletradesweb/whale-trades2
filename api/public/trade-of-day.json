@@ -1,10 +1,10 @@
 {
-  "author": "dcrypt0705",
-  "profit_percentage": "49.03",
+  "author": "solhippo",
+  "profit_percentage": "1023.58",
   "symbol": "XMRUSDT ",
   "position_type": "LONG ",
-  "leverage": "8X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1459608848577855639/image.png?ex=6963e62b&is=696294ab&hm=8e4a4c75f0bb1ffb450c68bb049260ed7b0c55916a144289f97da231f5846b3b&",
-  "summary": "The image shows a trading profit of 49.03% with details on the symbol XMRUSDT, direction as LONG, and leverage used is 8X. ",
-  "updated_at": " 2026-01-11T06:00:46.763Z"
+  "leverage": "20X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1460060726361329685/IMG_2565.png?ex=69658b03&is=69643983&hm=28fcdf2fca834f746d9ca13034299b390ee0ec28d477d32ef9e5f54738f6e391&",
+  "summary": "Extremely high profit on XMRUSDT perpetual position. ",
+  "updated_at": " 2026-01-12T06:00:57.203Z"
 }
