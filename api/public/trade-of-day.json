@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "4961.6",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "author": "chris_93606",
+  "profit_percentage": "2942.93",
+  "symbol": "CLOSED ",
+  "position_type": "UNKNOWN ",
   "leverage": " ",
-  "image_url": " unknown",
-  "summary": "Trade showing profit of 4961.60 on XAUUSD. ",
-  "updated_at": " 2026-01-13T06:01:42.003Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1460658960880373963/IMG_0936.jpg?ex=696860ea&is=69670f6a&hm=730b6a6f00535feec9fa018e493646d41490f7a06ec21bae333a04e4618c5723&",
+  "summary": "Closed Net PnL showing a profit of +2942.93 USD. ",
+  "updated_at": " 2026-01-14T06:01:52.242Z"
 }
