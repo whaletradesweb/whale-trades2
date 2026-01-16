@@ -1,10 +1,10 @@
 {
   "author": "unknown",
-  "profit_percentage": "1091.57",
-  "symbol": "XAUUSD-ECN ",
-  "position_type": "SHORT ",
+  "profit_percentage": "1233.6",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
   "leverage": " ",
   "image_url": " unknown",
-  "summary": "Further screenshot of positions indicating significant profit. ",
-  "updated_at": " 2026-01-15T06:01:39.365Z"
+  "summary": "Position in XAUUSD with a profit of 1233.60, entry price at 4582.44 and current price at 4613.28. ",
+  "updated_at": " 2026-01-16T06:01:55.076Z"
 }
