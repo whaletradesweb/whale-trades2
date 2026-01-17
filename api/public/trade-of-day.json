@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "1233.6",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "author": "clarry77",
+  "profit_percentage": "2817.98",
+  "symbol": "SILVER ",
+  "position_type": "SHORT ",
   "leverage": " ",
-  "image_url": " unknown",
-  "summary": "Position in XAUUSD with a profit of 1233.60, entry price at 4582.44 and current price at 4613.28. ",
-  "updated_at": " 2026-01-16T06:01:55.076Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1461711833185517756/image.png?ex=696c357a&is=696ae3fa&hm=1bbadc37802acad4eeaebbe441c4b92f97d133ee37ee1c44beb234195d5a6990&",
+  "summary": "Profit of 2817.98% on a short position for SILVER with an entry price of 91.270 and a close price of 88.700. ",
+  "updated_at": " 2026-01-17T06:01:47.678Z"
 }
