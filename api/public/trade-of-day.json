@@ -1,10 +1,10 @@
 {
-  "author": "clarry77",
-  "profit_percentage": "2817.98",
-  "symbol": "SILVER ",
-  "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1461711833185517756/image.png?ex=696c357a&is=696ae3fa&hm=1bbadc37802acad4eeaebbe441c4b92f97d133ee37ee1c44beb234195d5a6990&",
-  "summary": "Profit of 2817.98% on a short position for SILVER with an entry price of 91.270 and a close price of 88.700. ",
-  "updated_at": " 2026-01-17T06:01:47.678Z"
+  "author": "rhino05959",
+  "profit_percentage": "128.25",
+  "symbol": "SYRUP/USDT ",
+  "position_type": "LONG ",
+  "leverage": "19X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1461971328449118465/ReactNative-snapshot-image3545585917253280550.jpg?ex=696d2726&is=696bd5a6&hm=4b0d8a28276c2d2f05fd948d9f8f46aca1161d6a830ba5ac4b91b0a3750fb161&",
+  "summary": "Profit rate of +128.25% for SYRUP/USDT perpetual trade with a leverage of 19X. ",
+  "updated_at": " 2026-01-18T06:00:44.230Z"
 }
