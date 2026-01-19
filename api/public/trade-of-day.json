@@ -1,10 +1,10 @@
 {
-  "author": "rhino05959",
-  "profit_percentage": "128.25",
-  "symbol": "SYRUP/USDT ",
-  "position_type": "LONG ",
-  "leverage": "19X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1461971328449118465/ReactNative-snapshot-image3545585917253280550.jpg?ex=696d2726&is=696bd5a6&hm=4b0d8a28276c2d2f05fd948d9f8f46aca1161d6a830ba5ac4b91b0a3750fb161&",
-  "summary": "Profit rate of +128.25% for SYRUP/USDT perpetual trade with a leverage of 19X. ",
-  "updated_at": " 2026-01-18T06:00:44.230Z"
+  "author": "dcrypt0705",
+  "profit_percentage": "104.33",
+  "symbol": "DASH/USDT ",
+  "position_type": "SHORT ",
+  "leverage": "20X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1462600917625995429/image.png?ex=696ec8c0&is=696d7740&hm=c1e5ea1eb012498c68711f7b47960f671abf4ac055e57ce824d17f3908e55551&",
+  "summary": "A profit rate of 104.33% on a short position for DASH/USDT using 20X leverage. ",
+  "updated_at": " 2026-01-19T06:01:04.273Z"
 }
