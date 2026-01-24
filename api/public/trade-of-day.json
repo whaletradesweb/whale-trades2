@@ -1,10 +1,10 @@
 {
-  "author": "paulo018154",
-  "profit_percentage": "791.04",
-  "symbol": "PIPPINUSDT ",
+  "author": "osiris101",
+  "profit_percentage": "388.21",
+  "symbol": "XAUUSD ",
   "position_type": "SHORT ",
-  "leverage": "20X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1463786864644194365/1769064362059.jpg?ex=6973c200&is=69727080&hm=27ae717ca92717f9199db4bd54a30d0ddccfd48ef254f1538da4e505e3e64a01&",
-  "summary": "Open short position on PIPPINUSDT with a profit of 791.04%. ",
-  "updated_at": " 2026-01-23T06:01:39.922Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1464174528870617129/image.png?ex=69752b0a&is=6973d98a&hm=e097e848b5dbd8b09b7eb4be1c757dc4286079ad433ab046276a3f9e803ea7c8&",
+  "summary": "Unrealised ROI for a short position on XAUUSD with a high profit percentage. ",
+  "updated_at": " 2026-01-24T06:01:32.500Z"
 }
