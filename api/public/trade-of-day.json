@@ -1,10 +1,10 @@
 {
-  "author": "osiris101",
-  "profit_percentage": "388.21",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1464174528870617129/image.png?ex=69752b0a&is=6973d98a&hm=e097e848b5dbd8b09b7eb4be1c757dc4286079ad433ab046276a3f9e803ea7c8&",
-  "summary": "Unrealised ROI for a short position on XAUUSD with a high profit percentage. ",
-  "updated_at": " 2026-01-24T06:01:32.500Z"
+  "author": "josephdane",
+  "profit_percentage": "254.48",
+  "symbol": "XMRUSDT ",
+  "position_type": "LONG ",
+  "leverage": "15X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1464651462465294528/image.png?ex=6976e738&is=697595b8&hm=c000309532c92c2c0eaf6a58138106e26517e50a14951b89ec07ac1e688112e9&",
+  "summary": "A trade on XMRUSDT with a profit of 254.48% using 15X leverage. ",
+  "updated_at": " 2026-01-25T06:00:40.239Z"
 }
