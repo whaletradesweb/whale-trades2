@@ -1,10 +1,10 @@
 {
-  "author": "josephdane",
-  "profit_percentage": "254.48",
-  "symbol": "XMRUSDT ",
+  "author": "chris_93606",
+  "profit_percentage": "3573.97",
+  "symbol": "ZKCUSDT ",
   "position_type": "LONG ",
-  "leverage": "15X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1464651462465294528/image.png?ex=6976e738&is=697595b8&hm=c000309532c92c2c0eaf6a58138106e26517e50a14951b89ec07ac1e688112e9&",
-  "summary": "A trade on XMRUSDT with a profit of 254.48% using 15X leverage. ",
-  "updated_at": " 2026-01-25T06:00:40.239Z"
+  "leverage": "100X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1464914783764615362/IMG_1409.png?ex=6977dc75&is=69768af5&hm=626f02ec3e7daa35a8ab1b479542b07164638eebbef625da0b1ce6103b3dc254&",
+  "summary": "A screenshot showing a long position on ZKCUSDT with a profit percent of 3573.97%. ",
+  "updated_at": " 2026-01-26T06:01:05.193Z"
 }
