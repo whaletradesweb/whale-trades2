@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "3573.97",
-  "symbol": "ZKCUSDT ",
+  "author": "hevoso",
+  "profit_percentage": "864.65",
+  "symbol": "XAGUSDT ",
   "position_type": "LONG ",
-  "leverage": "100X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1464914783764615362/IMG_1409.png?ex=6977dc75&is=69768af5&hm=626f02ec3e7daa35a8ab1b479542b07164638eebbef625da0b1ce6103b3dc254&",
-  "summary": "A screenshot showing a long position on ZKCUSDT with a profit percent of 3573.97%. ",
-  "updated_at": " 2026-01-26T06:01:05.193Z"
+  "leverage": "40X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1465466664207253554/260126180921.jpg?ex=697935af&is=6977e42f&hm=3f8077cd3ee1b344f9afe3842f6e9b649be930d58da89d8ad8b2aa7f9af1513c&",
+  "summary": "A long position on XAGUSDT with a profit of 864.65%. Entry price is 94.28, current price is 114.44. ",
+  "updated_at": " 2026-01-27T06:01:50.265Z"
 }
