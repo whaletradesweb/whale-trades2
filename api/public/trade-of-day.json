@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "864.65",
-  "symbol": "XAGUSDT ",
+  "author": "mattyc5677",
+  "profit_percentage": "927.27",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "40X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1465466664207253554/260126180921.jpg?ex=697935af&is=6977e42f&hm=3f8077cd3ee1b344f9afe3842f6e9b649be930d58da89d8ad8b2aa7f9af1513c&",
-  "summary": "A long position on XAGUSDT with a profit of 864.65%. Entry price is 94.28, current price is 114.44. ",
-  "updated_at": " 2026-01-27T06:01:50.265Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1465621361790816277/IMG_6875.jpg?ex=697a6e82&is=69791d02&hm=dd4b39e8b3ab7342c174c3d15b5f64e172b43b4e4e9181f1cb9151a6ebe7e6e3&",
+  "summary": "A long position on XAUUSD with a profit of 927.27%, entry price of 4991.00 and close price of 5083.56. ",
+  "updated_at": " 2026-01-28T06:01:55.781Z"
 }
