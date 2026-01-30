@@ -1,10 +1,10 @@
 {
-  "author": "sandris8504",
-  "profit_percentage": "948",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1466142170099744949/Share_99.jpg?ex=697baacc&is=697a594c&hm=65cc1510b51760a2cc04527e97a98e0987181710b6ea9c6a8a95756da612bd23&",
-  "summary": "Unrealized profit of 948.00 on an open long position for XAUUSD with entry and current prices specified. ",
-  "updated_at": " 2026-01-29T06:02:08.789Z"
+  "author": "theroad2030",
+  "profit_percentage": "1058.21",
+  "symbol": "PIPPINUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "50x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1466374677105610927/1769681346367.jpg?ex=697d2c16&is=697bda96&hm=1f4558b05f6e5829479a91f22f986f6aac73dd1ac3060652cd7872f4ebc40512&",
+  "summary": "A short trade showing a massive ROI of 1058.21% with an entry price of 0.48384 and a fair price of 0.38144. ",
+  "updated_at": " 2026-01-30T06:01:48.035Z"
 }
