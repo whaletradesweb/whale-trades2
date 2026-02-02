@@ -1,10 +1,10 @@
 {
-  "author": "xryptod",
-  "profit_percentage": "231.59",
-  "symbol": "BTCUSDT ",
+  "author": "theadventuredan",
+  "profit_percentage": "214.31",
+  "symbol": "AAVEUSDT ",
   "position_type": "SHORT ",
-  "leverage": "25X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1467168230832476251/1769870549384_code.png?ex=69800f24&is=697ebda4&hm=1530a028e3089a4bfa7e2ecbd35030eb64a017721d05720149c41530287ffc0b&",
-  "summary": "A profit of 231.59% from a short position on BTCUSDT with entry price of 89,128.0 and last price of 80,871.2. ",
-  "updated_at": " 2026-02-01T06:00:51.444Z"
+  "leverage": "75.0X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1467524395831656682/1769955445383.jpg?ex=69815ad9&is=69800959&hm=4bf5eb61fef5cf6dbec6dbc8bf223e9dc692be839e2f468bfed6197d092f7ecc&",
+  "summary": "A trading profit screenshot for AAVEUSDT showing a profit of 214.31% with an entry price of 128.78 and an exit price of 125.10. ",
+  "updated_at": " 2026-02-02T06:01:12.215Z"
 }
