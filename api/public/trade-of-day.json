@@ -1,10 +1,10 @@
 {
-  "author": "xryptod",
-  "profit_percentage": "675.18",
+  "author": "cryptohussler",
+  "profit_percentage": "0.011",
   "symbol": "BTCUSDT ",
   "position_type": "SHORT ",
-  "leverage": "25X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1469254816659144770/image.png?ex=6987a66d&is=698654ed&hm=9cefad9f62372435d728b136032a78db71a4dbb3af535b9d21e1e022e0d0fa62&",
-  "summary": "A screenshot displaying a profitable short trade on BTCUSDT with a return of 675.18% at 25x leverage. ",
-  "updated_at": " 2026-02-07T06:00:54.650Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1469726622532763749/Screenshot_20260207_170330_Chrome.jpg?ex=69895dd5&is=69880c55&hm=e7161b6b830f88ef6ff4b9835b5ce554e1c6c8381bcdb124c1b7e6852c814505&",
+  "summary": "Sell trade with a profit of +7.09 from a sell price of 68,823.12. ",
+  "updated_at": " 2026-02-08T06:00:36.684Z"
 }
