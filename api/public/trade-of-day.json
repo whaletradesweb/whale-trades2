@@ -1,10 +1,10 @@
 {
-  "author": "cryptohussler",
-  "profit_percentage": "0.011",
-  "symbol": "BTCUSDT ",
-  "position_type": "SHORT ",
+  "author": "botswana1371",
+  "profit_percentage": "2814.08",
+  "symbol": "BTCUSD ",
+  "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1469726622532763749/Screenshot_20260207_170330_Chrome.jpg?ex=69895dd5&is=69880c55&hm=e7161b6b830f88ef6ff4b9835b5ce554e1c6c8381bcdb124c1b7e6852c814505&",
-  "summary": "Sell trade with a profit of +7.09 from a sell price of 68,823.12. ",
-  "updated_at": " 2026-02-08T06:00:36.684Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1470025560922001408/IMG_6057.jpg?ex=698a743d&is=698922bd&hm=4a67888198bb52da530cc395db39709e020fce43cd97e5825e792537c21c2c23&",
+  "summary": "Buy trade on BTCUSD with a return of 2814.08%, entry price of $66,414.19 and close price of $70,412.438. ",
+  "updated_at": " 2026-02-09T06:00:42.113Z"
 }
