@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "337.61",
+  "profit_percentage": "314.52",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SELL ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1470697620300238888/IMG_1944.jpg?ex=698ce624&is=698b94a4&hm=ad014d5919f7d542dd1ced3aa54771288d985c72befb81897bd218c3cbca197c&",
-  "summary": "ROI of 337.61% on a long trade for XAUUSD with specified entry and close prices. ",
-  "updated_at": " 2026-02-11T06:01:30.425Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1471287898065211516/IMG_2019.jpg?ex=698e6322&is=698d11a2&hm=24618aecc7c002c01b89df05ccc4a3d3659689d6822833801d3651c25aac058a&",
+  "summary": "A profitable sell position on XAUUSD with an ROI of 314.52%, entry price at 5095.63 and close price at 5063.58. ",
+  "updated_at": " 2026-02-12T06:01:34.283Z"
 }
