@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "257.89",
-  "symbol": "XAUUSD ",
+  "author": "theadventuredan",
+  "profit_percentage": "368.41",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1471526011744026666/IMG_2062.jpg?ex=698fe9a4&is=698e9824&hm=01a331c9cf6c7653c0dbd4343f025b440eb1fe26e1a93b3fad38c73f7fdf9bf3&",
-  "summary": "Profit of 257.89% with an entry price of 5041.00 and a close price of 5067.00. ",
-  "updated_at": " 2026-02-13T06:01:44.240Z"
+  "leverage": "100x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1472065294980616325/image.png?ex=69913723&is=698fe5a3&hm=d9a7d54519ff1a49f9a3607453c197923282b5ca7db1c89ac11d283b09cd8771&",
+  "summary": "Long position in BTCUSDT with a profit of 368.41%. ",
+  "updated_at": " 2026-02-14T06:01:03.984Z"
 }
