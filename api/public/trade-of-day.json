@@ -1,10 +1,10 @@
 {
-  "author": "theadventuredan",
-  "profit_percentage": "368.41",
-  "symbol": "BTCUSDT ",
+  "author": "borderlessbyblockchain",
+  "profit_percentage": "348.48",
+  "symbol": "ZECUSDT ",
   "position_type": "LONG ",
-  "leverage": "100x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1472065294980616325/image.png?ex=69913723&is=698fe5a3&hm=d9a7d54519ff1a49f9a3607453c197923282b5ca7db1c89ac11d283b09cd8771&",
-  "summary": "Long position in BTCUSDT with a profit of 368.41%. ",
-  "updated_at": " 2026-02-14T06:01:03.984Z"
+  "leverage": "25.0x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1472361433504289073/IMG_7092.jpg?ex=69924af0&is=6990f970&hm=ec9895e3b4291636777c81021fe33170c89d710091aa2158d0d413e5587d1b88&",
+  "summary": "Profit from a long position on ZECUSDT with a ROI of 348.48%. ",
+  "updated_at": " 2026-02-15T06:00:51.072Z"
 }
