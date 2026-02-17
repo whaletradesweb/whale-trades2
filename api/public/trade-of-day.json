@@ -1,10 +1,10 @@
 {
   "author": "hevoso",
-  "profit_percentage": "523.7",
-  "symbol": "XRPUSDT ",
-  "position_type": "LONG ",
-  "leverage": "20X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1472721069860192475/2602152080514.jpg?ex=699399e0&is=69924860&hm=cb8065dac0e48ec7da91fb782cde526a0d333899111a599012292c67d3f524b1&",
-  "summary": "A screenshot showing a profitable long trade for XRPUSDT with a 20x leverage and a profit of 523.7%. ",
-  "updated_at": " 2026-02-16T06:01:23.836Z"
+  "profit_percentage": "695.12",
+  "symbol": "BTCUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "200x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1472991652216963174/260216170356.jpg?ex=69953ea0&is=6993ed20&hm=7b40d5310c585a02c19166bb008f70ad0b2a016df00710a955383481671df740&",
+  "summary": "A short position on BTCUSDT with a 200x leverage showing a profit of 695.12%. ",
+  "updated_at": " 2026-02-17T06:01:04.807Z"
 }
