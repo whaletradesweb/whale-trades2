@@ -1,10 +1,10 @@
 {
   "author": "hevoso",
-  "profit_percentage": "877.54",
-  "symbol": "BTCUSDT ",
+  "profit_percentage": "1893.64",
+  "symbol": "ETHUSDT ",
   "position_type": "SHORT ",
-  "leverage": "200X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1473333923919695902/260217160155.jpg?ex=69967d64&is=69952be4&hm=193b73607c5490d41cd731e5e431f7576499ef0c0474394caddd9c736851fa23&",
-  "summary": "A profit report for a BTCUSDT short trade indicating an 877.54% gain with a leverage of 200X. ",
-  "updated_at": " 2026-02-18T06:01:15.122Z"
+  "leverage": "50X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1473783344625094848/260218214111.jpg?ex=69977732&is=699625b2&hm=db6a59115222c880d8d6c274069b3b90f97ba36fdf4fd7644d4cf8d260be4d27&",
+  "summary": "A screenshot showing a profitable short position on ETHUSDT with a gain of 1893.64%. ",
+  "updated_at": " 2026-02-19T06:01:47.812Z"
 }
