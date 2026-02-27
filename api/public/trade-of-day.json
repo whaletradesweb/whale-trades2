@@ -1,10 +1,10 @@
 {
-  "author": "botswana1371",
-  "profit_percentage": "3214.13",
-  "symbol": "UKOUSD ",
-  "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1473964482324725844/IMG_6181.jpg?ex=6998c8a5&is=69977725&hm=d5ce37d370a7257d989b6b8932cedb8e8cd46083d10530fa37cd32b03ecfeafe&",
-  "summary": "Unrealised ROI and details of a long position on UKOUSD. ",
-  "updated_at": " 2026-02-20T06:01:15.545Z"
+  "author": "chris_93606",
+  "profit_percentage": "1276.59",
+  "symbol": "BTCUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "500x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1476762145596244099/IMG_2461.png?ex=69a24d6c&is=69a0fbec&hm=093b903bca64ffbfe5bfca45b1fa70e32c6348e8434171cf1664d59f53a70389&",
+  "summary": "Short position on BTCUSDT showing an exceptional profit of +1276.59% with an entry price of 69,248.8 and fair price of 67,392.3. ",
+  "updated_at": " 2026-02-27T06:01:19.831Z"
 }
