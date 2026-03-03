@@ -1,10 +1,10 @@
 {
-  "author": "theadventuredan",
-  "profit_percentage": "7320.55",
-  "symbol": "UKOUSD ",
-  "position_type": "BUY ",
+  "author": "chris_93606",
+  "profit_percentage": "2257.35",
+  "symbol": "CL-OIL ",
+  "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1477806028497358928/1772406738716.jpg?ex=69a6199d&is=69a4c81d&hm=4c5c144a8c227f4e9f9aab781be6b0abac4aeeb490cd4fba982b4038a8c2b80a&",
-  "summary": "Screenshot showing a buy position on UKOUSD with a return on investment of 7320.55%, entry price of 71.552, and close price of 82.028. ",
-  "updated_at": " 2026-03-02T06:00:23.012Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1477928961173360713/IMG_2558.jpg?ex=69a734da&is=69a5e35a&hm=ac4778f29d727a062aa0a96e8bf8fae346a24f92715dbf214471f0edcf90ce01&",
+  "summary": "Unrealised ROI for a long position on CL-OIL with entry price of 69.814 and current price of 72.963. ",
+  "updated_at": " 2026-03-03T06:00:41.179Z"
 }
