@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "7508.57",
-  "symbol": "CL-OIL ",
-  "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1479373356942757970/IMG_2756.JPG?ex=69ac760d&is=69ab248d&hm=69e28bc793c53879018298d2ed495dff615c1b14419a3c972c7bfba5c0f89387&",
-  "summary": "Unrealised ROI for a long position in CL-OIL with an entry price of 69.879 and a current price of 80.391. ",
-  "updated_at": " 2026-03-07T06:01:03.682Z"
+  "author": "raps_icle",
+  "profit_percentage": "21.49",
+  "symbol": "BTCUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "3.0X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1479783829051805736/1772878350523.jpg?ex=69adf455&is=69aca2d5&hm=ae0bf34c9ba296c753c85c1331290bb8f8581ca13167428277a57547f9bc2ad3&",
+  "summary": "A trading screenshot showing a short position on BTCUSDT with a profit percentage of +21.49%. Entry price is 72,935.85 and current price is 68,048.60. ",
+  "updated_at": " 2026-03-08T06:00:21.468Z"
 }
