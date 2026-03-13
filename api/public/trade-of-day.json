@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "3629.23",
-  "symbol": "CL-OIL ",
-  "position_type": "LONG ",
+  "author": "ruzel9029",
+  "profit_percentage": "1798.66",
+  "symbol": "UKOUSD ",
+  "position_type": "SHORT ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1481276909328404480/IMG_2903.jpg?ex=69b362df&is=69b2115f&hm=398769994e651e62a60ce56bef2d8bf131e5b80e3fe4e10b3719a01a42b360df&",
-  "summary": "A trading record showing a buy position for CL-OIL with an unrealized ROI of +3629.23%. ",
-  "updated_at": " 2026-03-12T06:01:35.350Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1481560167987548231/image.png?ex=69b46aae&is=69b3192e&hm=5558bf91d6d4d8e584816bc40e2862e0862a1ae773a9e8e394f3ffd1a192907d&",
+  "summary": "Trade shown with a +1798.66% ROI, entry price of 99.683 and close price of 96.095. ",
+  "updated_at": " 2026-03-13T06:01:07.228Z"
 }
