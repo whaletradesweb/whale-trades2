@@ -1,10 +1,10 @@
 {
-  "author": "ruzel9029",
-  "profit_percentage": "1798.66",
-  "symbol": "UKOUSD ",
-  "position_type": "SHORT ",
+  "author": "unknown",
+  "profit_percentage": "1304.58",
+  "symbol": "UKOUSDT ",
+  "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1481560167987548231/image.png?ex=69b46aae&is=69b3192e&hm=5558bf91d6d4d8e584816bc40e2862e0862a1ae773a9e8e394f3ffd1a192907d&",
-  "summary": "Trade shown with a +1798.66% ROI, entry price of 99.683 and close price of 96.095. ",
-  "updated_at": " 2026-03-13T06:01:07.228Z"
+  "image_url": " unknown",
+  "summary": "Profit of 1304.58% from entry price 101.028 to close price 103.671. ",
+  "updated_at": " 2026-03-14T06:00:53.319Z"
 }
