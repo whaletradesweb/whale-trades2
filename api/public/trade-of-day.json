@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "302.52",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1482269800045609091/IMG_3011.JPG?ex=69b6ff93&is=69b5ae13&hm=b8266a84c56c4ac7013bbdca2c6851159296f8a12fe48a12ed4e5737743c8709&",
-  "summary": "A profitable trade on XAUUSD, showing a return on investment of +302.52% with an entry price of 5024.60 and a close price of 5055.00. ",
-  "updated_at": " 2026-03-15T06:00:28.216Z"
+  "profit_percentage": "513.85",
+  "symbol": "FETUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "200X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1482743020695715851/IMG_3074.png?ex=69b8b84c&is=69b766cc&hm=3ff1e92c0fc1786d5cf9cab4c46c472be857af1d29f5c4b59b6e2ec31738942b&",
+  "summary": "A screenshot showing a short position on FETUSDT with a profit of 513.85%. ",
+  "updated_at": " 2026-03-16T06:00:38.479Z"
 }
