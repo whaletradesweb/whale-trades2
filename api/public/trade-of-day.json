@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "513.85",
-  "symbol": "FETUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "200X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1482743020695715851/IMG_3074.png?ex=69b8b84c&is=69b766cc&hm=3ff1e92c0fc1786d5cf9cab4c46c472be857af1d29f5c4b59b6e2ec31738942b&",
-  "summary": "A screenshot showing a short position on FETUSDT with a profit of 513.85%. ",
-  "updated_at": " 2026-03-16T06:00:38.479Z"
+  "profit_percentage": "605.73",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1482990413659901952/IMG_3126.jpg?ex=69b99eb3&is=69b84d33&hm=b49bae6375ba5f36e221a9983fc0983a3c67ede5275a33c2fc609b50efc4866e&",
+  "summary": "Unrealized ROI for a long position on XAUUSD with entry price 4969.60 and current price 5029.81. ",
+  "updated_at": " 2026-03-17T06:01:02.824Z"
 }
