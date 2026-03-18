@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "605.73",
-  "symbol": "XAUUSD ",
+  "profit_percentage": "393.23",
+  "symbol": "CL-OIL ",
   "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1482990413659901952/IMG_3126.jpg?ex=69b99eb3&is=69b84d33&hm=b49bae6375ba5f36e221a9983fc0983a3c67ede5275a33c2fc609b50efc4866e&",
-  "summary": "Unrealized ROI for a long position on XAUUSD with entry price 4969.60 and current price 5029.81. ",
-  "updated_at": " 2026-03-17T06:01:02.824Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1483380068620177438/IMG_3145.jpg?ex=69bb0998&is=69b9b818&hm=571d00804597adf19f70474904141eb7754cf9723c3e383dd33c55a912167f7f&",
+  "summary": "A chart showing an unrealized ROI of +393.23% for a long position on CL-OIL. ",
+  "updated_at": " 2026-03-18T06:00:41.434Z"
 }
