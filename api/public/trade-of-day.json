@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "1740.28",
-  "symbol": "CL-OIL ",
+  "author": "matyv",
+  "profit_percentage": "3416.12",
+  "symbol": "SAHARA-PERP ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " unknown",
-  "summary": "Trade on CL-OIL with a profit of +1740.28%, Entry Price: 96.591, Close Price: 99.936. ",
-  "updated_at": " 2026-03-20T06:01:20.748Z"
+  "leverage": "30X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1484621518167343215/image.png?ex=69bee508&is=69bd9388&hm=6d9e97efe3fa7863b73c778fffbb4010a45f1c3032d9d07df3c3b2104ac9c33c&",
+  "summary": "The image displays a highly profitable long trade on SAHARA-PERP, indicating a profit of +3416.12% with an entry price of 0.01377 and a mark price of 0.02945. ",
+  "updated_at": " 2026-03-21T06:00:58.669Z"
 }
