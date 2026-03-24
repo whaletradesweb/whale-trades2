@@ -1,10 +1,10 @@
 {
-  "author": "bullzeye69",
-  "profit_percentage": "2315.13",
-  "symbol": "BTCUSD ",
+  "author": "chris_93606",
+  "profit_percentage": "1735.37",
+  "symbol": "BTCUSDT ",
   "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1485390863013249247/IMG_6346.jpg?ex=69c1b18a&is=69c0600a&hm=0da2ffa98af3574c9f840e807fab98cecf494e76cb1a4d69e4a993580245abc4&",
-  "summary": "A screenshot showcasing an unrealized ROI of 2315.13% on a short BTCUSD position. ",
-  "updated_at": " 2026-03-23T06:00:44.403Z"
+  "leverage": "500X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1485528342345158717/IMG_3413.png?ex=69c2da54&is=69c188d4&hm=3383fe7b8fc733259b40bfba6d2910e34167f37b3cce1fafa7a50e639287a6cc&",
+  "summary": "Closed PNL on a short position for BTCUSDT with a 3-win streak, profit of 1735.37%. ",
+  "updated_at": " 2026-03-24T06:01:00.856Z"
 }
