@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "800.39",
+  "author": "chris_93606",
+  "profit_percentage": "493.16",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": " ",
-  "image_url": " unknown",
-  "summary": "XAUUSD trade with a ROI of +800.39%. ",
-  "updated_at": " 2026-03-26T06:01:32.092Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1486614083573776527/IMG_3579.jpg?ex=69c6cd81&is=69c57c01&hm=af7ef2aa7f4363b001673d92acd75c2340bc01cf3a9e395023f35201956ab000&",
+  "summary": "Profit of 493.16% from a short position with entry price of 4483.15 and close price of 4438.93. ",
+  "updated_at": " 2026-03-27T06:01:24.788Z"
 }
