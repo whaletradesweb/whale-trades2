@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "493.16",
-  "symbol": "XAUUSD ",
+  "author": "theadventuredan",
+  "profit_percentage": "182.35",
+  "symbol": "SIRENUSDT ",
   "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1486614083573776527/IMG_3579.jpg?ex=69c6cd81&is=69c57c01&hm=af7ef2aa7f4363b001673d92acd75c2340bc01cf3a9e395023f35201956ab000&",
-  "summary": "Profit of 493.16% from a short position with entry price of 4483.15 and close price of 4438.93. ",
-  "updated_at": " 2026-03-27T06:01:24.788Z"
+  "leverage": "5X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1487096791987130368/image.png?ex=69c88f10&is=69c73d90&hm=c424c2d05144ea52b43fa7574634d48c8cd7d25e2c9acfdcaac4e2f4fa81c06e&",
+  "summary": "A profit of 182.35% from a short position on SIRENUSDT with 5X leverage. ",
+  "updated_at": " 2026-03-28T06:00:28.612Z"
 }
