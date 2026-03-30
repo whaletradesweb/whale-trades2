@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "827.18",
-  "symbol": "BTCUSDT ",
+  "profit_percentage": "496.16",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "500X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1487451965993783467/IMG_3655.png?ex=69c9d9d8&is=69c88858&hm=7345f75e0ab52e7403f7e9e916d135befa8202a58f37e39677aa12b89a0ee04f&",
-  "summary": "A trading screenshot showing a long position taken on BTCUSDT with a profit percentage of 827.18%. ",
-  "updated_at": " 2026-03-29T06:00:48.075Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1488000513554255872/IMG_3675.jpg?ex=69cb2ff8&is=69c9de78&hm=a28141a2be6b8e9f9a2896684bbc941654d5d09a017cfa238f794fe65b8bd31d&",
+  "summary": "Unrealised ROI for a LONG position on XAUUSD with entry price 4430.83 and current price 4474.79. ",
+  "updated_at": " 2026-03-30T06:00:50.578Z"
 }
