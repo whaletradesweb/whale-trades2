@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "1391.97",
-  "symbol": "XAUUSD ",
+  "author": "emil_1988",
+  "profit_percentage": "1032.33",
+  "symbol": "SP500 ",
   "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1488358107364196482/IMG_3746.jpg?ex=69cc7d01&is=69cb2b81&hm=78d14a4917d4e769ef4c88fb6d458f715f9b6725ab096e45a1e1e75bcecb1fa6&",
-  "summary": "Unrealised ROI of +1391.97% for a long position on XAUUSD, with an entry price of 4487.04 and current price of 4611.90. ",
-  "updated_at": " 2026-03-31T06:01:12.109Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1488540185342906628/1774966018051.jpg?ex=69cdcf53&is=69cc7dd3&hm=fa8f8dfcea039c799e6a0ad72827ac71d339da388ac27e684544815b604db5f2&",
+  "summary": "Unrealised ROI for a long position on SP500 with entry and current prices. ",
+  "updated_at": " 2026-04-01T06:01:02.335Z"
 }
