@@ -1,10 +1,10 @@
 {
-  "author": "snitza",
-  "profit_percentage": "262.17",
-  "symbol": "BTCUSDT ",
-  "position_type": "LONG ",
-  "leverage": "99x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1490569326565261392/1775449782220.png?ex=69d4885c&is=69d336dc&hm=d36e95628c25ee7074730c23f17c3bbde8370058b315442a00f1ee29a20df8f2&",
-  "summary": "A profit screenshot showing a long position on BTCUSDT with a current price of 68,956.1 and an entry price of 67,130. ",
-  "updated_at": " 2026-04-06T06:00:20.826Z"
+  "author": "theadventuredan",
+  "profit_percentage": "197.03",
+  "symbol": "TRUUUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "10x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1490882719184322680/image.png?ex=69d5ac3b&is=69d45abb&hm=72fcf4951dd0a436c4f072ee3d71d95d86fcbb7bee7257035198f316c3f2f189&",
+  "summary": "A short trade on TRUUUSDT with a profit percentage of 197.03% at 10x leverage. ",
+  "updated_at": " 2026-04-07T06:00:26.917Z"
 }
