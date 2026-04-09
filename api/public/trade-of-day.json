@@ -1,10 +1,10 @@
 {
-  "author": "vishnu219",
-  "profit_percentage": "1295.1",
-  "symbol": "USOILUSDT ",
+  "author": "snitza",
+  "profit_percentage": "433.86",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": "50x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1491233194991947867/IMG_1155.jpg?ex=69d6f2a3&is=69d5a123&hm=b785204aae76b8a9254919a0dc59b578494f3600b1bb1edd0101801ba171312c&",
-  "summary": "Screenshot showing a long position on USOILUSDT with a profit of 1295.10% at 50x leverage. ",
-  "updated_at": " 2026-04-08T06:01:19.353Z"
+  "leverage": "99x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1491317625622499358/1775628145393.png?ex=69d7ea05&is=69d69885&hm=165c3547fd3834f5ee9ae473a367b42c1163d2d4a7f8f7bc521117fb71a2afc9&",
+  "summary": "Long position on BTCUSDT with a profit percentage of 433.86%. Entry price: 68,464.6, current price: 71,602.6. ",
+  "updated_at": " 2026-04-09T06:01:09.120Z"
 }
