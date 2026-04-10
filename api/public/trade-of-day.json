@@ -1,10 +1,10 @@
 {
-  "author": "snitza",
-  "profit_percentage": "433.86",
-  "symbol": "BTCUSDT ",
+  "author": "find_my_freedom",
+  "profit_percentage": "443",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "99x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1491317625622499358/1775628145393.png?ex=69d7ea05&is=69d69885&hm=165c3547fd3834f5ee9ae473a367b42c1163d2d4a7f8f7bc521117fb71a2afc9&",
-  "summary": "Long position on BTCUSDT with a profit percentage of 433.86%. Entry price: 68,464.6, current price: 71,602.6. ",
-  "updated_at": " 2026-04-09T06:01:09.120Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1491716960608850082/80CA09AA-2587-466A-8FB9-50DC636AEB9B.jpg?ex=69d95dee&is=69d80c6e&hm=25fd9efde5b8890d27cd557b91f95ddb51332530da01806ba932b8a879b1f402&",
+  "summary": "Trade details showing entry and market prices for XAUUSD. ",
+  "updated_at": " 2026-04-10T06:01:34.523Z"
 }
