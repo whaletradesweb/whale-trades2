@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "377.59",
-  "symbol": "PLTR ",
-  "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1492840172780388452/IMG_4037.jpg?ex=69dd7400&is=69dc2280&hm=6437f2629d18f1d601c6d7c92612d782d932636e0cf642bcf1e0c4b1bf7b9cd7&",
-  "summary": "Unrealised ROI for a short position on PLTR with an entry price of 158.00 and current price of 128.17. ",
-  "updated_at": " 2026-04-13T06:00:29.707Z"
+  "author": "hevoso",
+  "profit_percentage": "2586",
+  "symbol": "RAVEUSDT ",
+  "position_type": "LONG ",
+  "leverage": "6X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1493311004044431510/260413162922.jpg?ex=69de81bf&is=69dd303f&hm=2809a2a7096f5571280445f09ff5993805f7769fe9bac2e8995dff5628df3c69&",
+  "summary": "Long position with a profit of 2586.00%, average price of 1.73223 and last price of 9.19817. ",
+  "updated_at": " 2026-04-14T06:00:34.497Z"
 }
