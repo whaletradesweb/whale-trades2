@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "382.42",
+  "profit_percentage": "228.75",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1494595050884042762/IMG_4156.jpg?ex=69e3d65c&is=69e284dc&hm=84f6655cab2fca36ec8843bfed809f450f3a2dc6cee8383ce21495a28c6b1144&",
-  "summary": "Unrealized ROI of 382.42% from an entry price of 4768.91 to a current price of 4805.38. ",
-  "updated_at": " 2026-04-18T06:00:38.956Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1495636979629691055/IMG_4211.JPG?ex=69e6f7fb&is=69e5a67b&hm=837f9f50acc527830ee5affccb69ea92f51699f27f21ff760ed2080ecd72dc64&",
+  "summary": "A profit percentage of +228.75% from a sell position on XAUUSD, with an entry price of 4,814.05 and a close price of 4,792.02. ",
+  "updated_at": " 2026-04-20T06:01:43.107Z"
 }
