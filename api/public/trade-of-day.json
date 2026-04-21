@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "228.75",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1495636979629691055/IMG_4211.JPG?ex=69e6f7fb&is=69e5a67b&hm=837f9f50acc527830ee5affccb69ea92f51699f27f21ff760ed2080ecd72dc64&",
-  "summary": "A profit percentage of +228.75% from a sell position on XAUUSD, with an entry price of 4,814.05 and a close price of 4,792.02. ",
-  "updated_at": " 2026-04-20T06:01:43.107Z"
+  "author": "snitza",
+  "profit_percentage": "111.75",
+  "symbol": "BTCUSDT ",
+  "position_type": "LONG ",
+  "leverage": "99x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1495685896098549933/share_46.png?ex=69e7ce4a&is=69e67cca&hm=8b487d68f56cc14f4f9e45d759449fd5c51b029f808a32b33b7a93bf81ee7a46&",
+  "summary": "Long position on BTCUSDT with a profit percentage of 111.75%. ",
+  "updated_at": " 2026-04-21T06:01:46.803Z"
 }
