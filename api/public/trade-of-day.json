@@ -1,10 +1,10 @@
 {
-  "author": "snitza",
-  "profit_percentage": "111.75",
-  "symbol": "BTCUSDT ",
+  "author": "osiris101",
+  "profit_percentage": "5102.17",
+  "symbol": "UKOUSD ",
   "position_type": "LONG ",
-  "leverage": "99x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1495685896098549933/share_46.png?ex=69e7ce4a&is=69e67cca&hm=8b487d68f56cc14f4f9e45d759449fd5c51b029f808a32b33b7a93bf81ee7a46&",
-  "summary": "Long position on BTCUSDT with a profit percentage of 111.75%. ",
-  "updated_at": " 2026-04-21T06:01:46.803Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1496240737719947304/image.png?ex=69e92a46&is=69e7d8c6&hm=8af65231dfd20f1cfb4bc492ff4b4f29ddc13286f0a0952d51ce4b1e9fb29fa2&",
+  "summary": "Unrealized return of 5102.17% for UKOUSD with an open price of 91.855. ",
+  "updated_at": " 2026-04-22T06:01:49.564Z"
 }
