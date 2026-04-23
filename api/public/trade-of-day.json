@@ -1,10 +1,10 @@
 {
-  "author": "osiris101",
-  "profit_percentage": "5102.17",
-  "symbol": "UKOUSD ",
+  "author": "bakathcqr",
+  "profit_percentage": "1058.27",
+  "symbol": "BANUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1496240737719947304/image.png?ex=69e92a46&is=69e7d8c6&hm=8af65231dfd20f1cfb4bc492ff4b4f29ddc13286f0a0952d51ce4b1e9fb29fa2&",
-  "summary": "Unrealized return of 5102.17% for UKOUSD with an open price of 91.855. ",
-  "updated_at": " 2026-04-22T06:01:49.564Z"
+  "leverage": "40x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1496541215385059499/post_3.gif?ex=69eaeade&is=69e9995e&hm=3f4573c76920e5f99c350b89347a626be42b8cbf2c3c1ec6bdc5b38391dd8052&",
+  "summary": "A long position on BANUSDT with an average open price of 0.06762 and current price of 0.08551, displaying a profit percent of 1058.27% ",
+  "updated_at": " 2026-04-23T06:01:49.860Z"
 }
