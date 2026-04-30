@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "455.43",
-  "symbol": "XAUUSD ",
+  "author": "osiris101",
+  "profit_percentage": "7299.01",
+  "symbol": "UKOUSD ",
   "position_type": "LONG ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1498671711808393216/IMG_4325.jpg?ex=69f2ab0c&is=69f1598c&hm=5c06dcfe338e7b8153b3a4b57b3a7b5cddb65ce9bd1c5e3af5f4af3f27b36e74&",
-  "summary": "Unrealized profit of 455.43% on a long position in XAUUSD. ",
-  "updated_at": " 2026-04-29T06:01:43.772Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1499073082374230187/image.png?ex=69f420da&is=69f2cf5a&hm=44f5aee22a7f86c76e3bb3bbcb60cc364d3a7f936ac65b02db17a67d3bd580a9&",
+  "summary": "An unrealised profit of 7299.01% on a long position for UKOUSD. Entry price is 101.077, current price is 115.821. ",
+  "updated_at": " 2026-04-30T06:01:59.867Z"
 }
