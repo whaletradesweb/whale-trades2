@@ -1,10 +1,10 @@
 {
-  "author": "osiris101",
-  "profit_percentage": "7299.01",
-  "symbol": "UKOUSD ",
+  "author": "flipsidesteve",
+  "profit_percentage": "17.27",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1499073082374230187/image.png?ex=69f420da&is=69f2cf5a&hm=44f5aee22a7f86c76e3bb3bbcb60cc364d3a7f936ac65b02db17a67d3bd580a9&",
-  "summary": "An unrealised profit of 7299.01% on a long position for UKOUSD. Entry price is 101.077, current price is 115.821. ",
-  "updated_at": " 2026-04-30T06:01:59.867Z"
+  "leverage": "30X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1499648783863255161/blofin_1777240877995.png?ex=69f59044&is=69f43ec4&hm=eebaa105341e9fcdb7122dc6ec62db9108b94840d138a4882380932ad7851eef&",
+  "summary": "Profit of 17.27% from a long position on BTCUSDT Perpetual with an entry price of 77,615.4 and a close price of 78,062.3. ",
+  "updated_at": " 2026-05-01T06:02:02.572Z"
 }
