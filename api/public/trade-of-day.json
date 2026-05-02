@@ -1,10 +1,10 @@
 {
-  "author": "flipsidesteve",
-  "profit_percentage": "17.27",
-  "symbol": "BTCUSDT ",
+  "author": "chris_93606",
+  "profit_percentage": "399.05",
+  "symbol": "CL-OIL ",
   "position_type": "LONG ",
-  "leverage": "30X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1499648783863255161/blofin_1777240877995.png?ex=69f59044&is=69f43ec4&hm=eebaa105341e9fcdb7122dc6ec62db9108b94840d138a4882380932ad7851eef&",
-  "summary": "Profit of 17.27% from a long position on BTCUSDT Perpetual with an entry price of 77,615.4 and a close price of 78,062.3. ",
-  "updated_at": " 2026-05-01T06:02:02.572Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1499662579306463283/IMG_4386.jpg?ex=69f645dd&is=69f4f45d&hm=2b5f16fc50fdd3f9f3c8f4086cd7b810c07463e726b124676de0bec8446b5617&",
+  "summary": "Unrealised ROI for CL-OIL showing a profit percentage of 399.05%. ",
+  "updated_at": " 2026-05-02T06:01:21.739Z"
 }
