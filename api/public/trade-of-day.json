@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "399.05",
-  "symbol": "CL-OIL ",
+  "author": "jyokv",
+  "profit_percentage": "11.59",
+  "symbol": "TAOUSDT ",
   "position_type": "LONG ",
-  "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1499662579306463283/IMG_4386.jpg?ex=69f645dd&is=69f4f45d&hm=2b5f16fc50fdd3f9f3c8f4086cd7b810c07463e726b124676de0bec8446b5617&",
-  "summary": "Unrealised ROI for CL-OIL showing a profit percentage of 399.05%. ",
-  "updated_at": " 2026-05-02T06:01:21.739Z"
+  "leverage": "5X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1500205825661075587/blofin_1777747269867.png?ex=69f7970d&is=69f6458d&hm=39643b0f1290c75e528b31c795b78e1c97eec88e16337feb053e7fcdd8873792&",
+  "summary": "Trade showing a profit of 11.59% with entry price of 275.85 and mark price of 282.25. ",
+  "updated_at": " 2026-05-03T06:01:21.210Z"
 }
