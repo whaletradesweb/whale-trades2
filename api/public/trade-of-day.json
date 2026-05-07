@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "454.53",
-  "symbol": "XAUT/USDT ",
+  "author": "theadventuredan",
+  "profit_percentage": "818.39",
+  "symbol": "LABUSDT ",
   "position_type": "LONG ",
-  "leverage": "300x ",
-  "image_url": " unknown",
-  "summary": "Long position on XAUT/USDT with a profit of 454.53%. Entry price at 4559.2 and mark price at 4629.4. ",
-  "updated_at": " 2026-05-06T06:01:37.395Z"
+  "leverage": "10X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1501756334650036234/1778116809714.jpg?ex=69fd3b13&is=69fbe993&hm=c8f5ccec02375184ae2efd62bd53b851304619f238b186a5fdfd3638e8ccc59f&",
+  "summary": "A significant profit of 818.39% on LABUSDT with 10X leverage. ",
+  "updated_at": " 2026-05-07T06:01:53.431Z"
 }
