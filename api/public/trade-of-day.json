@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "1508.43",
-  "symbol": "SUIUSDT ",
+  "author": "matyv",
+  "profit_percentage": "810.81",
+  "symbol": "SUI-PERP ",
   "position_type": "LONG ",
-  "leverage": "45X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1503117429046509659/260510211629.jpg?ex=6a022eb1&is=6a00dd31&hm=2f3c1b49c8f9aeee93c6b0057d18802d9fbe3f3b754ad1b2bc814eaa3d8c8bba&",
-  "summary": "An exceptionally high profit long position on SUIUSDT. ",
-  "updated_at": " 2026-05-11T06:03:05.110Z"
+  "leverage": "20X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1503457833759543326/image.png?ex=6a036bb8&is=6a021a38&hm=8ad644d48cb30c0f401146df3e9078237e3e2e563e786611aee98c0ff0152cba&",
+  "summary": "Long position on SUI-PERP with a profit of 810.81% and total gain of 881.70. ",
+  "updated_at": " 2026-05-12T06:02:36.641Z"
 }
