@@ -1,10 +1,10 @@
 {
-  "author": "matyv",
-  "profit_percentage": "810.81",
-  "symbol": "SUI-PERP ",
+  "author": "chris_93606",
+  "profit_percentage": "171.67",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "20X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1503457833759543326/image.png?ex=6a036bb8&is=6a021a38&hm=8ad644d48cb30c0f401146df3e9078237e3e2e563e786611aee98c0ff0152cba&",
-  "summary": "Long position on SUI-PERP with a profit of 810.81% and total gain of 881.70. ",
-  "updated_at": " 2026-05-12T06:02:36.641Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1503742033129640027/IMG_4537.jpg?ex=6a051d26&is=6a03cba6&hm=aea039d6b954efde591b3e249dc548304847d31e7d3acba8f6135eccd3bc0b10&",
+  "summary": "Shows an unrealized return on investment of +171.67% for a long position on XAUUSD. Open price is 4694.00 and current price is 4710.12. ",
+  "updated_at": " 2026-05-13T06:01:56.708Z"
 }
