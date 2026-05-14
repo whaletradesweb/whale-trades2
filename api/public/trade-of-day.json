@@ -1,10 +1,10 @@
 {
   "author": "chris_93606",
-  "profit_percentage": "171.67",
+  "profit_percentage": "209.59",
   "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1503742033129640027/IMG_4537.jpg?ex=6a051d26&is=6a03cba6&hm=aea039d6b954efde591b3e249dc548304847d31e7d3acba8f6135eccd3bc0b10&",
-  "summary": "Shows an unrealized return on investment of +171.67% for a long position on XAUUSD. Open price is 4694.00 and current price is 4710.12. ",
-  "updated_at": " 2026-05-13T06:01:56.708Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1504009763137257602/IMG_4545.jpg?ex=6a06167e&is=6a04c4fe&hm=761252bbe2faed92de90bb33c7d815ae146d89956c95dcac26b042e13ad2b86c&",
+  "summary": "Unrealized ROI of 209.59% with open price of 4691.38 and current price of 4711.04. ",
+  "updated_at": " 2026-05-14T06:01:47.559Z"
 }
