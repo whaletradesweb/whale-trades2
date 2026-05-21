@@ -491,15 +491,43 @@ case "long-short": {
     }
 
     const coins = response.data.data;
-    const top10 = coins.filter(c => c.long_short_ratio_24h != null).sort((a, b) => b.market_cap_usd - a.market_cap_usd).slice(0, 10);
+    const top10 = coins
+      .filter(c => Number.isFinite(Number(c.long_short_ratio_24h)) && Number(c.long_short_ratio_24h) > 0)
+      .sort((a, b) => Number(b.market_cap_usd || 0) - Number(a.market_cap_usd || 0))
+      .slice(0, 10);
 
     if (!top10.length) {
       return res.json({ long_pct: "0.00", short_pct: "0.00", differential: "0.00", method: "no-valid-ratios" });
     }
 
-    const avgRatio = top10.reduce((s, c) => s + c.long_short_ratio_24h, 0) / top10.length;
-    const avgLongPct = (avgRatio / (1 + avgRatio)) * 100;
-    const avgShortPct = 100 - avgLongPct;
+    const positionedCoins = top10.map(c => {
+      const ratio = Number(c.long_short_ratio_24h);
+      const weight = Number(c.open_interest_usd || 0);
+      const longNotional = weight * (ratio / (1 + ratio));
+      const shortNotional = weight * (1 / (1 + ratio));
+      return { ...c, ratio, weight, longNotional, shortNotional };
+    });
+
+    const totalWeight = positionedCoins.reduce((s, c) => s + c.weight, 0);
+
+    let avgLongPct;
+    let avgShortPct;
+    let avgRatio;
+
+    if (totalWeight > 0) {
+      const totalLong = positionedCoins.reduce((s, c) => s + c.longNotional, 0);
+      const totalShort = positionedCoins.reduce((s, c) => s + c.shortNotional, 0);
+      const totalPositioned = totalLong + totalShort;
+
+      avgLongPct = totalPositioned > 0 ? (totalLong / totalPositioned) * 100 : 0;
+      avgShortPct = totalPositioned > 0 ? (totalShort / totalPositioned) * 100 : 0;
+      avgRatio = totalShort > 0 ? totalLong / totalShort : 0;
+    } else {
+      avgLongPct = positionedCoins.reduce((s, c) => s + (c.ratio / (1 + c.ratio)) * 100, 0) / positionedCoins.length;
+      avgShortPct = 100 - avgLongPct;
+      avgRatio = avgShortPct > 0 ? avgLongPct / avgShortPct : 0;
+    }
+
     const differential = Math.abs(avgLongPct - avgShortPct);
 
     const payload = {
@@ -507,9 +535,14 @@ case "long-short": {
       short_pct: avgShortPct.toFixed(2),
       differential: differential.toFixed(2),
       average_ratio: avgRatio.toFixed(4),
-      sampled_coins: top10.map(c => ({ symbol: c.symbol, market_cap_usd: c.market_cap_usd, long_short_ratio_24h: c.long_short_ratio_24h })),
+      sampled_coins: positionedCoins.map(c => ({
+        symbol: c.symbol,
+        market_cap_usd: c.market_cap_usd,
+        open_interest_usd: c.open_interest_usd,
+        long_short_ratio_24h: c.long_short_ratio_24h
+      })),
       lastUpdated: new Date().toISOString(),
-      method: "live-fetch"
+      method: totalWeight > 0 ? "live-fetch-oi-weighted" : "live-fetch-equal-weighted-fallback"
     };
 
     await kv.set(cacheKey, payload, { ex: TTL });
