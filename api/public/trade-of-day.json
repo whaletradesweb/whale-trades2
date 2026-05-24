@@ -1,10 +1,10 @@
 {
   "author": "unknown",
-  "profit_percentage": "187.64",
-  "symbol": "XAUUSD ",
+  "profit_percentage": "43.98",
+  "symbol": "ETHUSDT ",
   "position_type": "SHORT ",
-  "leverage": " ",
+  "leverage": "10.0X ",
   "image_url": " unknown",
-  "summary": "Sell trade with a profit of 187.64% ROI. ",
-  "updated_at": " 2026-05-23T06:01:55.606Z"
+  "summary": "ROI of 43.98% from a short position on ETHUSDT, with entry price of 2,135.94 and exit price of 2,042.00. ",
+  "updated_at": " 2026-05-24T06:01:08.480Z"
 }
