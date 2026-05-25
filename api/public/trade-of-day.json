@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "43.98",
-  "symbol": "ETHUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "10.0X ",
-  "image_url": " unknown",
-  "summary": "ROI of 43.98% from a short position on ETHUSDT, with entry price of 2,135.94 and exit price of 2,042.00. ",
-  "updated_at": " 2026-05-24T06:01:08.480Z"
+  "author": "snitza",
+  "profit_percentage": "138.55",
+  "symbol": "BTC-USDT-PERP ",
+  "position_type": "LONG ",
+  "leverage": "50X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1508022684586348738/pnl_3.png?ex=6a14afd1&is=6a135e51&hm=09fa4eeca25318890460e8d02592420cda9557e616c045b541f291e6f2480c26&",
+  "summary": "A trading screenshot indicating a LONG position on BTC-USDT-PERP with a profit percentage of 138.55% using 50x leverage. Entry price is 74,700.0 and mark price is 76,770.0. ",
+  "updated_at": " 2026-05-25T06:01:40.149Z"
 }
