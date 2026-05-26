@@ -1,10 +1,10 @@
 {
-  "author": "snitza",
-  "profit_percentage": "138.55",
-  "symbol": "BTC-USDT-PERP ",
+  "author": "chris_93606",
+  "profit_percentage": "283.42",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "50X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1508022684586348738/pnl_3.png?ex=6a14afd1&is=6a135e51&hm=09fa4eeca25318890460e8d02592420cda9557e616c045b541f291e6f2480c26&",
-  "summary": "A trading screenshot indicating a LONG position on BTC-USDT-PERP with a profit percentage of 138.55% using 50x leverage. Entry price is 74,700.0 and mark price is 76,770.0. ",
-  "updated_at": " 2026-05-25T06:01:40.149Z"
+  "leverage": " ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1508363236637020190/IMG_4742.jpg?ex=6a15ecfb&is=6a149b7b&hm=747aa7e72e14ea32eb678dcbab77774b8fd12106459bd4e71e06b79f3ce63860&",
+  "summary": "An unrealized ROI of 283.42% for an XAUUSD position. ",
+  "updated_at": " 2026-05-26T06:02:26.572Z"
 }
