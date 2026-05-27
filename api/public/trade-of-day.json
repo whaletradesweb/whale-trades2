@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "283.42",
+  "author": "unknown",
+  "profit_percentage": "336.94",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": " ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1508363236637020190/IMG_4742.jpg?ex=6a15ecfb&is=6a149b7b&hm=747aa7e72e14ea32eb678dcbab77774b8fd12106459bd4e71e06b79f3ce63860&",
-  "summary": "An unrealized ROI of 283.42% for an XAUUSD position. ",
-  "updated_at": " 2026-05-26T06:02:26.572Z"
+  "image_url": " unknown",
+  "summary": "Unrealized ROI of 336.94% from a short position on XAUUSD. ",
+  "updated_at": " 2026-05-27T06:02:38.694Z"
 }
