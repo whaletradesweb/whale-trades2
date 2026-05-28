@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "336.94",
-  "symbol": "XAUUSD ",
+  "author": "chris_93606",
+  "profit_percentage": "2897.81",
+  "symbol": "BTCUSDT ",
   "position_type": "SHORT ",
-  "leverage": " ",
-  "image_url": " unknown",
-  "summary": "Unrealized ROI of 336.94% from a short position on XAUUSD. ",
-  "updated_at": " 2026-05-27T06:02:38.694Z"
+  "leverage": "500X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1509413314445180968/IMG_4842.png?ex=6a191631&is=6a17c4b1&hm=e7f29094bc56445534491d8bbe11daba951fe5e581ea4f757c538027fc603263&",
+  "summary": "A screenshot showing a short position on BTCUSDT with an extraordinary profit of 2897.81%. ",
+  "updated_at": " 2026-05-28T06:02:12.102Z"
 }
