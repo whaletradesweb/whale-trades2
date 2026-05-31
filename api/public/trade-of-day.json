@@ -1,10 +1,10 @@
 {
-  "author": "freddape",
-  "profit_percentage": "11534.05",
-  "symbol": "XAUUSD ",
+  "author": "flipsidesteve",
+  "profit_percentage": "45.14",
+  "symbol": "HYPEUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1509934704168534096/share_1780066759663.jpg?ex=6a1ba486&is=6a1a5306&hm=0a286717e3ee2e6637317e6eac250ea723040f63650759afb67e784e704139ee&",
-  "summary": "ROI calculation based on an entry price of 4516.50 USD and a close price of 4570.34 USD. ",
-  "updated_at": " 2026-05-30T06:01:46.772Z"
+  "leverage": "20x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1510185220639428768/MEXC_POSTER_2.png?ex=6a1c8dd6&is=6a1b3c56&hm=0bf950539dff931685d0b889d89632b3f9c2bac98bb867dbd285df2e0ec453d0&",
+  "summary": "Futures grid trade for HYPEUSDT with a profit of 45.14% at a 20x leverage. ",
+  "updated_at": " 2026-05-31T06:01:31.002Z"
 }
