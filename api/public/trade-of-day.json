@@ -1,10 +1,10 @@
 {
-  "author": "gyarados7866",
-  "profit_percentage": "184.38",
-  "symbol": "HYPE-PERP ",
+  "author": "chris_93606",
+  "profit_percentage": "259.52",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "50X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1511078598193188965/image.png?ex=6a1f251c&is=6a1dd39c&hm=8a2534d8208b18520d1a46a2bf99bb642aaf738692de4b22ec37e113f0d0c84e&",
-  "summary": "A screenshot displaying a successful long trade on HYPE-PERP with a profit of 184.38%. The entry price was $70.6648, and the mark price was $73.2707. ",
-  "updated_at": " 2026-06-02T06:01:53.971Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1511609773437489192/IMG_4949.JPG?ex=6a2113ce&is=6a1fc24e&hm=84094adbe3865c608f4616842f0a99585100fc1a5042357976b6b067dda11766&",
+  "summary": "Unrealized ROI of +259.52% with an open price of 4485.26 and a current price of 4461.98. ",
+  "updated_at": " 2026-06-03T06:01:03.200Z"
 }
