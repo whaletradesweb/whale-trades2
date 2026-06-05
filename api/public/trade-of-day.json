@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "591.13",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1511730533036724264/IMG_4975.JPG?ex=6a222d05&is=6a20db85&hm=880b7c4c43d9173e27f202902a203284899a71b9040524156b9e46c695233f6f&",
-  "summary": "A trade showing a profit of +591.13% with a total profit of +530.30 USD, opening at 4485.26 and closing at 4432.23. ",
-  "updated_at": " 2026-06-04T06:01:03.925Z"
+  "author": "unknown",
+  "profit_percentage": "413.57",
+  "symbol": "ZECUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "15x ",
+  "image_url": " unknown",
+  "summary": "Trade showing a profit of 413.57% with an entry price of 520.56 and a current price of 375.98. ",
+  "updated_at": " 2026-06-05T06:01:06.049Z"
 }
