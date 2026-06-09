@@ -1,10 +1,10 @@
 {
-  "author": "mr.white1601",
-  "profit_percentage": "283.92",
-  "symbol": "BTCUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "25X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1513421686945349652/IMG_5389.png?ex=6a27ab48&is=6a2659c8&hm=8812d4f8583a752f1e3153202e87aa231907ee6a8cbe775c3634a3ee6552e5ea&",
-  "summary": "A short position on BTCUSDT showing a profit of 283.92% and a profit of 4,379.0108 USDT with an average entry price of $70,106. ",
-  "updated_at": " 2026-06-08T06:00:52.179Z"
+  "author": "chris_93606",
+  "profit_percentage": "425",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1513427809991790702/IMG_5071.jpg?ex=6a2859bc&is=6a27083c&hm=be4ace49fff1d31fc1ae013f86c71922f6a4388ee926e5e42a64333cc92b9aee&",
+  "summary": "Unrealized ROI of +425.00% with an open price of 4269.39 and a current price of 4305.68. ",
+  "updated_at": " 2026-06-09T06:00:31.085Z"
 }
