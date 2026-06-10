@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "425",
+  "author": "bullzeye69",
+  "profit_percentage": "481.18",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1513427809991790702/IMG_5071.jpg?ex=6a2859bc&is=6a27083c&hm=be4ace49fff1d31fc1ae013f86c71922f6a4388ee926e5e42a64333cc92b9aee&",
-  "summary": "Unrealized ROI of +425.00% with an open price of 4269.39 and a current price of 4305.68. ",
-  "updated_at": " 2026-06-09T06:00:31.085Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1513916977150824678/IMG_7036.jpg?ex=6a2a214e&is=6a28cfce&hm=8b6a46ea087681e314bfb224c46a2f92527b8d572dbc3d20620966ab3b0bc32c&",
+  "summary": "A profit of 481.18% on a short position. ",
+  "updated_at": " 2026-06-10T06:02:05.797Z"
 }
