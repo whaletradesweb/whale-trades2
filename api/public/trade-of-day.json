@@ -1,10 +1,10 @@
 {
-  "author": "longpiconico",
-  "profit_percentage": "516.78",
-  "symbol": "XAUUSD ",
+  "author": "chris_93606",
+  "profit_percentage": "7.5",
+  "symbol": "HYPEUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1514907096754421920/image.png?ex=6a2dbb6d&is=6a2c69ed&hm=723236554461a858f83fa6f04fa2f6a2ccdd96ceec526d8de4fe918aed5520b2&",
-  "summary": "A long trade on XAUUSD showing a profit of +516.78%. ",
-  "updated_at": " 2026-06-13T06:00:49.345Z"
+  "leverage": "5x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1515261844963721326/Hype_WE.png?ex=6a2f05d0&is=6a2db450&hm=7e43b7fe8e3e73373cac93cfeaf2ac73c53c629fc8c58bba9385bc9c973c383d&",
+  "summary": "A trading card showing a long position on HYPEUSDT with a profit of 7.50%. The last price is 58.882, and the average price is 58.005. ",
+  "updated_at": " 2026-06-14T06:00:41.416Z"
 }
