@@ -1,10 +1,10 @@
 {
-  "author": "mr.white1601",
-  "profit_percentage": "236.47",
-  "symbol": "GOLD(XAU)USDT ",
+  "author": "chris_93606",
+  "profit_percentage": "386.46",
+  "symbol": "XAU/USD ",
   "position_type": "LONG ",
-  "leverage": "100X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1515907885568360508/IMG_5664.png?ex=6a30b6bc&is=6a2f653c&hm=4406e54cbd5b61f46318715180489a29053edd2524d3d9e7e22799fc325296ea&",
-  "summary": "A screenshot showing a long position on GOLD (XAU) with a profit of 236.47% at 100X leverage. ",
-  "updated_at": " 2026-06-15T06:01:33.240Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1516004812670505040/IMG_5244.jpg?ex=6a31b9c1&is=6a306841&hm=93dd8deeb343f156ea26ec6e17292e8a785988698a0233fa363147d4f3c2f132&",
+  "summary": "Unrealised ROI of +386.46% on a buy position with an open price of 4306.72 and current price of 4340.01. ",
+  "updated_at": " 2026-06-16T06:01:20.633Z"
 }
