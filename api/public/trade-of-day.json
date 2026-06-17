@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "386.46",
-  "symbol": "XAU/USD ",
-  "position_type": "LONG ",
+  "author": "gregitch1412",
+  "profit_percentage": "9475.31",
+  "symbol": "UNKNOWN ",
+  "position_type": "UNKNOWN ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1516004812670505040/IMG_5244.jpg?ex=6a31b9c1&is=6a306841&hm=93dd8deeb343f156ea26ec6e17292e8a785988698a0233fa363147d4f3c2f132&",
-  "summary": "Unrealised ROI of +386.46% on a buy position with an open price of 4306.72 and current price of 4340.01. ",
-  "updated_at": " 2026-06-16T06:01:20.633Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1516495301664313344/IMG_0800.png?ex=6a33828f&is=6a32310f&hm=42ec7ca125343f2048d2ac8e712434c22663def67215be2bb1e3a03f2c415846&",
+  "summary": "Overall total profit of +9475.31, with gross profit of +11.13k and gross loss of -1.54k. ",
+  "updated_at": " 2026-06-17T06:01:25.200Z"
 }
