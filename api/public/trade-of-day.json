@@ -1,10 +1,10 @@
 {
-  "author": "thorrac",
-  "profit_percentage": "5950.82",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
+  "author": "osiris101",
+  "profit_percentage": "450.68",
+  "symbol": "NAS100ft ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1519324779277062264/1782305602668.jpg?ex=6a3dcdb7&is=6a3c7c37&hm=476a6e811190cb216c189a8f6acf87816ddfecad3436ff98ec5ce9d4a7be3e46&",
-  "summary": "Sell position for XAUUSD with a profit of 5950.82%. ",
-  "updated_at": " 2026-06-25T06:02:42.278Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1520070127997947904/image.png?ex=6a4083e0&is=6a3f3260&hm=3f43cc4ade6ff50166a87d4f7b296a000ff8dbd6b09be025a0253b74fa7421ec&",
+  "summary": "A LONG position on NAS100ft with an Unrealised ROI of +450.68%, open price at 29307.60 and current price at 29571.65. ",
+  "updated_at": " 2026-06-27T06:01:22.750Z"
 }
