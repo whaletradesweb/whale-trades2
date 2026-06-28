@@ -1,10 +1,10 @@
 {
-  "author": "osiris101",
-  "profit_percentage": "450.68",
-  "symbol": "NAS100ft ",
+  "author": "chris_93606",
+  "profit_percentage": "2.35",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1520070127997947904/image.png?ex=6a4083e0&is=6a3f3260&hm=3f43cc4ade6ff50166a87d4f7b296a000ff8dbd6b09be025a0253b74fa7421ec&",
-  "summary": "A LONG position on NAS100ft with an Unrealised ROI of +450.68%, open price at 29307.60 and current price at 29571.65. ",
-  "updated_at": " 2026-06-27T06:01:22.750Z"
+  "leverage": "5x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1520611309086052552/BTC_Sun2.png?ex=6a41d323&is=6a4081a3&hm=285a298c5b7cf399f7d3696ed5a3576aea980b85bfa2fbd604bc31f5d663a31d&",
+  "summary": "A trade on BTCUSDT showing a profit of 2.35% with a last price of 60247.7 and an average price of 59965.4. ",
+  "updated_at": " 2026-06-28T06:00:52.578Z"
 }
