@@ -1,10 +1,10 @@
 {
   "author": "hevoso",
-  "profit_percentage": "924.45",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
+  "profit_percentage": "1111.91",
+  "symbol": "BTCUSD ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1521684894063919234/IMG_8434.JPG?ex=6a45bafe&is=6a44697e&hm=759ef2a4f302a03284fb597c35412e3fd7932a574640d1cd3942e45991ffb1f7&",
-  "summary": "A profitable trade for XAUUSD with a return on investment of +924.45%, entry price was 4057.01 and the closing price is 3982.00. ",
-  "updated_at": " 2026-07-01T06:01:43.842Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1521882611499401287/image.jpg?ex=6a471be1&is=6a45ca61&hm=a6ed664ba8c5dea8a4896d913ff442dcdace5b7dd0eaca15678e26e656b50003&",
+  "summary": "A trade showing an unrealized profit of 1111.91% for BTCUSD, with an entry price of 58614.62 and a current price of 59947.80. ",
+  "updated_at": " 2026-07-02T06:02:24.014Z"
 }
