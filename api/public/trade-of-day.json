@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "1111.91",
-  "symbol": "BTCUSD ",
+  "author": "chris_93606",
+  "profit_percentage": "815.65",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1521882611499401287/image.jpg?ex=6a471be1&is=6a45ca61&hm=a6ed664ba8c5dea8a4896d913ff442dcdace5b7dd0eaca15678e26e656b50003&",
-  "summary": "A trade showing an unrealized profit of 1111.91% for BTCUSD, with an entry price of 58614.62 and a current price of 59947.80. ",
-  "updated_at": " 2026-07-02T06:02:24.014Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1522409279439765514/IMG_5829.JPG?ex=6a485da1&is=6a470c21&hm=c70c6fc6db7ee80c5c2342b2e6da9a775121749e56718789c0a6135914d19dbe&",
+  "summary": "A screenshot showing a buy position on XAUUSD with an unrealised ROI of 815.65%. ",
+  "updated_at": " 2026-07-03T06:01:21.821Z"
 }
