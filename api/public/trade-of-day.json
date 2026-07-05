@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "1106.44",
-  "symbol": "XAUUSD ",
+  "author": "unknown",
+  "profit_percentage": "19.48",
+  "symbol": "BTCUSD ",
   "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1522492584247824475/IMG_5834.JPG?ex=6a4953f6&is=6a480276&hm=c2e5b8acb71d7642ec82f2ac2eef471a1d34f1155449b5ff7c6bc6e5c8e5f937&",
-  "summary": "Unrealized ROI for a LONG position on XAUUSD showing +1106.44% profit. ",
-  "updated_at": " 2026-07-04T06:00:50.639Z"
+  "image_url": " unknown",
+  "summary": "Trade buy for 0.1 BTC at 62429.27, exited at 62624.08 ",
+  "updated_at": " 2026-07-05T06:01:00.247Z"
 }
