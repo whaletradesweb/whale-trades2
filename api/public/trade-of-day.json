@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "619.28",
+  "author": "hevoso",
+  "profit_percentage": "1429.79",
   "symbol": "BTCUSD ",
   "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " unknown",
-  "summary": "A substantial profit from a short sale. ",
-  "updated_at": " 2026-07-06T06:01:21.022Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1523669960138948699/image.jpg?ex=6a4d9c7a&is=6a4c4afa&hm=ce1348ec601ab3eeea28e8204592a81e85d23dd6a56c70b5c597884670333bcf&",
+  "summary": "A screenshot displaying an unrealized ROI of +1429.79% for a short position in BTCUSD. Entry price: 63810.54, Current price: 62036.74. ",
+  "updated_at": " 2026-07-07T06:01:41.977Z"
 }
