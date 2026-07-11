@@ -1,10 +1,10 @@
 {
   "author": "glorious_chipmunk_51415",
-  "profit_percentage": "1226.25",
-  "symbol": "SILVER(XAG) ",
+  "profit_percentage": "306.93",
+  "symbol": "VIRTUALUSDT ",
   "position_type": "LONG ",
-  "leverage": "500x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1524689872106033152/image.png?ex=6a515258&is=6a5000d8&hm=f2487f51fa6ddd24a5bc3f08e91adedae6b2d8c75e74c4a68a9b4606b4c9e3ea&",
-  "summary": "Screenshot of a long position on SILVER(XAG) with an unrealized profit of 1226.25%. ",
-  "updated_at": " 2026-07-10T06:01:32.879Z"
+  "leverage": "100X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1525305117669064736/image.png?ex=6a52e696&is=6a519516&hm=55bbc862a489def05cf02e40044a8a74a1e691190aeaf13df65e1cf3de707a17&",
+  "summary": "Unrealized profit and loss for a long position on VIRTUALUSDT with a ROI of 306.93%. ",
+  "updated_at": " 2026-07-11T06:01:48.153Z"
 }
