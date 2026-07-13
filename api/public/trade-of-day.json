@@ -1,10 +1,10 @@
 {
   "author": "glorious_chipmunk_51415",
-  "profit_percentage": "882.47",
-  "symbol": "Oil WTI ",
-  "position_type": "LONG ",
-  "leverage": "299X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1525628593110122567/image.png?ex=6a5413d9&is=6a52c259&hm=d337ceacf562d954e0fb613e2218c1be67a39922a35afe4dc002d732d3041e3d&",
-  "summary": "Unrealized profit indicating a long position on Oil WTI with an extremely high ROI. ",
-  "updated_at": " 2026-07-12T06:00:56.992Z"
+  "profit_percentage": "219.87",
+  "symbol": "GOLD(XAU) ",
+  "position_type": "SHORT ",
+  "leverage": "500X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1525988876437553152/image.png?ex=6a556363&is=6a5411e3&hm=d6bdbae8fc66c4dc083bf5ee1bc5423c896916f17b3b460246f74e6231ff3646&",
+  "summary": "Realized PnL showing a higher profit percentage on another short trade on GOLD with high leverage. ",
+  "updated_at": " 2026-07-13T06:00:40.727Z"
 }
