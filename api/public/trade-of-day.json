@@ -1,10 +1,10 @@
 {
   "author": "glorious_chipmunk_51415",
-  "profit_percentage": "495.32",
-  "symbol": "ACEUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "20X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1529106775985623110/image.png?ex=6a6163e8&is=6a601268&hm=4c792c8e5753115c70a58007d754462a047dd4ecddf0c01cfcd7aa5de6726913&",
-  "summary": "Short position with a return on investment of 495.32%. ",
-  "updated_at": " 2026-07-22T06:01:24.338Z"
+  "profit_percentage": "820.91",
+  "symbol": "NVDA ",
+  "position_type": "LONG ",
+  "leverage": "200X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1529560158001172703/Screenshot_2026-07-22_112034.png?ex=6a626167&is=6a610fe7&hm=0a3b85d4ec7bf124cd0f376c51c4e41bfa8920929b9542cc9f2770f90217836b&",
+  "summary": "Realized PnL for NVDA with a close price of 213.52 and an entry price of 205.1 ",
+  "updated_at": " 2026-07-23T06:00:36.490Z"
 }
