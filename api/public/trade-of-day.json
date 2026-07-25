@@ -1,10 +1,10 @@
 {
-  "author": "glorious_chipmunk_51415",
-  "profit_percentage": "482.65",
-  "symbol": "SILVER(XAG) ",
+  "author": "tomhardy21",
+  "profit_percentage": "200.08",
+  "symbol": "BTCUSDT ",
   "position_type": "SHORT ",
-  "leverage": "500X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1529772923487912016/image.png?ex=6a63d04e&is=6a627ece&hm=5a5fccb3d7c31df21e2b9aee5cbfc5aa5d8f4b20874efed0ccc0be50f2c9c39c&",
-  "summary": "Realized profit from a short position in SILVER(XAG) with an ROI of 482.65% ",
-  "updated_at": " 2026-07-24T06:01:16.752Z"
+  "leverage": "50X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1530331263859429426/image.png?ex=6a652f8d&is=6a63de0d&hm=3ace7dd0f33ab1cb6bb95283d251a5d435c1ac9bca39d9115f06995e08869ed6&",
+  "summary": "A short position taken on BTCUSDT showing significant leverage with high profit percentage. ",
+  "updated_at": " 2026-07-25T06:01:09.345Z"
 }
