@@ -1,10 +1,10 @@
 {
-  "author": "tomhardy21",
-  "profit_percentage": "200.08",
-  "symbol": "BTCUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "50X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1530331263859429426/image.png?ex=6a652f8d&is=6a63de0d&hm=3ace7dd0f33ab1cb6bb95283d251a5d435c1ac9bca39d9115f06995e08869ed6&",
-  "summary": "A short position taken on BTCUSDT showing significant leverage with high profit percentage. ",
-  "updated_at": " 2026-07-25T06:01:09.345Z"
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "469.21",
+  "symbol": "GOLD(XAU) ",
+  "position_type": "LONG ",
+  "leverage": "500X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1531151776328450068/image.png?ex=6a682bb6&is=6a66da36&hm=77a4ba196732f1bdeb428af7fcee325d563e339882b6cd06d92139dd5084403a&",
+  "summary": "A long position in GOLD (XAU) with a realized profit margin of 469.21%, entry price of 4050.03 and close price of 4088.04. ",
+  "updated_at": " 2026-07-27T06:01:49.610Z"
 }
