@@ -1,10 +1,10 @@
 {
-  "author": "el_gecko99",
-  "profit_percentage": "1781.49",
-  "symbol": "XAUUSD ",
+  "author": "chris_93606",
+  "profit_percentage": "101.03",
+  "symbol": "AMZNUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1532801478081908736/shareout_5.png?ex=6a6ed4de&is=6a6d835e&hm=274fb07d484bf4e607a5c4156e75519961367cededc0a4cf4c84600b2bec2c44&",
-  "summary": "Closed positions showing a profit of 1781.49 USD, net profit calculated at 1700.12 USD. ",
-  "updated_at": " 2026-08-01T06:01:29.869Z"
+  "leverage": "5x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1533346821211164813/AMZN_sun.png?ex=6a702802&is=6a6ed682&hm=e0117cf5a9fad64e71f6fde9f1184e9652add55418ab081adaec19ca57815f5e&",
+  "summary": "A screenshot displaying a profitable long position on AMZNUSDT with a profit percentage of 101.03%, using 5x leverage. ",
+  "updated_at": " 2026-08-02T06:01:18.752Z"
 }
