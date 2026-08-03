@@ -1,10 +1,10 @@
 {
-  "author": "chris_93606",
-  "profit_percentage": "101.03",
-  "symbol": "AMZNUSDT ",
+  "author": "gyarados7866",
+  "profit_percentage": "3422.4",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "5x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1533346821211164813/AMZN_sun.png?ex=6a702802&is=6a6ed682&hm=e0117cf5a9fad64e71f6fde9f1184e9652add55418ab081adaec19ca57815f5e&",
-  "summary": "A screenshot displaying a profitable long position on AMZNUSDT with a profit percentage of 101.03%, using 5x leverage. ",
-  "updated_at": " 2026-08-02T06:01:18.752Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1533604378034835456/image.png?ex=6a7117e0&is=6a6fc660&hm=d942dc41ff9341513fc2d438b5ec2569263b38696610f92c63d1eefcf0a5971a&",
+  "summary": "ROI and profit for a long trade on XAUUSD with specified entry and close prices. ",
+  "updated_at": " 2026-08-03T06:02:38.043Z"
 }
