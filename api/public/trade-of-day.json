@@ -1,10 +1,10 @@
 {
-  "author": "gyarados7866",
-  "profit_percentage": "3422.4",
-  "symbol": "XAUUSD ",
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "536.45",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1533604378034835456/image.png?ex=6a7117e0&is=6a6fc660&hm=d942dc41ff9341513fc2d438b5ec2569263b38696610f92c63d1eefcf0a5971a&",
-  "summary": "ROI and profit for a long trade on XAUUSD with specified entry and close prices. ",
-  "updated_at": " 2026-08-03T06:02:38.043Z"
+  "leverage": "500x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1533893847333994646/image.png?ex=6a72ce37&is=6a717cb7&hm=8322546507c16e0ca09fc39d9c7daea398b198773a09e7b34664de9b6fce868c&",
+  "summary": "Long position realized with a profit of 536.45% from an entry price of 63108.3. ",
+  "updated_at": " 2026-08-04T06:01:52.764Z"
 }
