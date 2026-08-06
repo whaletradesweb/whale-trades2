@@ -1,10 +1,10 @@
 {
-  "author": "gregitch1412",
-  "profit_percentage": "1085.46",
-  "symbol": "Total ",
-  "position_type": "UNKNOWN ",
+  "author": "dsestak1",
+  "profit_percentage": "2369.67",
+  "symbol": "XAUUSD ",
+  "position_type": "SELL ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1534252427258368251/IMG_1022.png?ex=6a741c2b&is=6a72caab&hm=0e5786a39d68d08b65e2cc7e1c5983c2336a62450329f6dfcd544b4a1cb4bea7&",
-  "summary": "Summary showing a total profit of +1085.46 with no gross loss. ",
-  "updated_at": " 2026-08-05T06:02:42.129Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1534594716878897425/share_1785946248117.jpg?ex=6a755af3&is=6a740973&hm=7a7adc910effc61db937be6b124f6acd54fbb6e6fede2499744e730c26ed72e4&",
+  "summary": "Profit of 2369.67% selling XAUUSD with entry price 4234.28 and close price 4228.80. ",
+  "updated_at": " 2026-08-06T06:01:54.643Z"
 }
