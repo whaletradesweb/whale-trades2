@@ -1,10 +1,10 @@
 {
   "author": "dsestak1",
-  "profit_percentage": "2369.67",
+  "profit_percentage": "1706.73",
   "symbol": "XAUUSD ",
-  "position_type": "SELL ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1534594716878897425/share_1785946248117.jpg?ex=6a755af3&is=6a740973&hm=7a7adc910effc61db937be6b124f6acd54fbb6e6fede2499744e730c26ed72e4&",
-  "summary": "Profit of 2369.67% selling XAUUSD with entry price 4234.28 and close price 4228.80. ",
-  "updated_at": " 2026-08-06T06:01:54.643Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1534896260123988071/share_1786018114859.jpg?ex=6a7673c9&is=6a752249&hm=3726a6c2b8f39ec9f6c91d55e2fc22a2db7deb3dc5f82526a655247e32e37291&",
+  "summary": "An ROI of +1706.73% on a buy position in XAUUSD from an entry price of 4266.00. ",
+  "updated_at": " 2026-08-07T06:01:47.708Z"
 }
