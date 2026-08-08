@@ -1,10 +1,10 @@
 {
-  "author": "dsestak1",
-  "profit_percentage": "1706.73",
-  "symbol": "XAUUSD ",
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "2466.62",
+  "symbol": "SILVER(XAG) ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1534896260123988071/share_1786018114859.jpg?ex=6a7673c9&is=6a752249&hm=3726a6c2b8f39ec9f6c91d55e2fc22a2db7deb3dc5f82526a655247e32e37291&",
-  "summary": "An ROI of +1706.73% on a buy position in XAUUSD from an entry price of 4266.00. ",
-  "updated_at": " 2026-08-07T06:01:47.708Z"
+  "leverage": "500X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1535215273785823284/Screenshot_20260807_051610.jpg?ex=6a779ce4&is=6a764b64&hm=82e0d74ba076a3898877ecc088c238ee594494686e8698a1d53bdea60baa5c01&",
+  "summary": "Long position on SILVER with a profit of 2466.62%. ",
+  "updated_at": " 2026-08-08T06:01:50.587Z"
 }
