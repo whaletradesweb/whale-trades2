@@ -1,10 +1,10 @@
 {
   "author": "jyokv",
-  "profit_percentage": "41369.87",
+  "profit_percentage": "45429.13",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1536416791956562050/share_1786380648376.jpg?ex=6a7bfbe4&is=6a7aaa64&hm=c0d751f2a25cd9c7d507abdbc51a994d318e61ed7b1f4722e5053023a994e5cc&",
-  "summary": "A screenshot showing a successful long trade on XAUUSD with a ROI of +41369.87% and a profit of +955.40 USD, with specified entry and close prices. ",
-  "updated_at": " 2026-08-11T06:01:47.095Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1536800578770833499/1786472126794.jpg?ex=6a7cb892&is=6a7b6712&hm=a6ff14613ccea469fe6efca24794813ea66bd7938cbc8ddc704909e10a9e8731&",
+  "summary": "Sell trade on XAUUSD with ROI of +45429.13%. Entry price at 4381.05 and close price at 4367.94. ",
+  "updated_at": " 2026-08-12T06:01:33.566Z"
 }
