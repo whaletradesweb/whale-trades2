@@ -1,10 +1,10 @@
 {
-  "author": "mrwhite_63031",
-  "profit_percentage": "266.33",
-  "symbol": "XAUUSD ",
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "1014.64",
+  "symbol": "MU ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1537077319985008711/image.png?ex=6a7e630e&is=6a7d118e&hm=6744fc4f36270611ddf7c6d88137fa703d2a3a1e62105fed572a4cf557bf6f3e&",
-  "summary": "A trading screenshot showing a successful long position on XAUUSD with a return on investment of +266.33%. ",
-  "updated_at": " 2026-08-13T06:01:51.319Z"
+  "leverage": "200X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1537474972870778950/image.png?ex=6a7fd566&is=6a7e83e6&hm=67713be0dbfd634b5632c93bef28c4697d01a58052b5f33295c014ece3261fcf&",
+  "summary": "The trade is a long position on MU with an entry price of 913.11 and a close price of 959.44, resulting in a profit percentage of +1014.64%. ",
+  "updated_at": " 2026-08-14T06:01:47.155Z"
 }
