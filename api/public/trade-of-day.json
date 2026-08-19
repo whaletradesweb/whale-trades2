@@ -1,10 +1,10 @@
 {
-  "author": "silvi7770",
-  "profit_percentage": "1431.64",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": "0.1 ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1538890523106869349/Screenshot_20260817-144116.png?ex=6a84fbbb&is=6a83aa3b&hm=70fffa348f66cbeb8413d59ec7e0904e4890de552e103d1a26bfd77d77cb500a&",
-  "summary": "Closed positions with profits listed for XAUUSD, showing significant profit. ",
-  "updated_at": " 2026-08-18T06:03:21.962Z"
+  "author": "staralliance74",
+  "profit_percentage": "460.86",
+  "symbol": "UNKNOWN ",
+  "position_type": "UNKNOWN ",
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1539265716312743978/image.png?ex=6a865928&is=6a8507a8&hm=23479bf30a9a740ff604b9e546e8f62ddc453ad3ef7f9054331bf1465632b602&",
+  "summary": "Closed PnL of +460.86 and Net PnL of +443.02. ",
+  "updated_at": " 2026-08-19T06:01:40.213Z"
 }
