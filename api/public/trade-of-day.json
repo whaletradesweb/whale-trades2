@@ -1,10 +1,10 @@
 {
-  "author": "jyokv",
-  "profit_percentage": "114569.37",
-  "symbol": "XAUUSD ",
+  "author": "gains100",
+  "profit_percentage": "250.22",
+  "symbol": "SOLUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1540382147511320586/1787325969838.jpg?ex=6a8a68ea&is=6a89176a&hm=a12bdaadc207561d7ffd2da70399ef3738e421d7e7aacfe96e45b77dac0ef4f2&",
-  "summary": "Very high ROI on a long position with specified entry and close prices. ",
-  "updated_at": " 2026-08-22T06:01:57.162Z"
+  "leverage": "15x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1540652843755769877/Screenshoots2026-08-22_102404.png?ex=6a8b6505&is=6a8a1385&hm=ce3cb0f532a065573f52809b806f1197dc34c38f1c411f87dabc8d643870b2a5&",
+  "summary": "Profit of 250.22% on a long position for SOLUSDT, with an average entry price of 75.73 and an average close price of 88.45, resulting in a profit of 612.6982 USDT. ",
+  "updated_at": " 2026-08-23T06:01:21.682Z"
 }
