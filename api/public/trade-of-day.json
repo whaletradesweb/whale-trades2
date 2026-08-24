@@ -1,10 +1,10 @@
 {
-  "author": "gains100",
-  "profit_percentage": "250.22",
-  "symbol": "SOLUSDT ",
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "3531.9",
+  "symbol": "ENAUSDT ",
   "position_type": "LONG ",
-  "leverage": "15x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1540652843755769877/Screenshoots2026-08-22_102404.png?ex=6a8b6505&is=6a8a1385&hm=ce3cb0f532a065573f52809b806f1197dc34c38f1c411f87dabc8d643870b2a5&",
-  "summary": "Profit of 250.22% on a long position for SOLUSDT, with an average entry price of 75.73 and an average close price of 88.45, resulting in a profit of 612.6982 USDT. ",
-  "updated_at": " 2026-08-23T06:01:21.682Z"
+  "leverage": "200x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1541055303544479784/1787486578731.png?ex=6a8cdbd7&is=6a8b8a57&hm=a19f3f96d5b6c0f48120ab5835450388aeb39f09030e8c50f4781a366390f20f&",
+  "summary": "Unrealized profit in a 200x long position on ENAUSDT, showing a massive profit of 3531.90%. ",
+  "updated_at": " 2026-08-24T06:02:11.034Z"
 }
