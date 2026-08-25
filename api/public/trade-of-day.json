@@ -1,10 +1,10 @@
 {
   "author": "glorious_chipmunk_51415",
-  "profit_percentage": "3531.9",
-  "symbol": "ENAUSDT ",
+  "profit_percentage": "1330.56",
+  "symbol": "GOLD(XAU) ",
   "position_type": "LONG ",
-  "leverage": "200x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1541055303544479784/1787486578731.png?ex=6a8cdbd7&is=6a8b8a57&hm=a19f3f96d5b6c0f48120ab5835450388aeb39f09030e8c50f4781a366390f20f&",
-  "summary": "Unrealized profit in a 200x long position on ENAUSDT, showing a massive profit of 3531.90%. ",
-  "updated_at": " 2026-08-24T06:02:11.034Z"
+  "leverage": "1000X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1541492423429984277/1787590682172.png?ex=6a8e72f1&is=6a8d2171&hm=fcc0f78c5dd407dd44e4af8f54f8800f3a4978e90aa927ad9ca7d35c9a23b693&",
+  "summary": "Closed position for GOLD with a profit of 1330.56% with entry price at 4573.80 and close price at 4634.66. ",
+  "updated_at": " 2026-08-25T06:02:14.121Z"
 }
