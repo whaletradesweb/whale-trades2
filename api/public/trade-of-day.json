@@ -1,10 +1,10 @@
 {
-  "author": "glorious_chipmunk_51415",
-  "profit_percentage": "1330.56",
-  "symbol": "GOLD(XAU) ",
-  "position_type": "LONG ",
-  "leverage": "1000X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1541492423429984277/1787590682172.png?ex=6a8e72f1&is=6a8d2171&hm=fcc0f78c5dd407dd44e4af8f54f8800f3a4978e90aa927ad9ca7d35c9a23b693&",
-  "summary": "Closed position for GOLD with a profit of 1330.56% with entry price at 4573.80 and close price at 4634.66. ",
-  "updated_at": " 2026-08-25T06:02:14.121Z"
+  "author": "bullzeye69",
+  "profit_percentage": "260.02",
+  "symbol": "XAUUSD ",
+  "position_type": "SHORT ",
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1541800373751124008/IMG_7808.jpg?ex=6a8f91be&is=6a8e403e&hm=4b65f361d7c96d15804ffd7957ac580bdfe2fd25d97d8a2e8d76f9cd65d8df8d&",
+  "summary": "Sell trade on XAUUSD showing an unrealized ROI of +260.02%. ",
+  "updated_at": " 2026-08-26T06:02:39.506Z"
 }
