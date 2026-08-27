@@ -1,10 +1,10 @@
 {
-  "author": "bullzeye69",
-  "profit_percentage": "260.02",
+  "author": "hevoso",
+  "profit_percentage": "870.56",
   "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
+  "position_type": "SELL ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1541800373751124008/IMG_7808.jpg?ex=6a8f91be&is=6a8e403e&hm=4b65f361d7c96d15804ffd7957ac580bdfe2fd25d97d8a2e8d76f9cd65d8df8d&",
-  "summary": "Sell trade on XAUUSD showing an unrealized ROI of +260.02%. ",
-  "updated_at": " 2026-08-26T06:02:39.506Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1542190933565640795/IMG_9096.JPG?ex=6a90fd7b&is=6a8fabfb&hm=84350be172845a2b89a6826e0e21098a852d25cb3164e0eb65582998290a35d4&",
+  "summary": "Open position with entry price of 4670.66 and current price of 4589.34. ",
+  "updated_at": " 2026-08-27T06:02:31.915Z"
 }
