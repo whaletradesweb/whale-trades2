@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "870.56",
-  "symbol": "XAUUSD ",
-  "position_type": "SELL ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1542190933565640795/IMG_9096.JPG?ex=6a90fd7b&is=6a8fabfb&hm=84350be172845a2b89a6826e0e21098a852d25cb3164e0eb65582998290a35d4&",
-  "summary": "Open position with entry price of 4670.66 and current price of 4589.34. ",
-  "updated_at": " 2026-08-27T06:02:31.915Z"
+  "author": "jess_dz",
+  "profit_percentage": "2043.21",
+  "symbol": "BTCUSDT ",
+  "position_type": "LONG ",
+  "leverage": "100X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1542424610321211433/IMG_9916.png?ex=6a91d71b&is=6a90859b&hm=1b2e66257e8b650b3ed8162868d0eba78591559b96c52dc0e4ec1a26d92fb53f&",
+  "summary": "A screenshot showing a long position on BTCUSDT with a 100X leverage and a profit of 2043.21%. ",
+  "updated_at": " 2026-08-28T06:02:18.080Z"
 }
