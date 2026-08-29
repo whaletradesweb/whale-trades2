@@ -1,10 +1,10 @@
 {
-  "author": "jess_dz",
-  "profit_percentage": "2043.21",
-  "symbol": "BTCUSDT ",
-  "position_type": "LONG ",
-  "leverage": "100X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1542424610321211433/IMG_9916.png?ex=6a91d71b&is=6a90859b&hm=1b2e66257e8b650b3ed8162868d0eba78591559b96c52dc0e4ec1a26d92fb53f&",
-  "summary": "A screenshot showing a long position on BTCUSDT with a 100X leverage and a profit of 2043.21%. ",
-  "updated_at": " 2026-08-28T06:02:18.080Z"
+  "author": "hevoso",
+  "profit_percentage": "2139.58",
+  "symbol": "XAUUSD ",
+  "position_type": "SHORT ",
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1542939629227868300/IMG_9151.JPG?ex=6a93b6c2&is=6a926542&hm=7ef8d42f00ee19fe8f7bed7cde392111b7033bdd81b549630e9cc160b9256fee&",
+  "summary": "The screenshot shows a profit percentage of +2139.58% for a short position on XAUUSD. The entry price is 4670.66 and the current price is 4470.77. ",
+  "updated_at": " 2026-08-29T06:01:45.421Z"
 }
