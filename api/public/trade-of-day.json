@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "2139.58",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1542939629227868300/IMG_9151.JPG?ex=6a93b6c2&is=6a926542&hm=7ef8d42f00ee19fe8f7bed7cde392111b7033bdd81b549630e9cc160b9256fee&",
-  "summary": "The screenshot shows a profit percentage of +2139.58% for a short position on XAUUSD. The entry price is 4670.66 and the current price is 4470.77. ",
-  "updated_at": " 2026-08-29T06:01:45.421Z"
+  "author": "gains100",
+  "profit_percentage": "10.55",
+  "symbol": "KAS/USDT ",
+  "position_type": "LONG ",
+  "leverage": "15X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1543340973705404566/Screenshoots2026-08-29_202546.png?ex=6a9483ca&is=6a93324a&hm=fcd96925a3b2e760e4d5baf0654adcf3db5bd9d5f3b1f2272376eeb006c549cc&",
+  "summary": "The user closed a long position on KAS/USDT with a profit of 10.55%. Average entry price was $0.02754 and the average close price was $0.02774. ",
+  "updated_at": " 2026-08-30T06:01:16.788Z"
 }
