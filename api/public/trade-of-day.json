@@ -1,10 +1,10 @@
 {
-  "author": "gains100",
-  "profit_percentage": "10.55",
-  "symbol": "KAS/USDT ",
+  "author": "hevoso",
+  "profit_percentage": "937",
+  "symbol": "BTCUSD ",
   "position_type": "LONG ",
-  "leverage": "15X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1543340973705404566/Screenshoots2026-08-29_202546.png?ex=6a9483ca&is=6a93324a&hm=fcd96925a3b2e760e4d5baf0654adcf3db5bd9d5f3b1f2272376eeb006c549cc&",
-  "summary": "The user closed a long position on KAS/USDT with a profit of 10.55%. Average entry price was $0.02754 and the average close price was $0.02774. ",
-  "updated_at": " 2026-08-30T06:01:16.788Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1543669931097460746/IMG_9218.jpg?ex=6a965ee7&is=6a950d67&hm=39132f056305dfa18355a5831ac25ec192e1a08ff748a660aa90bb48f5d0ff8d&",
+  "summary": "Long position in BTCUSD with an unrealized ROI of 937.00%. ",
+  "updated_at": " 2026-08-31T06:02:05.278Z"
 }
