@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "937",
-  "symbol": "BTCUSD ",
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "1198.96",
+  "symbol": "ZKSYNC/USDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1543669931097460746/IMG_9218.jpg?ex=6a965ee7&is=6a950d67&hm=39132f056305dfa18355a5831ac25ec192e1a08ff748a660aa90bb48f5d0ff8d&",
-  "summary": "Long position in BTCUSD with an unrealized ROI of 937.00%. ",
-  "updated_at": " 2026-08-31T06:02:05.278Z"
+  "leverage": "75X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1543865488990277662/image.png?ex=6a971508&is=6a95c388&hm=bad73543a1fb7989a5f2618379ce11f96f01d7cd242c316c6af03a2127c3ea6d&",
+  "summary": "A long position on ZKSYNC/USDT with a profit percentage of 1198.96%. ",
+  "updated_at": " 2026-09-01T06:02:28.181Z"
 }
