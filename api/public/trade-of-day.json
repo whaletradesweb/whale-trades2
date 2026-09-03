@@ -1,10 +1,10 @@
 {
-  "author": "stoyanzhelev_74512",
-  "profit_percentage": "514.91",
+  "author": "hevoso",
+  "profit_percentage": "1139.01",
   "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1544294414778892288/1788250455145.jpg?ex=6a98a480&is=6a975300&hm=4596d5ced1f9287d3039d2eb21663ac5bd7841989f545f2949d681c14273f45b&",
-  "summary": "XAUUSD trade with a profit of 514.91% from an entry price of 4403.65 to a close price of 4394.58. ",
-  "updated_at": " 2026-09-02T06:01:32.990Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1544910908076204052/image.jpg?ex=6a9a39e7&is=6a98e867&hm=2266ca5a7e7d7709b30a30c4eacc1bb13f31fcabc0d49ea53e9d6a959a90b3c7&",
+  "summary": "A screenshot showcasing an unrealized ROI of +1139.01% for a long position in XAUUSD, with entry price 4326.76 and current price 4425.33. ",
+  "updated_at": " 2026-09-03T06:02:20.445Z"
 }
