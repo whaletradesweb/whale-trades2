@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "1907.1",
+  "author": "dsestak1",
+  "profit_percentage": "1996.88",
   "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1545086713234460703/image.jpg?ex=6a9b8662&is=6a9a34e2&hm=4ccb0ec7b0add1145f8a8916ae4a61c6aa4037e716f71e4800f6d49037cc494d&",
-  "summary": "XAUUSD trade with an entry price of 4326.76 and current price of 4491.80. ",
-  "updated_at": " 2026-09-04T06:02:11.280Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1545414673694724228/Screenshot_20260904_144058.jpg?ex=6a9cb7d2&is=6a9b6652&hm=70a65c78d8d4196222ff74edc8a8dd0e14de4ebd11126f5fa033d41c2576d5fe&",
+  "summary": "Trade showing a profit of +1996.88% for a sell position on XAUUSD. ",
+  "updated_at": " 2026-09-05T06:01:53.827Z"
 }
