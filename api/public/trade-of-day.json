@@ -1,10 +1,10 @@
 {
-  "author": "dsestak1",
-  "profit_percentage": "1996.88",
-  "symbol": "XAUUSD ",
+  "author": "eddy_the_engine",
+  "profit_percentage": "724.53",
+  "symbol": "BTCUSD ",
   "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1545414673694724228/Screenshot_20260904_144058.jpg?ex=6a9cb7d2&is=6a9b6652&hm=70a65c78d8d4196222ff74edc8a8dd0e14de4ebd11126f5fa033d41c2576d5fe&",
-  "summary": "Trade showing a profit of +1996.88% for a sell position on XAUUSD. ",
-  "updated_at": " 2026-09-05T06:01:53.827Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1545690677734670377/IMG_6374.jpg?ex=6a9db8df&is=6a9c675f&hm=c751711b2c1b0a220b628a7b54cf6f0262a55f2330279a7a14addb53d5f710dd&",
+  "summary": "Profit of +724.53% from a short position on BTCUSD with entry price at 81031.01 and close price at 79879.45. ",
+  "updated_at": " 2026-09-06T06:00:30.160Z"
 }
