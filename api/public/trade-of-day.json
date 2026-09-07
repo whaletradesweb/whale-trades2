@@ -1,10 +1,10 @@
 {
-  "author": "eddy_the_engine",
-  "profit_percentage": "724.53",
-  "symbol": "BTCUSD ",
+  "author": "bullzeye69",
+  "profit_percentage": "634.08",
+  "symbol": "USELESSUSDT ",
   "position_type": "SHORT ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1545690677734670377/IMG_6374.jpg?ex=6a9db8df&is=6a9c675f&hm=c751711b2c1b0a220b628a7b54cf6f0262a55f2330279a7a14addb53d5f710dd&",
-  "summary": "Profit of +724.53% from a short position on BTCUSD with entry price at 81031.01 and close price at 79879.45. ",
-  "updated_at": " 2026-09-06T06:00:30.160Z"
+  "leverage": "50x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1546094891367407646/IMG_7956.jpg?ex=6a9f3153&is=6a9ddfd3&hm=9e23309c4f050aacbe843db2654cc7bd416542a6b714ea38967495e4c5cb93e8&",
+  "summary": "High profit on a short trade with significant leverage. ",
+  "updated_at": " 2026-09-07T06:00:36.409Z"
 }
