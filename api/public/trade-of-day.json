@@ -1,10 +1,10 @@
 {
-  "author": "bullzeye69",
-  "profit_percentage": "634.08",
-  "symbol": "USELESSUSDT ",
+  "author": "givvit",
+  "profit_percentage": "56.66",
+  "symbol": "XAUUSD ",
   "position_type": "SHORT ",
-  "leverage": "50x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1546094891367407646/IMG_7956.jpg?ex=6a9f3153&is=6a9ddfd3&hm=9e23309c4f050aacbe843db2654cc7bd416542a6b714ea38967495e4c5cb93e8&",
-  "summary": "High profit on a short trade with significant leverage. ",
-  "updated_at": " 2026-09-07T06:00:36.409Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1546583091991027712/image.png?ex=6aa04f3f&is=6a9efdbf&hm=0040bfd0e30a58ef5c5b9c7c78ad2ba3a3ae00c31e44a0cefda6797166b8f6fa&",
+  "summary": "A sell trade on XAUUSD with a ROI of +56.66%. The open price was 4412.45 and the close price was 4407.45. ",
+  "updated_at": " 2026-09-08T06:00:34.936Z"
 }
