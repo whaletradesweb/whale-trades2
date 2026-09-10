@@ -1,10 +1,10 @@
 {
-  "author": "josephe97.",
-  "profit_percentage": "105.57",
-  "symbol": "XAUUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "199X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1546781721972711454/Screenshot_2026-09-08_at_14.16.59.png?ex=6aa1b0fc&is=6aa05f7c&hm=2204c965310c82cc72dd9818b293f7e91d27fbf2b567268d5212bfd77560b4de&",
-  "summary": "Profit of +105.57% from a short position. ",
-  "updated_at": " 2026-09-09T06:00:48.116Z"
+  "author": "unknown",
+  "profit_percentage": "2455.58",
+  "symbol": "BTCUSD ",
+  "position_type": "LONG ",
+  "leverage": "",
+  "image_url": " unknown",
+  "summary": "ROI of +2455.58% on BTCUSD from entry price of 78823.67 to close price of 79599.48. ",
+  "updated_at": " 2026-09-10T06:00:49.708Z"
 }
