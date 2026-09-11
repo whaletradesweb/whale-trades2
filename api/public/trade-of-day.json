@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "2455.58",
-  "symbol": "BTCUSD ",
+  "author": "glorious_chipmunk_51415",
+  "profit_percentage": "2622.74",
+  "symbol": "ETHIUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " unknown",
-  "summary": "ROI of +2455.58% on BTCUSD from entry price of 78823.67 to close price of 79599.48. ",
-  "updated_at": " 2026-09-10T06:00:49.708Z"
+  "leverage": "125x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1547638530732331078/image.png?ex=6aa4cef3&is=6aa37d73&hm=29006b7a972740b96bb632793cb0e005f41004ba091e8a7ec98ce39cbdca71fd&",
+  "summary": "A screenshot showing a long position on ETHIUSDT with a profit of +2622.74%, entry price at 0.5687 and average close price at 0.6881. ",
+  "updated_at": " 2026-09-11T06:00:53.563Z"
 }
