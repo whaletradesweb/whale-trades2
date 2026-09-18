@@ -1,10 +1,10 @@
 {
-  "author": "dsestak1",
-  "profit_percentage": "2750.11",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1549848048828420136/Screenshot_20260916_202039.jpg?ex=6aac2ff9&is=6aaade79&hm=a5cce2ba2c017c76c04af49626db186f2e4409cd17af469410fceec04d951af6&",
-  "summary": "Significant ROI on a short trade with specified entry and close prices. ",
-  "updated_at": " 2026-09-17T06:01:04.203Z"
+  "author": "lilwarriormarc",
+  "profit_percentage": "79.24",
+  "symbol": "HYPEUSDT ",
+  "position_type": "LONG ",
+  "leverage": "6X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1550314718344904825/IMG_1869.png?ex=6aade298&is=6aac9118&hm=e5db8ac6ebd2e1aec37e85d7173b4641717d23a9051a799c9667ec2c28e2902c&",
+  "summary": "Closed long position on HYPEUSDT at 79.24% profit. ",
+  "updated_at": " 2026-09-18T06:01:10.823Z"
 }
