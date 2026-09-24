@@ -1,10 +1,10 @@
 {
-  "author": "glorious_chipmunk_51415",
-  "profit_percentage": "1512.66",
-  "symbol": "XRP/USDT ",
+  "author": "jamie.fanklyn",
+  "profit_percentage": "158.09",
+  "symbol": "BEUSDT ",
   "position_type": "LONG ",
-  "leverage": "100X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552181481307242536/image.png?ex=6ab4ad27&is=6ab35ba7&hm=a54ad8bdb99c63e61a56a89a43c20e47474da9073a2f687df5839d35242ca03b&",
-  "summary": "Profit percentage for a long position in XRP/USDT with a leverage of 100X. ",
-  "updated_at": " 2026-09-23T06:01:27.184Z"
+  "leverage": "5x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552294884814229554/share_pnl.png?ex=6ab5bf84&is=6ab46e04&hm=5aa5d04e4d60a6e3c5066e62dd1b9937a68406a49cc8053890259aff0c2c46a7&",
+  "summary": "Long position on BEUSDT with a profit of 158.09%. ",
+  "updated_at": " 2026-09-24T06:01:18.030Z"
 }
