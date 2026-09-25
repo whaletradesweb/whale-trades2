@@ -1,10 +1,10 @@
 {
-  "author": "jamie.fanklyn",
-  "profit_percentage": "158.09",
-  "symbol": "BEUSDT ",
+  "author": "kaya9210",
+  "profit_percentage": "360.75",
+  "symbol": "SUIUSDT ",
   "position_type": "LONG ",
-  "leverage": "5x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552294884814229554/share_pnl.png?ex=6ab5bf84&is=6ab46e04&hm=5aa5d04e4d60a6e3c5066e62dd1b9937a68406a49cc8053890259aff0c2c46a7&",
-  "summary": "Long position on BEUSDT with a profit of 158.09%. ",
-  "updated_at": " 2026-09-24T06:01:18.030Z"
+  "leverage": "10x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552607929537142784/IMG_1919.jpg?ex=6ab6e310&is=6ab59190&hm=393a91f262cafb196214b7c339ebca68f36e30c7c3e679e08b72f2cb5b010e25&",
+  "summary": "User's trade on SUIUSDT showing significant profit. ",
+  "updated_at": " 2026-09-25T06:01:24.730Z"
 }
