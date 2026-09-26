@@ -1,10 +1,10 @@
 {
-  "author": "kaya9210",
-  "profit_percentage": "360.75",
-  "symbol": "SUIUSDT ",
+  "author": "kieranmacca",
+  "profit_percentage": "902.5",
+  "symbol": "ONDOUSDT ",
   "position_type": "LONG ",
-  "leverage": "10x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552607929537142784/IMG_1919.jpg?ex=6ab6e310&is=6ab59190&hm=393a91f262cafb196214b7c339ebca68f36e30c7c3e679e08b72f2cb5b010e25&",
-  "summary": "User's trade on SUIUSDT showing significant profit. ",
-  "updated_at": " 2026-09-25T06:01:24.730Z"
+  "leverage": "20x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552963259949125653/Share_18.png?ex=6ab82dfd&is=6ab6dc7d&hm=4eb0bed9660a4f99064ed758fece7e27581c7cf753b845e50c1995f267315a87&",
+  "summary": "A screenshot showing a long trade on ONDOUSDT with a ROI of +902.50%. ",
+  "updated_at": " 2026-09-26T06:01:30.328Z"
 }
