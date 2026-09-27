@@ -1,10 +1,10 @@
 {
-  "author": "kieranmacca",
-  "profit_percentage": "902.5",
-  "symbol": "ONDOUSDT ",
+  "author": "jamie.fanklyn",
+  "profit_percentage": "165.14",
+  "symbol": "MARSCoinUSDT ",
   "position_type": "LONG ",
-  "leverage": "20x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1552963259949125653/Share_18.png?ex=6ab82dfd&is=6ab6dc7d&hm=4eb0bed9660a4f99064ed758fece7e27581c7cf753b845e50c1995f267315a87&",
-  "summary": "A screenshot showing a long trade on ONDOUSDT with a ROI of +902.50%. ",
-  "updated_at": " 2026-09-26T06:01:30.328Z"
+  "leverage": "9X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1553438327330447452/share_pnl.png?ex=6ab9e86e&is=6ab896ee&hm=906a69eea8b6f307fef3d9cafb323726750624222fb28b9dd05f715005d6f1ce&",
+  "summary": "A profitable long position in MARSCoinUSDT with a profit of 165.14% using 9X leverage. ",
+  "updated_at": " 2026-09-27T06:01:10.149Z"
 }
