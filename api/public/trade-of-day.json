@@ -1,10 +1,10 @@
 {
-  "author": "jamie.fanklyn",
-  "profit_percentage": "165.14",
-  "symbol": "MARSCoinUSDT ",
+  "author": "gareth5382",
+  "profit_percentage": "1330.28",
+  "symbol": "JTOUSDT ",
   "position_type": "LONG ",
-  "leverage": "9X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1553438327330447452/share_pnl.png?ex=6ab9e86e&is=6ab896ee&hm=906a69eea8b6f307fef3d9cafb323726750624222fb28b9dd05f715005d6f1ce&",
-  "summary": "A profitable long position in MARSCoinUSDT with a profit of 165.14% using 9X leverage. ",
-  "updated_at": " 2026-09-27T06:01:10.149Z"
+  "leverage": "40x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1553789314976972971/Screenshot_2026-09-27_at_10.42.39.png?ex=6abb2f50&is=6ab9ddd0&hm=41e23680cf44fef3f08b0d98f4e05f68e3e1fb13fc657ff7eb3da2358322aff1&",
+  "summary": "Trade on YUBIT with a massive profit of 1330.28% on a long position for JTOUSDT, with an entry price of 0.4793 and a last price of 0.6385. ",
+  "updated_at": " 2026-09-28T06:01:18.190Z"
 }
