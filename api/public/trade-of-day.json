@@ -1,10 +1,10 @@
 {
-  "author": "007dave",
-  "profit_percentage": "2616.2",
-  "symbol": "All symbols ",
-  "position_type": "UNKNOWN ",
+  "author": ".bjoernw",
+  "profit_percentage": "404.49",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1555563500967821392/Screenshot_20261002_144753_MetaTrader_5.jpg?backend=b2&ex=6ac1a3a7&is=6ac05227&hm=f4883c79e37f47ede25bcfd2b3942e226a99c2aa4ddc89a3620847803b39fb85&",
-  "summary": "The image shows a total profit of 2,616.20 without mentioning the specific trade details. ",
-  "updated_at": " 2026-10-03T06:02:15.866Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1555842649477484645/IMG_4296.jpg?backend=b2&ex=6ac2a7a1&is=6ac15621&hm=4616f985267240269c547151708ee8830e5b18ba355dce8e690fea863216ac1a&",
+  "summary": "Long trade with a profit of +404.49% from an entry price of 4188.12 to a close price of 4222.00. ",
+  "updated_at": " 2026-10-04T06:01:35.757Z"
 }
