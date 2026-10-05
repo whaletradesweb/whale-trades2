@@ -1,10 +1,10 @@
 {
-  "author": ".bjoernw",
-  "profit_percentage": "404.49",
-  "symbol": "XAUUSD ",
+  "author": "crypto_rex7",
+  "profit_percentage": "518.79",
+  "symbol": "PUMPUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1555842649477484645/IMG_4296.jpg?backend=b2&ex=6ac2a7a1&is=6ac15621&hm=4616f985267240269c547151708ee8830e5b18ba355dce8e690fea863216ac1a&",
-  "summary": "Long trade with a profit of +404.49% from an entry price of 4188.12 to a close price of 4222.00. ",
-  "updated_at": " 2026-10-04T06:01:35.757Z"
+  "leverage": "25x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1556202735601188955/Screenshot_20261004_131154_Bitget.jpg?backend=b2&ex=6ac3f6fd&is=6ac2a57d&hm=4858ab98af4666727ad06151d691ab4098f5c99fd99f506d8a97942d2697165d&",
+  "summary": "Profit of 518.79% on a long position in PUMPUSDT with an entry price of 0.005100 and a current price of 0.006436. ",
+  "updated_at": " 2026-10-05T06:02:37.798Z"
 }
