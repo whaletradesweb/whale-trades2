@@ -1,10 +1,10 @@
 {
-  "author": "crypto_rex7",
-  "profit_percentage": "518.79",
-  "symbol": "PUMPUSDT ",
+  "author": "zahir_mahomed",
+  "profit_percentage": "836",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "25x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1556202735601188955/Screenshot_20261004_131154_Bitget.jpg?backend=b2&ex=6ac3f6fd&is=6ac2a57d&hm=4858ab98af4666727ad06151d691ab4098f5c99fd99f506d8a97942d2697165d&",
-  "summary": "Profit of 518.79% on a long position in PUMPUSDT with an entry price of 0.005100 and a current price of 0.006436. ",
-  "updated_at": " 2026-10-05T06:02:37.798Z"
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1556647001653776504/35E60987-2C43-4F07-A27F-6016E7438B47_1_201_a.jpeg?backend=b2&ex=6ac594be&is=6ac4433e&hm=c99588a88203047ec8ac5c07f035e8a2d7f8a06da49bb6e873302247f16b63da&",
+  "summary": "Multiple trades with overall profit of $836 and a loss of $314 in the XAUUSD trades. ",
+  "updated_at": " 2026-10-06T06:02:01.327Z"
 }
