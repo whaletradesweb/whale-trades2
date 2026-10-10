@@ -1,10 +1,10 @@
 {
-  "author": "007dave",
-  "profit_percentage": "607.23",
+  "author": "unknown",
+  "profit_percentage": "693.05",
   "symbol": "UNKNOWN ",
   "position_type": "UNKNOWN ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1557762678389481563/image0.jpg?ex=6ac9a3cc&is=6ac8524c&hm=336e869b4d118a1c0c412ce3dfc4ee9a1a3336bdd9139ce802d8dddd452209e9&",
-  "summary": "A snapshot showing a total profit of 607.23. ",
-  "updated_at": " 2026-10-09T06:01:46.595Z"
+  "image_url": " unknown",
+  "summary": "Overall profit from trades, showing balance information. ",
+  "updated_at": " 2026-10-10T06:01:55.736Z"
 }
