@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "693.05",
-  "symbol": "UNKNOWN ",
-  "position_type": "UNKNOWN ",
-  "leverage": "",
-  "image_url": " unknown",
-  "summary": "Overall profit from trades, showing balance information. ",
-  "updated_at": " 2026-10-10T06:01:55.736Z"
+  "author": "emil_1988",
+  "profit_percentage": "53.05",
+  "symbol": "SUI-USDT-PERP ",
+  "position_type": "LONG ",
+  "leverage": "5X ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1558399382670544917/pnl_3.png?ex=6acbf4c6&is=6acaa346&hm=2e694a766b8617d47ce1e8e9194a42963688115e95f216d9048b6326ca0fae3d&",
+  "summary": "A screenshot showing a long position on SUI-USDT-PERP with a profit percentage of +53.05%. ",
+  "updated_at": " 2026-10-11T06:01:31.800Z"
 }
