@@ -1,10 +1,10 @@
 {
-  "author": "trade100000",
-  "profit_percentage": "59465.09",
-  "symbol": "ETHUSD ",
-  "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1558884899455373312/1791737277909.jpg?ex=6acdb8f2&is=6acc6772&hm=c84fc16c0683a0103691d2a5b3ce261624e1b61ab449714bcdb0b3ec5f81a2d2&",
-  "summary": "A profit of 59465.09% for a long position on ETHUSD with entry price 2510.37 and close price 2525.53. ",
-  "updated_at": " 2026-10-12T06:02:14.472Z"
+  "author": "cobynrg",
+  "profit_percentage": "83.52",
+  "symbol": "TAOUSDT ",
+  "position_type": "SHORT ",
+  "leverage": "10x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1559361147420024873/image.png?ex=6acecbbd&is=6acd7a3d&hm=5d425621b866ddf8b998bc3777a4a37b7937dfff41775ed65d05fe6ecd8d6831&",
+  "summary": "Trade showing a profit of 83.52% for TAOUSDT using 10x leverage. ",
+  "updated_at": " 2026-10-13T06:02:13.870Z"
 }
