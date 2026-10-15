@@ -1,10 +1,10 @@
 {
-  "author": "",
-  "profit_percentage": "",
-  "symbol": "",
-  "position_type": "",
+  "author": "newworldmoney",
+  "profit_percentage": "3192.25",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " ",
-  "summary": "",
-  "updated_at": " 2026-10-14T06:01:48.397Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1559909837117071400/Screenshot_20261014_094224_MetaTrader_5.jpg?ex=6ad1737e&is=6ad021fe&hm=98adbfed0f3508269a0dc10f853acc05ae77c00683c694dc7fad88cb4416913f&",
+  "summary": "A total profit of 3192.25 from multiple trades on XAUUSD. ",
+  "updated_at": " 2026-10-15T06:02:14.396Z"
 }
