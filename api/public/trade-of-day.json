@@ -1,10 +1,10 @@
 {
-  "author": "zahir_mahomed",
-  "profit_percentage": "5521.01",
-  "symbol": "XAUUSD-ECN ",
+  "author": "a34134223533",
+  "profit_percentage": "1172.49",
+  "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1560384634116898936/Screenshot_2026-10-15_at_22.08.40.png?ex=6ad284ef&is=6ad1336f&hm=0a5b725cce6a734a32a12aebeb8456750bf9a9e58a0727384cbb23bd53b48896&",
-  "summary": "Multiple trades of XAUUSD-ECN with a total profit of 5521.01. ",
-  "updated_at": " 2026-10-16T06:02:31.840Z"
+  "leverage": "2000x ",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1560649836309643355/IMG_6524.jpg?ex=6ad424ac&is=6ad2d32c&hm=be110d892c1c310afc27836c485daeae894e12c9abe515eb268ae63b70af4b20&",
+  "summary": "Another trade on XAUUSD with a profit percent of 1172.49%. Entry price was 4155.25 with the latest price at 4179.61. ",
+  "updated_at": " 2026-10-17T06:02:04.404Z"
 }
