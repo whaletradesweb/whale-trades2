@@ -1,10 +1,10 @@
 {
-  "author": "a34134223533",
-  "profit_percentage": "1172.49",
-  "symbol": "XAUUSD ",
+  "author": "unknown",
+  "profit_percentage": "14.16",
+  "symbol": "XAUUSD-STD ",
   "position_type": "LONG ",
-  "leverage": "2000x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1560649836309643355/IMG_6524.jpg?ex=6ad424ac&is=6ad2d32c&hm=be110d892c1c310afc27836c485daeae894e12c9abe515eb268ae63b70af4b20&",
-  "summary": "Another trade on XAUUSD with a profit percent of 1172.49%. Entry price was 4155.25 with the latest price at 4179.61. ",
-  "updated_at": " 2026-10-17T06:02:04.404Z"
+  "leverage": "",
+  "image_url": " unknown",
+  "summary": "A trade was made with a 0.2 volume buy position at 4143.92, resulting in a profit of 58.49 after closing. ",
+  "updated_at": " 2026-10-20T06:01:51.270Z"
 }
