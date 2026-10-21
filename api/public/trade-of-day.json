@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "14.16",
-  "symbol": "XAUUSD-STD ",
-  "position_type": "LONG ",
+  "author": "staralliance74",
+  "profit_percentage": "1295.34",
+  "symbol": "UNKNOWN ",
+  "position_type": "UNKNOWN ",
   "leverage": "",
-  "image_url": " unknown",
-  "summary": "A trade was made with a 0.2 volume buy position at 4143.92, resulting in a profit of 58.49 after closing. ",
-  "updated_at": " 2026-10-20T06:01:51.270Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1562116370487971951/image.png?ex=6ad97a7d&is=6ad828fd&hm=8c077defd7836c7dbed03d2f27a802f85976dc212df5ea59686422cb53a59877&",
+  "summary": "Display of closed and net profit and loss over time. ",
+  "updated_at": " 2026-10-21T06:02:32.097Z"
 }
