@@ -26,7 +26,9 @@ has completed and been verified.
   The log contains the actual Node version, patch comparison and deployment SHA;
   it contains no credentials.
 - Fail the deployment build on versions below 22.23.4, 24.22.1, or 26.12.1, or
-  unsupported major versions. Keep the project's Node 22 major unchanged.
+  unsupported major versions. Target Node 24 in this security branch because
+  three Node 22 previews built on 22.23.4 but actually ran 22.23.2. Node 24 must
+  report at least 24.22.1 in actual runtime logs before any production rollout.
 - Run the regression checks during Vercel builds.
 
 ## Required coordinated sequence
