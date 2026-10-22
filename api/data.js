@@ -2,6 +2,7 @@ const axios = require("axios");
 const { kv } = require("@vercel/kv");
 const COINGLASS_API_KEY = process.env.COINGLASS_API_KEY;
 const { cacheGetSet, allow, axiosWithBackoff } = require("./lib/cacheAndLimit");
+require('../lib/runtime-security.cjs').reportRuntime();
 
 module.exports = async (req, res) => {
   // --- CORS (open to all origins) ---
@@ -30,6 +31,12 @@ module.exports = async (req, res) => {
 
   const { type, symbol = "BTC", exchange = "Binance", action, interval = "1h", limit = "100" } = req.query;
 
+  // Production diagnostics must not disclose credentials or upstream responses.
+  if (type === 'debug-env' || type === 'api-usage-debug') {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(404).json({ error: 'Not found' });
+  }
+
   try {
     console.log(`DEBUG: Processing request for type: ${type}`);
     
@@ -47,14 +54,6 @@ module.exports = async (req, res) => {
     };
 
     switch (type) {
-      case "debug-env": {
-        return res.json({
-          exists: !!COINGLASS_API_KEY,
-          length: COINGLASS_API_KEY?.length || 0,
-          masked: COINGLASS_API_KEY?.slice(0, 4) + "****" || null,
-          environment: process.env.VERCEL_ENV || "unknown"
-        });
-      }
 
 
  case "altcoin-season": {
@@ -1645,40 +1644,6 @@ case "bull-market-peak-indicators": {
   }
 }
         
-
-
-case "api-usage-debug": {
-  // Make a simple test call to see if you're rate limited
-  try {
-    const testResponse = await axios.get(
-      "https://open-api-v4.coinglass.com/api/futures/supported-coins",
-      { 
-        headers,
-        timeout: 5000,
-        validateStatus: () => true // Don't throw on any status
-      }
-    );
-    
-    return res.json({
-      status: testResponse.status,
-      message: testResponse.status === 429 ? "Rate Limited" : 
-               testResponse.status === 200 ? "API Working" : 
-               `HTTP ${testResponse.status}`,
-      headers: {
-        remaining: testResponse.headers['x-ratelimit-remaining'],
-        limit: testResponse.headers['x-ratelimit-limit'],
-        reset: testResponse.headers['x-ratelimit-reset']
-      },
-      response_body: testResponse.data
-    });
-  } catch (err) {
-    return res.json({
-      error: err.message,
-      api_status: "Connection Failed"
-    });
-  }
-}
-
 
 
 case "market-sentiment-flow": {

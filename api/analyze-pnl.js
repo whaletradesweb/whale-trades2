@@ -1,5 +1,8 @@
 // Robust analyze-pnl.js with better error handling
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const { authorized, normalizeImages, validateImages, reserveBudget } = require('../lib/analysis-security.cjs');
+const { kv } = require('@vercel/kv');
+require('../lib/runtime-security.cjs').reportRuntime();
 
 const PROMPT = `You are a trading analyst. Analyze each image and extract ANY trading information you can find.
 
@@ -20,7 +23,8 @@ export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'no-store');
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -42,6 +46,30 @@ export default async function handler(req, res) {
     });
   }
 
+  if (!authorized(req, process.env.ANALYZE_PNL_SECRET)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A JSON request body is required' });
+  }
+
+  const normalizedImages = normalizeImages(req.body.images);
+  const validationError = validateImages(normalizedImages);
+  if (validationError) {
+    return res.status(normalizedImages.length > 100 ? 413 : 400).json({ error: validationError });
+  }
+
+  try {
+    if (!(await reserveBudget(kv, normalizedImages.length))) {
+      res.setHeader('Retry-After', String(3600 - Math.floor(Date.now() / 1000) % 3600));
+      return res.status(429).json({ error: 'Analysis image limit reached. Try again later.' });
+    }
+  } catch (_) {
+    console.error('Analysis rate limiter unavailable');
+    return res.status(503).json({ error: 'Analysis temporarily unavailable' });
+  }
+
   try {
     if (!OPENAI_API_KEY) {
       return res.status(500).json({ 
@@ -51,58 +79,21 @@ export default async function handler(req, res) {
     }
 
     // Get and validate images array and authors
-    let { images, authors } = req.body;
-    
-    console.log('DEBUG: Raw req.body:', JSON.stringify(req.body, null, 2));
-    console.log('DEBUG: Images received:', JSON.stringify(images, null, 2));
-    console.log('DEBUG: Authors received:', JSON.stringify(authors, null, 2));
-    console.log('DEBUG: Images type:', typeof images);
-    console.log('DEBUG: Authors type:', typeof authors);
-    console.log('DEBUG: Images is array:', Array.isArray(images));
-    
-    // Handle different input formats for images
-    if (!images) {
-      return res.status(400).json({ error: "No images field in request body" });
-    }
-    
-    // Handle double-encoded JSON from Zapier for images
-    if (typeof images === 'string') {
-      try {
-        const parsed = JSON.parse(images);
-        if (parsed.images && Array.isArray(parsed.images)) {
-          images = parsed.images;
-          console.log('DEBUG: Parsed double-encoded JSON for images, found', images.length, 'images');
-        } else {
-          // Check if it's a comma-separated string from Zapier
-          if (images.includes(',')) {
-            images = images.split(',').map(url => url.trim());
-            console.log('DEBUG: Split comma-separated images string, found', images.length, 'images');
-          } else {
-            images = [images];
-          }
-        }
-      } catch (parseError) {
-        if (images.includes(',')) {
-          images = images.split(',').map(url => url.trim());
-          console.log('DEBUG: Split comma-separated images string, found', images.length, 'images');
-        } else {
-          images = [images];
-        }
-      }
-    }
-    
-    // Handle authors field - should be comma-separated string matching images
+    const images = normalizedImages;
+    const { authors } = req.body;
+
+// Handle authors field - should be comma-separated string matching images
     let authorsArray = [];
     if (authors) {
       if (typeof authors === 'string') {
         if (authors.includes(',')) {
           authorsArray = authors.split(',').map(author => author.trim());
-          console.log('DEBUG: Split comma-separated authors string, found', authorsArray.length, 'authors');
+
         } else {
           authorsArray = [authors.trim()];
         }
       } else if (Array.isArray(authors)) {
-        authorsArray = authors;
+        authorsArray = authors.map(author => typeof author === 'string' ? author : 'unknown');
       }
     }
     
@@ -110,42 +101,22 @@ export default async function handler(req, res) {
     while (authorsArray.length < images.length) {
       authorsArray.push('unknown');
     }
-    
-    console.log('DEBUG: Final images array length:', images.length);
-    console.log('DEBUG: Final authors array length:', authorsArray.length);
-    console.log('DEBUG: Authors mapping:', authorsArray);
-    
-    // Convert to array if it's not already
-    if (!Array.isArray(images)) {
-      images = [images];
-    }
-    
-    if (images.length === 0) {
-      return res.status(400).json({ error: "Images array is empty" });
-    }
-
-    console.log(`DEBUG: Processing ${images.length} images`);
 
     // Dynamic import for OpenAI (required for Vercel serverless)
     const { OpenAI } = await import('openai');
-    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY, timeout: 30000, maxRetries: 1 });
 
     // Process in smaller batches to avoid errors
     const batchSize = 5; // Reduced from 10
     const results = [];
-    let imageIndex = 0; // Track overall image index for author mapping
     
     for (let i = 0; i < images.length; i += batchSize) {
       const batch = images.slice(i, i + batchSize);
       const batchAuthors = authorsArray.slice(i, i + batchSize); // Get corresponding authors
-      
-      console.log(`DEBUG: Processing batch ${Math.floor(i/batchSize) + 1}, ${batch.length} images`);
-      console.log(`DEBUG: Batch content:`, JSON.stringify(batch, null, 2));
-      console.log(`DEBUG: Batch authors:`, JSON.stringify(batchAuthors, null, 2));
-      
+
       // Ensure batch is an array and has valid items
       if (!Array.isArray(batch)) {
-        console.error('ERROR: Batch is not an array:', batch);
+        console.error('Invalid analysis batch');
         continue;
       }
       
@@ -162,7 +133,7 @@ export default async function handler(req, res) {
           } else if (img && typeof img === 'object') {
             imageUrl = img.url || img.imageUrl || img.href || String(img);
           } else {
-            console.warn('Skipping invalid image:', img);
+            console.warn('Skipping invalid image');
             continue;
           }
           
@@ -173,9 +144,7 @@ export default async function handler(req, res) {
             });
           }
         }
-        
-        console.log(`DEBUG: Sending ${content.length - 1} images to OpenAI`);
-        
+
         const response = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [{
@@ -186,8 +155,7 @@ export default async function handler(req, res) {
         });
 
         const responseContent = response.choices[0].message.content;
-        console.log(`DEBUG: GPT response:`, responseContent);
-        
+
         let parsed = [];
         try { 
           // Remove markdown code blocks if present
@@ -199,10 +167,9 @@ export default async function handler(req, res) {
           }
           
           parsed = JSON.parse(cleanContent); 
-          console.log(`DEBUG: Successfully parsed GPT response, found ${parsed.length} items`);
+
         } catch (parseError) {
-          console.log("DEBUG: Failed to parse GPT response as JSON:", parseError);
-          console.log("DEBUG: Raw response:", responseContent);
+
           continue;
         }
         
@@ -217,9 +184,7 @@ export default async function handler(req, res) {
             
             // Get the correct author for this image using batch index
             const authorName = batchAuthors[batchIndex] || "unknown";
-            
-            console.log(`DEBUG: Mapping image ${batchIndex} to author: ${authorName}`);
-            
+
             results.push({
               profit_percent: trade.profit_percent || 0,
               symbol: trade.symbol || "UNKNOWN",
@@ -234,7 +199,7 @@ export default async function handler(req, res) {
         });
         
       } catch (batchError) {
-        console.error("DEBUG: GPT batch failed:", batchError);
+        console.error('Analysis batch failed');
       }
     }
 
@@ -245,17 +210,12 @@ const profitableTrades = results.filter(t => {
   const hasValidProfit = t.profit_percent > 0;
   const isNotBanned = !bannedUsers.includes(t.author?.toLowerCase());
   
-  if (!isNotBanned) {
-    console.log(`DEBUG: Excluding trade from banned user: ${t.author}`);
-  }
   
   return hasValidProfit && isNotBanned;
 });
     const best = profitableTrades.length > 0
       ? profitableTrades.reduce((a, b) => a.profit_percent > b.profit_percent ? a : b)
       : null;
-
-    console.log(`DEBUG: Analysis complete. Found ${results.length} total results, ${profitableTrades.length} profitable`);
 
     // Calculate statistics
     const imageTypes = results.reduce((acc, t) => {
@@ -274,11 +234,9 @@ const profitableTrades = results.filter(t => {
     });
 
   } catch (error) {
-    console.error("Analysis failed:", error);
+    console.error('Analysis failed');
     res.status(500).json({ 
-      error: "Analysis failed", 
-      message: error.message,
-      stack: error.stack
+      error: "Analysis failed"
     });
   }
 }
