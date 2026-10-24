@@ -1,10 +1,10 @@
 {
-  "author": "stoyanzhelev_74512",
-  "profit_percentage": "1298.69",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "author": "zahir_mahomed",
+  "profit_percentage": "2.54",
+  "symbol": "XAUUSD-ECN ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1562711593786019861/1792649697947.jpg?ex=6adba4d5&is=6ada5355&hm=f68473a2f048f77153b7c8dde35dab793bc0fcdc6fb45aa28b41877f6f991372&",
-  "summary": "A long position on XAUUSD with a return on investment (ROI) of +1298.69%. Entry price was 4071.78 and close price was 4092.93. ",
-  "updated_at": " 2026-10-23T06:01:56.496Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1563268164027027456/IMG_5026.png?ex=6add026e&is=6adbb0ee&hm=c65361c9262aba8563e741ed72edc254471b7604b5619537acbfd543addeca18&",
+  "summary": "Several trades on XAUUSD-ECN with multiple buy and sell orders, showcasing profits and losses for individual trades. ",
+  "updated_at": " 2026-10-24T06:01:33.583Z"
 }
