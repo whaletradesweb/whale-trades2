@@ -1,10 +1,10 @@
 {
-  "author": "jelter4969",
-  "profit_percentage": "60.36",
-  "symbol": "BNBUSDT ",
-  "position_type": "SHORT ",
-  "leverage": "24X ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1563557845801238700/image.png?ex=6adeb8f7&is=6add6777&hm=c5227a95c6a62ad80f669c56dd411d361127dc8984aed147d80c543c406078b4&",
-  "summary": "Profit percentage of 60.36% on a short position for BNBUSDT with an entry price of 746.05 and a mark price of 727.28. ",
-  "updated_at": " 2026-10-25T06:01:21.889Z"
+  "author": ".knauf1de",
+  "profit_percentage": "1245.59",
+  "symbol": "XAUUSD ",
+  "position_type": "LONG ",
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1564289003061117048/IMG_1382.png?ex=6ae161e9&is=6ae01069&hm=7bf9e915b39c8fa22e429bbed6e4cd0d9cecf66de847d6234bef8c1375250275&",
+  "summary": "Total closed profit of +1245.59 from trades between 25/10/2026 and 26/10/2026. ",
+  "updated_at": " 2026-10-27T06:02:08.980Z"
 }
