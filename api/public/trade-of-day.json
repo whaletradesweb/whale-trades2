@@ -1,10 +1,10 @@
 {
-  "author": "cryptocat0968",
-  "profit_percentage": "308.26",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "author": "zahir_mahomed",
+  "profit_percentage": "2905.28",
+  "symbol": "XAUUSD-ECN ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1565093583436910633/IMG_5295.jpg?ex=6ae3a67c&is=6ae254fc&hm=014d3c19f15047e2990527804b4a66855afe62e2c26e0b5fe54b6c488318469e&",
-  "summary": "A profit screenshot showing an ROI of +308.26% from an open price of 4055.00 to a close price of 4080.00. ",
-  "updated_at": " 2026-10-29T06:02:00.168Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1565567501578797086/IMG_5100.png?ex=6ae55fdb&is=6ae40e5b&hm=f4eed3dffa1366f52eeeb961bd4b7aae025d09ab808003d7cc54150ae800dc00&",
+  "summary": "Three sell trades from XAUUSD-ECN resulting in a total profit of 2905.28 with various entry and exit prices. ",
+  "updated_at": " 2026-10-30T06:01:54.188Z"
 }
