@@ -1,10 +1,10 @@
 {
-  "author": "zahir_mahomed",
-  "profit_percentage": "2905.28",
-  "symbol": "XAUUSD-ECN ",
+  "author": "cryptomarc",
+  "profit_percentage": "263.3",
+  "symbol": "XAUUSD ",
   "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1565567501578797086/IMG_5100.png?ex=6ae55fdb&is=6ae40e5b&hm=f4eed3dffa1366f52eeeb961bd4b7aae025d09ab808003d7cc54150ae800dc00&",
-  "summary": "Three sell trades from XAUUSD-ECN resulting in a total profit of 2905.28 with various entry and exit prices. ",
-  "updated_at": " 2026-10-30T06:01:54.188Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1565625645302816768/IMG_7639.png?ex=6ae63ec1&is=6ae4ed41&hm=e7b0d6f7701b5c2fc260117725a4f33da3afe00384fd9712109d0b75cedbb201&",
+  "summary": "Trade showing sell direction on XAUUSD with a 263.30% return. Open price was 4029.41 and close price was 3994.03. ",
+  "updated_at": " 2026-10-31T06:01:30.542Z"
 }
