@@ -1,10 +1,10 @@
 {
-  "author": "newworldmoney",
-  "profit_percentage": "8",
-  "symbol": "XAUUSD ",
+  "author": "unknown",
+  "profit_percentage": "13.1",
+  "symbol": "BTCUSDT ",
   "position_type": "LONG ",
-  "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1566093199552946196/Screenshot_20261031_111049_MetaTrader_5.jpg?ex=6ae7f233&is=6ae6a0b3&hm=b8075d385a563f96a3fa9d07883800d2049c8d254f0fb6162b0bfcfac3e54050&",
-  "summary": "XAUUSD position opened at 4184.40 and closed at 4218.70 for a profit of 343.00. ",
-  "updated_at": " 2026-11-01T06:01:28.336Z"
+  "leverage": "5X-Isolated ",
+  "image_url": " unknown",
+  "summary": "Long position in BTCUSDT with 1 BTC open and unrealized profit of +2008.98 USDT. ",
+  "updated_at": " 2026-11-02T06:01:35.800Z"
 }
