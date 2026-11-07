@@ -1,10 +1,10 @@
 {
-  "author": "a34134223533",
-  "profit_percentage": "1801.3",
+  "author": "unknown",
+  "profit_percentage": "1.01",
   "symbol": "XAUUSD ",
   "position_type": "LONG ",
-  "leverage": "2000x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1567914348427477132/IMG_7579.jpg?ex=6aee9247&is=6aed40c7&hm=50ab23ecb834a5c91278841cfa9ad0ba9d838ef0009559b1fcde73d39321f261&",
-  "summary": "A trade on XAUUSD showing a profit percentage of 1801.30% with a leverage of 2000x, open price of 4131.45. ",
-  "updated_at": " 2026-11-06T06:02:12.095Z"
+  "leverage": "",
+  "image_url": " unknown",
+  "summary": "Buy trade from 4052.18 to 4077.87 with a profit of 68.98 ",
+  "updated_at": " 2026-11-07T06:01:20.141Z"
 }
