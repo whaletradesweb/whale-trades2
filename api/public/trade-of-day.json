@@ -1,10 +1,10 @@
 {
-  "author": "unknown",
-  "profit_percentage": "2293",
+  "author": "2k850",
+  "profit_percentage": "1336.75",
   "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " unknown",
-  "summary": "A profitable trade with a profit of 2293.00 on a short position for XAUUSD. ",
-  "updated_at": " 2026-11-11T06:00:45.875Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1570151516646547537/image.png?ex=6af60d0d&is=6af4bb8d&hm=d68b5d43f86ab3fd706dbbf4a9d1fcec659dd54f405904a2d03ed41c4ed7ac2a&",
+  "summary": "XAUUSD trade with an average open price of 4045.46 and a closing price of 3991.99, yielding a profit of 1336.75%. ",
+  "updated_at": " 2026-11-12T06:01:06.204Z"
 }
