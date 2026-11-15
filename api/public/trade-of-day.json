@@ -1,10 +1,10 @@
 {
-  "author": "zahir_mahomed",
-  "profit_percentage": "3377",
-  "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
+  "author": "2k850",
+  "profit_percentage": "100",
+  "symbol": "XAU ",
+  "position_type": "LONG ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1570829836568764516/IMG_5288.png?ex=6af92d89&is=6af7dc09&hm=f84a7c71c4feef61a6fb1e6e3aa5b9465fc4a261192f751f7ea5ef4d87c5ee9b&",
-  "summary": "Profit report showing several sell orders on XAUUSD with a total profit of 3377.00. ",
-  "updated_at": " 2026-11-14T06:01:25.131Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1571058382960336946/image.png?ex=6afa0263&is=6af8b0e3&hm=e00e6b519d4022dd980dd86cd14ca8719a5d81fe694f54890125a76566ed9ebe&",
+  "summary": "The image shows a profit of +1,655.2 USD from a long position in XAU with a quantity of 0.4 lots. ",
+  "updated_at": " 2026-11-15T06:00:35.614Z"
 }
