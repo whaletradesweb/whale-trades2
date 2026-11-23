@@ -1,10 +1,10 @@
 {
-  "author": "moefati",
-  "profit_percentage": "1073.27",
+  "author": "hevoso",
+  "profit_percentage": "418.78",
   "symbol": "BTCUSD ",
-  "position_type": "LONG ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1573696554156556399/IMG_2125.jpg?ex=6b039b60&is=6b0249e0&hm=2eee11fd7e86521f6ee31fd0630fa87943d7a07bf57aca845ad8914c437f77b0&",
-  "summary": "An image showing an unrealized return on investment (ROI) for a long position in Bitcoin, significant profit indicated. ",
-  "updated_at": " 2026-11-22T06:00:56.073Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1574126397910163687/IMG_9875.JPG?ex=6b0482f3&is=6b033173&hm=a0044675725f41ec01680e8590091adb975437b95e0efe360d61537a971ec413&",
+  "summary": "Unrealized ROI for a short position on BTCUSD with entry price 61204.79 and current price 60696.50. ",
+  "updated_at": " 2026-11-23T06:01:07.234Z"
 }
