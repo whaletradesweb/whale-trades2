@@ -1,10 +1,10 @@
 {
-  "author": "hevoso",
-  "profit_percentage": "519.32",
-  "symbol": "XAUUSD ",
-  "position_type": "LONG ",
+  "author": "zahir_mahomed",
+  "profit_percentage": "4783.9",
+  "symbol": "XAUUSD-ECN ",
+  "position_type": "SHORT ",
   "leverage": "",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1574590162724192266/IMG_9886.JPG?ex=6b0632dd&is=6b04e15d&hm=2ff35e33b6838f75f7ef884104d51af730ee77caa102911333b8c24a6cfdb4f1&",
-  "summary": "A non-realized ROI of +519.32% from a buy position on XAUUSD, with an entry price of 3629.75 and a current price of 3667.45. ",
-  "updated_at": " 2026-11-24T06:01:11.944Z"
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1574808152975745175/IMG_5777.png?ex=6b07a6a2&is=6b065522&hm=a98a319bd84a307c446bfbff00005ab37190a3865970bacbc72dd1b3e7eabfe5&",
+  "summary": "History showing total profit of 4783.90 from various short trades on XAUUSD-ECN. ",
+  "updated_at": " 2026-11-25T06:02:20.458Z"
 }
