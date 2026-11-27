@@ -1,10 +1,10 @@
 {
-  "author": "a34134223533",
-  "profit_percentage": "2306.19",
+  "author": "d7d949",
+  "profit_percentage": "15.04",
   "symbol": "XAUUSD ",
-  "position_type": "SHORT ",
-  "leverage": "2000x ",
-  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1575210445814632458/IMG_8547.jpg?ex=6b08748c&is=6b07230c&hm=35f341ba0688945777a78b1f0688cce8b80571869c8db9bf3db49ec8b6815784&",
-  "summary": "Selling XAUUSD with a profit of 2306.19% at 2000x leverage. ",
-  "updated_at": " 2026-11-26T06:02:22.915Z"
+  "position_type": "LONG ",
+  "leverage": "",
+  "image_url": " https://cdn.discordapp.com/attachments/1164102219998695445/1575746781226991699/B89D4C59-78D8-411E-8105-296E0D507D5A.jpg?ex=6b0a680c&is=6b09168c&hm=9bb419ecbbbd8e1840fbe556690abcafa0e616f68f35768e6686db0e6a952ccc&",
+  "summary": "Trade shows +15.04% ROI with a profit of +5389.92 USD. Open price at 3639.07 and close price at 3666.43. ",
+  "updated_at": " 2026-11-27T06:00:44.599Z"
 }
